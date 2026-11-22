@@ -1,4 +1,4 @@
-name: Deploy Candlelight
+name: Deploy PluTrade
 on:
   push:
     branches: [main]
@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: candlelight-verified-pages-v2
+  group: plutrade-verified-pages-v2
   cancel-in-progress: true
 jobs:
   build:
@@ -60,9 +60,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Build isolated Node worker image
-        run: docker build -f services/ingest-worker/Dockerfile -t candlelight-ingest-worker:ci .
+        run: docker build -f services/ingest-worker/Dockerfile -t plutrade-ingest-worker:ci .
       - name: Test worker inside its release image
-        run: docker run --rm candlelight-ingest-worker:ci node --test protocol.test.mjs store.test.mjs order-intent.test.mjs
+        run: docker run --rm plutrade-ingest-worker:ci node --test protocol.test.mjs store.test.mjs order-intent.test.mjs
   deploy:
     needs: [build, worker]
     runs-on: ubuntu-latest
