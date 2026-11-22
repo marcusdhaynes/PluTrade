@@ -71,7 +71,7 @@ export const ReplayBacktestPanel:React.FC<Props>=({asset,timeframe})=>{
        setConfig(prev=>({...prev,[key]:value}));}}
       className="block w-full bg-[#121925] border border-[#374251] rounded px-2 py-1 text-white"/>
  </label>;
- return <div id="candlelight-historical-lab" className="space-y-3 p-3 text-[11px] text-[#d3dbea]">
+ return <div id="plutrade-historical-lab" className="space-y-3 p-3 text-[11px] text-[#d3dbea]">
    <div className="flex gap-2 items-center flex-wrap">
      <strong className="text-sm">Historical Replay & Backtest · {asset.symbol} ({asset.source||asset.exchange})</strong>
      <span>{timeframe}</span>

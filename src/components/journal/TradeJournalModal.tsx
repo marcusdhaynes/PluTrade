@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { JournalTrade, JournalTab } from '../../types';
-import {JOURNAL_KEY,JOURNAL_BACKUP_KEY,isJournalRecoveryBlocked,loadJournalTrades,
+import {JOURNAL_KEY,isJournalRecoveryBlocked,loadJournalTrades,readJournalBackupRaw,
  persistJournalTrades} from '../../services/journalStorage';
 import {
   calculateJournalStats,
@@ -62,14 +62,14 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
   // Manual journal entries are independent of the currently selected paper account.
   const [journalOpeningBalance,setJournalOpeningBalance]=useState<number>(()=>{
     try{
-      const value=Number(localStorage.getItem('candlelight_journal_opening_balance_v1'));
+      const value=Number(localStorage.getItem('plutrade_journal_opening_balance_v1'));
       return Number.isFinite(value)&&value>=0?value:0;
     }catch{return 0;}
   });
   const changeJournalOpeningBalance=(value:number)=>{
     if(!Number.isFinite(value)||value<0)return;
     setJournalOpeningBalance(value);
-    try{localStorage.setItem('candlelight_journal_opening_balance_v1',String(value));}
+    try{localStorage.setItem('plutrade_journal_opening_balance_v1',String(value));}
     catch(e){console.warn('Journal opening balance could not be saved',e);}
   };
   const [trades,setTrades]=useState<JournalTrade[]>(loadJournalTrades);
@@ -86,11 +86,11 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
   };
   const exportJournalBackup=()=>{
     try{
-      const backup=localStorage.getItem(JOURNAL_BACKUP_KEY);
+      const backup=readJournalBackupRaw();
       if(!backup)throw Error('No recovery backup is available');
       const url=URL.createObjectURL(new Blob([backup],{type:'application/json'}));
       const link=document.createElement('a');
-      link.href=url;link.download='candlelight-journal-recovery.json';link.click();
+      link.href=url;link.download='plutrade-journal-recovery.json';link.click();
       URL.revokeObjectURL(url);
     }catch(error){setJournalStorageError(error instanceof Error?error.message:'Journal export failed');}
   };
@@ -98,7 +98,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
     if(!journalRecoveryBlocked)return;
     try{
       const raw=localStorage.getItem(JOURNAL_KEY);
-      if(raw&&localStorage.getItem(JOURNAL_BACKUP_KEY)!==raw)throw Error('Backup does not match the damaged journal. Original is protected.');
+      if(raw&&readJournalBackupRaw()!==raw)throw Error('Backup does not match the damaged journal. Original is protected.');
       if(!window.confirm('The original journal is backed up. Starting fresh replaces its active data; export the backup first. Continue?'))return;
       localStorage.removeItem(JOURNAL_KEY);
       setTrades([]);setJournalRecoveryBlocked(false);setJournalStorageError('');

@@ -7,7 +7,7 @@ import {TIMEFRAME_SECONDS} from './dataFeed';
 // secret/service_role credentials in this application.
 export const CLOUD_PROJECT_URL='https://tbrqqjrzknhdnwcpkqro.supabase.co';
 export const CLOUD_PUBLISHABLE_KEY="sb_publishable_BlALANbrrBPf_0IHiuL7HQ_55P6XiTS";
-export const CLOUD_ENDPOINT=CLOUD_PROJECT_URL+'/functions/v1/candlelight-sync';
+export const CLOUD_ENDPOINT=CLOUD_PROJECT_URL+'/functions/v1/plutrade-sync';
 export type CloudKey='layouts'|'watchlists'|'journal';
 export const CLOUD_DOCUMENTS:readonly CloudKey[]=['layouts','watchlists','journal'];
 export type CloudPayload={version:1;data:unknown[];exportedAt:string};
@@ -49,13 +49,13 @@ export function readLocalCloudDocument(key:CloudKey):CloudPayload{
 }
 export function restoreCloudDocument(key:CloudKey,payload:CloudPayload):string{
  if(!payload||payload.version!==1||!validCloudRows(key,payload.data))
-   throw Error('Remote '+key+' does not match a valid Candlelight record.');
+   throw Error('Remote '+key+' does not match a valid PluTrade record.');
  // Back up the exact original local bytes before any replacement.
  const original=key==='watchlists'?{
   current:localStorage.getItem(WATCHLIST_KEY),
   legacy:localStorage.getItem(WATCHLIST_LEGACY_KEY)
  }:{current:localStorage.getItem(localKeys[key])};
- const backup='candlelight_cloud_pre_restore_'+key+'_'+Date.now();
+ const backup='plutrade_cloud_pre_restore_'+key+'_'+Date.now();
  const backupData=JSON.stringify({key,savedAt:new Date().toISOString(),original});
  localStorage.setItem(backup,backupData);
  if(localStorage.getItem(backup)!==backupData)throw Error('Local backup was not written; cloud restore refused.');

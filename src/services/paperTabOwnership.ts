@@ -1,6 +1,6 @@
 /** Web Locks are origin-wide and mutual-exclusive across tabs and workers.
  * No localStorage pseudo-lock is used: it cannot prevent two tabs racing. */
-export const PAPER_WRITER_LOCK='candlelight-paper-ledger-writer-v1';
+export const PAPER_WRITER_LOCK='plutrade-paper-ledger-writer-v1';
 export type WriterLocks=Pick<LockManager,'request'>;
 export function createPaperWriterLease(
   manager:WriterLocks|undefined,acquired:()=>void,onLost:()=>void=()=>{}

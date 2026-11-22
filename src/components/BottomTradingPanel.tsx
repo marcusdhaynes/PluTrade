@@ -115,19 +115,19 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
       [new Date(f.timestamp).toISOString(),f.symbol,f.exchange,f.note,String(f.quantity),String(f.price),String(f.fee),String(f.realizedPnL)])];
     const csv=rows.map(row=>row.map(v=>'"'+v.replace(/"/g,'""')+'"').join(',')).join('\n');
     const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-    const a=document.createElement('a');a.href=url;a.download='candlelight-paper-fills.csv';a.click();
+    const a=document.createElement('a');a.href=url;a.download='plutrade-paper-fills.csv';a.click();
     window.setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
   if(!isOpen)return <button type="button" onClick={()=>setIsOpen(true)}
     className="h-6 bg-[#1e222d] border-t border-[#2a2e39] px-3 flex items-center gap-3 text-[11px] text-[#d1d4dc]">
     <strong>Paper Trading</strong><span>Equity {cash(account.equity)} {paperSettings.currency}</span><span>Open {positions.length}</span>
   </button>;
-  const corruptBackup=(()=>{try{return localStorage.getItem('candlelight_paper_accounts_corrupt_backup_v1');}catch{return null;}})();
+  const corruptBackup=(()=>{try{return localStorage.getItem('plutrade_paper_accounts_corrupt_backup_v1');}catch{return null;}})();
   const exportRecoveredLedger=()=>{
     if(!corruptBackup)return;
     const blob=new Blob([corruptBackup],{type:'application/json'});
     const url=URL.createObjectURL(blob);
-    const anchor=document.createElement('a');anchor.href=url;anchor.download='candlelight-paper-ledger-recovery.json';
+    const anchor=document.createElement('a');anchor.href=url;anchor.download='plutrade-paper-ledger-recovery.json';
     anchor.click();URL.revokeObjectURL(url);
   };
   return <section className={`border-t border-[#2a2e39] bg-[#131722] flex flex-col text-[#d1d4dc] z-20 ${isExpanded?'h-[450px]':'h-[295px]'}`}>

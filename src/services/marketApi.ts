@@ -2,13 +2,13 @@
 // No API keys, third-party CORS proxies, or synthetic responses belong here.
 export async function marketFetch(input: string, init?: RequestInit): Promise<Response> {
   if (!input.startsWith('/api/')) return globalThis.fetch(input, init);
-  const url = new URL(input, 'https://candlelight.invalid');
+  const url = new URL(input, 'https://plutrade.invalid');
   let upstream: string;
   let parse: (data: any) => any[];
   if (url.pathname === '/api/kraken/futures-chart') {
     const symbol = url.searchParams.get('symbol') || '';
     const resolution = url.searchParams.get('resolution') || '1h';
-    upstream = `https://candlelight-market-api.vercel.app/api/history?symbol=${encodeURIComponent(symbol)}&resolution=${encodeURIComponent(resolution)}`;
+    upstream = `https://plutrade-market-api.vercel.app/api/history?symbol=${encodeURIComponent(symbol)}&resolution=${encodeURIComponent(resolution)}`;
     parse = data => (data.candles || []).map((c: any) => ({
       time: Math.floor(Number(c.time) / 1000), open: Number(c.open), high: Number(c.high),
       low: Number(c.low), close: Number(c.close), volume: Number(c.volume) || 0,

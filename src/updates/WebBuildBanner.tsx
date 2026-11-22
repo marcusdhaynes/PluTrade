@@ -33,7 +33,7 @@ export default function WebBuildBanner(){
     window.location.assign(target.toString());
   };
   return <div role="status" className="fixed top-2 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-2 rounded-full border border-[#566079] bg-[#242b3b] px-3 py-1.5 text-xs text-white shadow-xl">
-    <span>Verified Candlelight update available</span>
+    <span>Verified PluTrade update available</span>
     <button type="button" onClick={reload} className="underline font-semibold">Reload</button>
     <button type="button" onClick={()=>setDismissed(ready)} aria-label="Dismiss update notice" className="px-1">×</button>
   </div>;

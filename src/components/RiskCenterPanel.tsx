@@ -13,7 +13,7 @@ export const RiskCenterPanel:React.FC<Props>=({portfolio,asset,policy,onChange})
    const n=Number(value);
    if(Number.isFinite(n)&&n>0&&n<=1000)onChange({...policy,[key]:n});
  };
- return <div id="candlelight-risk-center" className="p-4 space-y-3 text-[11px] text-[#d5dbe7]">
+ return <div id="plutrade-risk-center" className="p-4 space-y-3 text-[11px] text-[#d5dbe7]">
    <div className="flex justify-between items-center gap-4 flex-wrap">
      <strong className="text-sm">Paper Risk Management Center</strong>
      <label className="flex items-center gap-2"><input type="checkbox" checked={policy.killSwitch}

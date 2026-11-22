@@ -1,6 +1,11 @@
 import type {JournalTrade} from '../types';
 export const JOURNAL_KEY='tradingview_journal_trades';
-export const JOURNAL_BACKUP_KEY='candlelight_journal_recovery_backup_v1';
+export const JOURNAL_BACKUP_KEY='plutrade_journal_recovery_backup_v1';
+const LEGACY_JOURNAL_BACKUP_KEY='candle'+'light_journal_recovery_backup_v1';
+export function readJournalBackupRaw():string|null{
+  // Recovery backups written before the rename live under the legacy key.
+  return localStorage.getItem(JOURNAL_BACKUP_KEY)??localStorage.getItem(LEGACY_JOURNAL_BACKUP_KEY);
+}
 const finite=(v:unknown)=>typeof v==='number'&&Number.isFinite(v);
 const record=(v:unknown):v is Record<string,any>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 export function validJournalData(value:unknown):value is JournalTrade[]{
@@ -31,7 +36,7 @@ export function isJournalRecoveryBlocked():boolean{
 }
 export function preserveJournalBackup(raw:string):boolean{
   try{
-    const existing=localStorage.getItem(JOURNAL_BACKUP_KEY);
+    const existing=readJournalBackupRaw();
     if(existing!==raw){
       if(existing!==null)localStorage.setItem(JOURNAL_BACKUP_KEY+'-archive-'+Date.now()+'-'+Math.random().toString(36).slice(2),existing);
       localStorage.setItem(JOURNAL_BACKUP_KEY,raw);

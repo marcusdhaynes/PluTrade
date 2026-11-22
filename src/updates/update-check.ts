@@ -1,6 +1,6 @@
 // Uniform auto-update check — see updates/UPDATES_SPEC.md
 // Checks this repo's GitHub Releases and compares semver against the current version.
-export const GITHUB_REPO = "marcusdhaynes/Candlelight";
+export const GITHUB_REPO = "marcusdhaynes/PluTrade";
 export const CURRENT_VERSION = "0.0.0"; // from package.json at rollout
 
 export interface ReleaseInfo {

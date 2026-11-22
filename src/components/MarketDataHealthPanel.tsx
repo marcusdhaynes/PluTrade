@@ -6,7 +6,7 @@ export const MarketDataHealthPanel:React.FC<Props>=({health,status})=>{
   .sort((a,b)=>b[1].lastReceivedAt-a[1].lastReceivedAt).slice(0,50);
  const now=Date.now();
  const ago=(ms?:number)=>ms?Math.max(0,Math.round((now-ms)/1000))+'s ago':'Never';
- return <div id="candlelight-data-health" className="p-4 text-[11px] text-[#d4d9e5] space-y-3">
+ return <div id="plutrade-data-health" className="p-4 text-[11px] text-[#d4d9e5] space-y-3">
    <strong className="text-sm">Market Data Health Center</strong>
    <p>Selected feed: {status.provider} · {status.connected?'Connected':'Unavailable'}</p>
    <p className="text-[#a4afbf]">Only observed trade prints authorize paper executions. Tickers and REST snapshots do not.

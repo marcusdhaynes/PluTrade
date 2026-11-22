@@ -63,7 +63,7 @@ import {paperLedgerCriticalChanged} from './services/paperPersistence';
 import {loadRiskPolicy,saveRiskPolicy,evaluateRiskPolicy} from './services/riskCenter';
 import {updateFeedHealth,type MarketEvent,type FeedHealth} from './services/marketEvents';
 import {createPaperWriterLease} from './services/paperTabOwnership';
-import {loadWatchlists,persistWatchlists,isWatchlistStorageBlocked,WATCHLIST_BACKUP_KEY,WATCHLIST_KEY,WATCHLIST_LEGACY_KEY} from './services/watchlistStorage';
+import {loadWatchlists,persistWatchlists,isWatchlistStorageBlocked,readWatchlistBackupRaw,WATCHLIST_KEY,WATCHLIST_LEGACY_KEY} from './services/watchlistStorage';
 import { emptyPaperPortfolio, closePaperPosition, updatePaperStops, enableTrailingPaperStop, disableTrailingPaperStop, isFreshPaperQuote, accountLeverage, paperCommission, paperExecutionPrice, configurePaperPortfolio, type PaperPortfolio, type PaperSettings } from './services/paperTrading';
 import { loadPaperAccounts, savePaperAccounts, updateActivePaperAccount, createPaperAccountRecord, initialPaperAccounts,isPaperStorageBlocked,PAPER_ACCOUNTS_STORAGE_KEY, type PaperAccountsState } from './services/paperAccounts';
 
@@ -74,7 +74,7 @@ function readLocalJson<T>(key: string, fallback: T): T {
 }
 function preserveInvalidPreference(key:string){
   try{
-    const saved=localStorage.getItem(key),backup='candlelight_invalid_pref_backup_'+key;
+    const saved=localStorage.getItem(key),backup='plutrade_invalid_pref_backup_'+key;
     if(saved&&!localStorage.getItem(backup))localStorage.setItem(backup,saved);
   }catch(error){console.warn('Unable to back up invalid saved preference',key,error);}
 }
@@ -97,7 +97,7 @@ export default function App() {
       else preserveInvalidPreference(localStorage.getItem('tv_assets')?'tv_assets':'tv_assets_v4');
     }
     try {
-      const custom = JSON.parse(localStorage.getItem('candlelight_saved_markets_v1') || '[]') as Asset[];
+      const custom = JSON.parse(localStorage.getItem('plutrade_saved_markets_v1') || '[]') as Asset[];
       if(!Array.isArray(custom))return base;
       const seen=new Set(base.map(assetIdentity));
       return [...base,...custom.filter(a => {
@@ -111,10 +111,10 @@ export default function App() {
   });
   const [activeAsset, setActiveAsset] = useState<Asset>(() => {
     const savedSym = localStorage.getItem('tv_active_symbol');
-    const savedVenue = localStorage.getItem('candlelight_active_source');
-    const savedType = localStorage.getItem('candlelight_active_market_type');
-    const savedChain=localStorage.getItem('candlelight_active_chain_id');
-    const savedPool=localStorage.getItem('candlelight_active_pair_address');
+    const savedVenue = localStorage.getItem('plutrade_active_source');
+    const savedType = localStorage.getItem('plutrade_active_market_type');
+    const savedChain=localStorage.getItem('plutrade_active_chain_id');
+    const savedPool=localStorage.getItem('plutrade_active_pair_address');
     if (savedSym) {
       const matches=assets.filter(a=>a.symbol===savedSym&&(a.source||a.exchange)===savedVenue&&
         (a.marketType||'')===savedType&&
@@ -160,7 +160,7 @@ export default function App() {
     if(!isWatchlistStorageBlocked())return;
     try{
       const damaged=localStorage.getItem(WATCHLIST_LEGACY_KEY)??localStorage.getItem(WATCHLIST_KEY);
-      if(!damaged||localStorage.getItem(WATCHLIST_BACKUP_KEY)!==damaged)
+      if(!damaged||readWatchlistBackupRaw()!==damaged)
         throw Error('Recovery backup does not match the damaged watchlist; original collection is protected.');
       if(!window.confirm('Your original watchlists are backed up. Reset active watchlists to defaults? Export the backup first.'))return;
       localStorage.removeItem(WATCHLIST_KEY);
@@ -227,8 +227,8 @@ export default function App() {
     // the prior version; don't project them across every symbol.
     const old=readLocalJson<Drawing[]>('tv_drawings',[]);
     const savedSymbol=localStorage.getItem('tv_active_symbol');
-    const savedVenue=localStorage.getItem('candlelight_active_source');
-    const savedType=localStorage.getItem('candlelight_active_market_type')||'';
+    const savedVenue=localStorage.getItem('plutrade_active_source');
+    const savedType=localStorage.getItem('plutrade_active_market_type')||'';
     if(Array.isArray(old)&&old.length&&savedSymbol&&savedVenue)
       return {[savedSymbol+'|'+savedVenue+'|'+savedType]:old};
     return {};
@@ -362,7 +362,7 @@ export default function App() {
   const previousAlertPricesRef = useRef<Record<string, number>>({});
   const [alertLog, setAlertLog] = useState<AlertLogEntry[]>(() => {
     try {
-      const value = JSON.parse(localStorage.getItem('candlelight_alert_log_v1') || '[]');
+      const value = JSON.parse(localStorage.getItem('plutrade_alert_log_v1') || '[]');
       return Array.isArray(value) ? value.slice(0, 100) : [];
     } catch { return []; }
   });
@@ -372,7 +372,7 @@ export default function App() {
     catch (error) { console.warn('Price alert storage unavailable', error); }
   }, [alerts]);
   useEffect(() => {
-    try { localStorage.setItem('candlelight_alert_log_v1', JSON.stringify(alertLog)); }
+    try { localStorage.setItem('plutrade_alert_log_v1', JSON.stringify(alertLog)); }
     catch (error) { console.warn('Alert log storage unavailable', error); }
   }, [alertLog]);
   const [activeNotification, setActiveNotification] = useState<{ id: string; message: string; type: 'alert' | 'info' } | null>(null);
@@ -446,7 +446,7 @@ export default function App() {
   const setPaperAccounts:typeof setPaperAccountsRaw=(change)=>{
     if(paperStorageBlockedRef.current||paperStorageWriteFailed||!paperWriterOwnedRef.current){
       setPaperError(!paperWriterOwnedRef.current?
-        'This tab is read-only. Another Candlelight tab owns paper trading, or secure Web Locks are unavailable.':
+        'This tab is read-only. Another PluTrade tab owns paper trading, or secure Web Locks are unavailable.':
         'Paper trading is locked while ledger recovery or persistence repair is required.');
       return;
     }
@@ -1185,7 +1185,7 @@ export default function App() {
 
   // Save changes to LocalStorage
   // Do not serialize the entire catalog on every price tick. Custom markets
-  // are separately persisted under candlelight_saved_markets_v1.
+  // are separately persisted under plutrade_saved_markets_v1.
 
   useEffect(() => {
     try {
@@ -1209,10 +1209,10 @@ export default function App() {
  
   useEffect(() => {
     localStorage.setItem('tv_active_symbol', activeAsset.symbol);
-    localStorage.setItem('candlelight_active_source', activeAsset.source || activeAsset.exchange);
-    localStorage.setItem('candlelight_active_market_type', activeAsset.marketType || '');
-    localStorage.setItem('candlelight_active_chain_id',activeAsset.chainId||'');
-    localStorage.setItem('candlelight_active_pair_address',activeAsset.pairAddress||'');
+    localStorage.setItem('plutrade_active_source', activeAsset.source || activeAsset.exchange);
+    localStorage.setItem('plutrade_active_market_type', activeAsset.marketType || '');
+    localStorage.setItem('plutrade_active_chain_id',activeAsset.chainId||'');
+    localStorage.setItem('plutrade_active_pair_address',activeAsset.pairAddress||'');
   }, [activeAsset.symbol, activeAsset.source, activeAsset.exchange, activeAsset.marketType,
     activeAsset.chainId,activeAsset.pairAddress]);
 
@@ -1473,7 +1473,7 @@ export default function App() {
     if(!p)return;
     // TradingView's default is review-before-close. One-click is user opt-in.
     let oneClick=false;
-    try {oneClick=localStorage.getItem('candlelight_paper_one_click_v1')==='true';}catch{}
+    try {oneClick=localStorage.getItem('plutrade_paper_one_click_v1')==='true';}catch{}
     if(oneClick){executeClosePosition(id);return;}
     setCloseReviewQty(String(p.qty));
     setCloseReviewId(id);
@@ -1600,9 +1600,9 @@ export default function App() {
   const handleSelectAsset = (selected: Asset) => {
     setAssets(prev => prev.some(a => assetIdentity(a) === assetIdentity(selected)) ? prev : [...prev, selected]);
     try {
-      const custom = JSON.parse(localStorage.getItem('candlelight_saved_markets_v1') || '[]') as Asset[];
+      const custom = JSON.parse(localStorage.getItem('plutrade_saved_markets_v1') || '[]') as Asset[];
       if (!custom.some(a => assetIdentity(a) === assetIdentity(selected))) {
-        localStorage.setItem('candlelight_saved_markets_v1', JSON.stringify([...custom, selected].slice(-100)));
+        localStorage.setItem('plutrade_saved_markets_v1', JSON.stringify([...custom, selected].slice(-100)));
       }
     } catch { /* persistence is optional */ }
     setMarketStatus({ connected: false, provider: 'Connecting to ' + (selected.source || selected.exchange), latencyMs: 0 });
@@ -1923,7 +1923,7 @@ export default function App() {
             <Bell className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs font-semibold text-white">{activeNotification.type==='alert'?'Price Alert Notification':'Candlelight Notice'}</div>
+            <div className="text-xs font-semibold text-white">{activeNotification.type==='alert'?'Price Alert Notification':'PluTrade Notice'}</div>
             <div className="text-xs text-[#d1d4dc] mt-0.5">{activeNotification.message}</div>
           </div>
           <button

@@ -164,7 +164,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
               <div className="text-[10.5px] font-semibold text-[#787b86] uppercase tracking-wider pb-1.5">
                 Market Sentiment & News
               </div>
-              {news.length === 0 && <p className="text-[#8b93a4] text-[11px] py-4 leading-relaxed">No verified market-news feed is connected. Candlelight does not generate or display fictional news headlines.</p>}
+              {news.length === 0 && <p className="text-[#8b93a4] text-[11px] py-4 leading-relaxed">No verified market-news feed is connected. PluTrade does not generate or display fictional news headlines.</p>}
               {news.map((item) => (
                 <div key={item.id} className="py-2 group cursor-pointer">
                   <div className="flex items-center justify-between text-[9px] text-[#787b86] mb-0.5">
@@ -201,7 +201,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
               {notification ? <div className="p-2 bg-[#1e222d] rounded border border-[#2a2e39] text-[11px]">
                 <div className="font-medium text-white">{notification.type === 'alert' ? 'Price alert' : 'Workspace notification'}</div>
                 <p className="text-[#d1d4dc] mt-1">{notification.message}</p>
-              </div> : <p className="text-[#787b86] text-[11px]">No current notifications. Alerts are evaluated only while Candlelight is running.</p>}
+              </div> : <p className="text-[#787b86] text-[11px]">No current notifications. Alerts are evaluated only while PluTrade is running.</p>}
             </div>
           )}
         </div>

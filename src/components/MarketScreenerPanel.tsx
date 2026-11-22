@@ -39,7 +39,7 @@ export const MarketScreenerPanel:React.FC<Props>=({assets,onSelect,onAdd})=>{
  };
  const filteredTechnical=technical.filter(row=>!row.data||
    (row.data.rsi14>=rsiBounds.min&&row.data.rsi14<=rsiBounds.max));
- return <div id="candlelight-screener" className="text-[11px] p-3 space-y-2 text-[#d4daeb]">
+ return <div id="plutrade-screener" className="text-[11px] p-3 space-y-2 text-[#d4daeb]">
   <div className="flex gap-3 flex-wrap items-end">
    <strong className="text-sm">Live/Observed Market Screener</strong>
    <input aria-label="Search markets" value={screen.query}

@@ -12,8 +12,10 @@ export interface PaperAccountRecord {
   id:string;portfolio:PaperPortfolio;orders:ConditionalOrder[];
 }
 export interface PaperAccountsState {activeId:string;accounts:PaperAccountRecord[]}
-export const PAPER_ACCOUNTS_STORAGE_KEY='candlelight_paper_accounts_v3';
-export const PAPER_RECOVERY_BACKUP_KEY='candlelight_paper_accounts_corrupt_backup_v1';
+export const PAPER_ACCOUNTS_STORAGE_KEY='plutrade_paper_accounts_v3';
+export const PAPER_RECOVERY_BACKUP_KEY='plutrade_paper_accounts_corrupt_backup_v1';
+const LEGACY_PAPER_ACCOUNTS_STORAGE_KEY='candle'+'light_paper_accounts_v3';
+const LEGACY_PAPER_PORTFOLIO_V2_KEY='candle'+'light_paper_portfolio_v2';
 const object=(value:unknown):value is Record<string,any>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 const positive=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)&&n>0;
 const finite=(n:unknown)=>typeof n==='number'&&Number.isFinite(n);
@@ -146,7 +148,12 @@ export function initialPaperAccounts():PaperAccountsState{
 }
 export function loadPaperAccounts(markets:Asset[]=INITIAL_ASSETS):PaperAccountsState{
   try{
-    const saved=localStorage.getItem(PAPER_ACCOUNTS_STORAGE_KEY);
+    let saved=localStorage.getItem(PAPER_ACCOUNTS_STORAGE_KEY);
+    if(!saved){
+      // Pre-rename ledger saved under the legacy key: adopt it under the new key.
+      const legacy=localStorage.getItem(LEGACY_PAPER_ACCOUNTS_STORAGE_KEY);
+      if(legacy){saved=legacy;try{localStorage.setItem(PAPER_ACCOUNTS_STORAGE_KEY,legacy);}catch{}}
+    }
     if(saved){
       let raw:unknown;
       try{raw=JSON.parse(saved);}catch{raw=null;}
@@ -176,7 +183,7 @@ export function loadPaperAccounts(markets:Asset[]=INITIAL_ASSETS):PaperAccountsS
     }
     // Migrate genuine saved v2 trades, but do not inherit its forced 0.04% rate
     // or recreate prior demo positions from the legacy initial-assets constant.
-    const old=localStorage.getItem('candlelight_paper_portfolio_v2');
+    const old=localStorage.getItem(LEGACY_PAPER_PORTFOLIO_V2_KEY);
     if(old){
       const p=JSON.parse(old) as PaperPortfolio;
       if(p?.account&&Array.isArray(p.positions)&&Array.isArray(p.fills)){

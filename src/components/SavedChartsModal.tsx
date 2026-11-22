@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {X,Save,Trash2,Download,RotateCcw,FileText} from 'lucide-react';
 import type {Asset,ChartType,Timeframe,Drawing,IndicatorSettings} from '../types';
-import {createSavedChartIdea,parseSavedCharts,SAVED_CHARTS_KEY,type SavedChartIdea} from '../services/savedCharts';
+import {createSavedChartIdea,parseSavedCharts,readSavedChartsRaw,SAVED_CHARTS_KEY,type SavedChartIdea} from '../services/savedCharts';
 
 interface Props{
   open:boolean;onClose:()=>void;
@@ -11,7 +11,7 @@ interface Props{
 }
 const inputClass='w-full rounded border border-[#363f50] bg-[#101723] px-3 py-2 text-sm text-white outline-none focus:border-[#5e94f9]';
 export const SavedChartsModal:React.FC<Props>=({open,onClose,asset,timeframe,chartType,drawings,indicators,onRestore})=>{
-  const [saved,setSaved]=useState<SavedChartIdea[]>(()=>parseSavedCharts(localStorage.getItem(SAVED_CHARTS_KEY)));
+  const [saved,setSaved]=useState<SavedChartIdea[]>(()=>parseSavedCharts(readSavedChartsRaw()));
   const [name,setName]=useState('');
   const [note,setNote]=useState('');
   const [error,setError]=useState('');
@@ -31,7 +31,7 @@ export const SavedChartsModal:React.FC<Props>=({open,onClose,asset,timeframe,cha
   };
   const download=(record:SavedChartIdea)=>{
     const url=URL.createObjectURL(new Blob([JSON.stringify(record,null,2)],{type:'application/json'}));
-    const a=document.createElement('a');a.href=url;a.download='candlelight-'+record.symbol.toLowerCase()+'-chart.json';
+    const a=document.createElement('a');a.href=url;a.download='plutrade-'+record.symbol.toLowerCase()+'-chart.json';
     a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
   if(!open)return null;

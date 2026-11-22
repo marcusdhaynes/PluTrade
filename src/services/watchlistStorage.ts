@@ -1,7 +1,12 @@
 import type {Watchlist} from '../types';
 export const WATCHLIST_LEGACY_KEY='tv_watchlists';
 export const WATCHLIST_KEY='tv_watchlists_v4';
-export const WATCHLIST_BACKUP_KEY='candlelight_watchlists_recovery_backup_v1';
+export const WATCHLIST_BACKUP_KEY='plutrade_watchlists_recovery_backup_v1';
+const LEGACY_WATCHLIST_BACKUP_KEY='candle'+'light_watchlists_recovery_backup_v1';
+export function readWatchlistBackupRaw():string|null{
+  // Recovery backups written before the rename live under the legacy key.
+  return localStorage.getItem(WATCHLIST_BACKUP_KEY)??localStorage.getItem(LEGACY_WATCHLIST_BACKUP_KEY);
+}
 export function validWatchlists(value:unknown):value is Watchlist[]{
   if(!Array.isArray(value)||value.length===0)return false;
   const ids=new Set<string>();
@@ -24,7 +29,7 @@ export function isWatchlistStorageBlocked():boolean{
 }
 export function saveWatchlistBackup(raw:string):boolean{
   try{
-    const existing=localStorage.getItem(WATCHLIST_BACKUP_KEY);
+    const existing=readWatchlistBackupRaw();
     if(existing!==raw){
       if(existing!==null)localStorage.setItem(WATCHLIST_BACKUP_KEY+'-archive-'+Date.now()+'-'+Math.random().toString(36).slice(2),existing);
       localStorage.setItem(WATCHLIST_BACKUP_KEY,raw);

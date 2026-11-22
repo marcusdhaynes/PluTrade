@@ -51,7 +51,7 @@ export const CloudSyncPanel:React.FC=()=>{
   setNotice('Local backup saved under '+backup+'. Reloading to show your restored data.');
   window.location.reload();
  });
- return <section id="candlelight-cloud-sync" className="p-4 space-y-3 text-xs text-[#d6e0ee]">
+ return <section id="plutrade-cloud-sync" className="p-4 space-y-3 text-xs text-[#d6e0ee]">
   <strong className="text-sm">Optional Private Cloud Sync · Supabase</strong>
   <p className="text-[#a7b7c9]">Manual transfer only: layouts, watchlists and journal. No paper accounts, broker credentials, open positions or order execution are synchronized. Cloud sync never runs automatically or merges trades without review.</p>
   {!signedIn?<div className="flex flex-wrap items-end gap-3">
@@ -90,6 +90,6 @@ export const CloudSyncPanel:React.FC=()=>{
       </td>
     </tr>)}</tbody>
   </table></div>}
-  <p className="text-[#91a4bd]">Every upload checks the expected remote revision. Every restore validates the cloud document and stores an exact backup of current local bytes first. This sign-in is shared Supabase Auth, but documents are isolated to Candlelight's private owner-scoped schema.</p>
+  <p className="text-[#91a4bd]">Every upload checks the expected remote revision. Every restore validates the cloud document and stores an exact backup of current local bytes first. This sign-in is shared Supabase Auth, but documents are isolated to PluTrade's private owner-scoped schema.</p>
  </section>;
 };

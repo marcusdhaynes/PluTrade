@@ -69,7 +69,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   const [priceMode,setPriceMode]=useState<'price'|'offset'>('price');
   const [reviewOpen,setReviewOpen]=useState(false);
   const [oneClick,setOneClick]=useState(()=>{
-    try { return localStorage.getItem('candlelight_paper_one_click_v1')==='true'; }
+    try { return localStorage.getItem('plutrade_paper_one_click_v1')==='true'; }
     catch { return false; }
   });
   const [tif,setTif]=useState<PaperTimeInForce>('Week');
@@ -90,7 +90,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   const venue=asset.source||asset.exchange;
   useEffect(()=>{setPriceInput('');setLimitPriceInput('');setErrorLocal('');setKind('market');setDom(false);setExtraTps([]);setReviewOpen(false);},[asset.symbol,venue]);
   useEffect(()=>{
-    try {localStorage.setItem('candlelight_paper_one_click_v1',String(oneClick));}
+    try {localStorage.setItem('plutrade_paper_one_click_v1',String(oneClick));}
     catch { /* browser storage can be disabled */ }
   },[oneClick]);
   useEffect(()=>{

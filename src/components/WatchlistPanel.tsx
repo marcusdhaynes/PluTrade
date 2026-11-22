@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Asset, Watchlist, AssetCategory } from '../types';
 import {marketIdentity,resolveWatchlistEntry} from '../services/marketIdentity';
-import {WATCHLIST_BACKUP_KEY} from '../services/watchlistStorage';
+import {readWatchlistBackupRaw} from '../services/watchlistStorage';
 import {
   Plus,
   Trash2,
@@ -133,9 +133,9 @@ export const WatchlistPanel: React.FC<WatchlistPanelProps> = React.memo(({
         Saved watchlists are locked: malformed entries were preserved in a recovery backup.
         <div className="flex gap-3">
           <button className="underline" onClick={()=>{
-            const raw=localStorage.getItem(WATCHLIST_BACKUP_KEY);if(!raw)return;
+            const raw=readWatchlistBackupRaw();if(!raw)return;
             const url=URL.createObjectURL(new Blob([raw],{type:'application/json'}));
-            const link=document.createElement('a');link.href=url;link.download='candlelight-watchlists-recovery.json';link.click();URL.revokeObjectURL(url);
+            const link=document.createElement('a');link.href=url;link.download='plutrade-watchlists-recovery.json';link.click();URL.revokeObjectURL(url);
           }}>Export backup</button>
           <button className="underline" onClick={onResetCorruptWatchlists}>Start fresh (keep backup)</button>
         </div>

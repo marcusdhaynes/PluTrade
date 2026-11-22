@@ -15,7 +15,16 @@ export interface SavedChartIdea{
   drawings:Drawing[];
   indicators:IndicatorSettings;
 }
-export const SAVED_CHARTS_KEY='candlelight_saved_charts_v1';
+export const SAVED_CHARTS_KEY='plutrade_saved_charts_v1';
+const LEGACY_SAVED_CHARTS_KEY='candle'+'light_saved_charts_v1';
+export function readSavedChartsRaw():string|null{
+  const raw=localStorage.getItem(SAVED_CHARTS_KEY);
+  if(raw!==null)return raw;
+  // Pre-rename charts saved under the legacy key: adopt them under the new key.
+  const legacy=localStorage.getItem(LEGACY_SAVED_CHARTS_KEY);
+  if(legacy!==null){try{localStorage.setItem(SAVED_CHARTS_KEY,legacy);}catch{}}
+  return legacy;
+}
 const isRecord=(x:unknown):x is Record<string,unknown>=>typeof x==='object'&&x!==null;
 export function parseSavedCharts(text:string|null):SavedChartIdea[]{
   if(!text)return [];

@@ -6,7 +6,7 @@ export type RiskPolicy={
  enabled:boolean;killSwitch:boolean;
  maxRiskPerTradePct:number;maxGrossExposurePct:number;maxDailyLossPct:number;
 };
-export const RISK_POLICY_KEY='candlelight_risk_policy_v1';
+export const RISK_POLICY_KEY='plutrade_risk_policy_v1';
 export const DEFAULT_RISK_POLICY:RiskPolicy={
  enabled:false,killSwitch:false,maxRiskPerTradePct:1,
  maxGrossExposurePct:300,maxDailyLossPct:5

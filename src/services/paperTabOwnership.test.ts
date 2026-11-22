@@ -4,7 +4,7 @@ let held=false;
 const manager={request:async(_name:string,_options:unknown,fn:(lock:unknown)=>Promise<void>)=>{
  if(held)return fn(null);
  held=true;
- try{await fn({name:'candlelight-paper-ledger-writer-v1'});}
+ try{await fn({name:'plutrade-paper-ledger-writer-v1'});}
  finally{held=false;}
 }} as unknown as Pick<LockManager,'request'>;
 let first=0,second=0;

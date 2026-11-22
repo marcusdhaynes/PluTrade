@@ -9,7 +9,7 @@ const number=(n:number,places=2)=>n.toLocaleString(undefined,{minimumFractionDig
 export const JournalInsightsPanel:React.FC<{trades:JournalTrade[]}>=({trades})=>{
  const [group,setGroup]=useState<JournalInsightGroup>('strategy');
  const insight=useMemo(()=>summarizeJournalInsights(trades,group),[trades,group]);
- return <section id="candlelight-journal-insights" className="h-full overflow-y-auto p-4 bg-[#0f131c] space-y-3 text-xs text-[#d9dfec]">
+ return <section id="plutrade-journal-insights" className="h-full overflow-y-auto p-4 bg-[#0f131c] space-y-3 text-xs text-[#d9dfec]">
    <div className="flex flex-wrap gap-3 items-end">
      <div><strong className="text-base">Trade Performance Insights</strong>
        <p className="text-[#9daac0] mt-1">Closed trades only · {insight.closedTrades} records · realized net results</p>
