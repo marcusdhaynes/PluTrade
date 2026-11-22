@@ -3,18 +3,18 @@ import {parseCoinbaseMatch,parseCoinbaseHeartbeat,BoundedQueue} from './protocol
 import {loadCoinbaseRecovery} from './recovery.mjs';
 import {MarketIngestStore} from './store.mjs';
 
-const product=process.env.CANDLELIGHT_COINBASE_PRODUCT||'BTC-USD';
-const market=process.env.CANDLELIGHT_MARKET_ID||'BTCUSD|Coinbase|spot';
+const product=process.env.PLUTRADE_COINBASE_PRODUCT||'BTC-USD';
+const market=process.env.PLUTRADE_MARKET_ID||'BTCUSD|Coinbase|spot';
 if(!/^[-A-Z0-9]{3,30}$/.test(product)||
    !/^[A-Z0-9-]{3,30}\|Coinbase\|spot$/.test(market))
   throw Error('Invalid explicit market identity');
-if(!process.env.CANDLELIGHT_DATABASE_URL||
-   !/^postgres(ql)?:\/\//.test(process.env.CANDLELIGHT_DATABASE_URL)||
-   !/sslmode=verify-full/.test(process.env.CANDLELIGHT_DATABASE_URL))
+if(!process.env.PLUTRADE_DATABASE_URL||
+   !/^postgres(ql)?:\/\//.test(process.env.PLUTRADE_DATABASE_URL)||
+   !/sslmode=verify-full/.test(process.env.PLUTRADE_DATABASE_URL))
   throw Error('Private verified-TLS PostgreSQL DATABASE_URL required');
 const {default:pg}=await import('pg');
 const pool=new pg.Pool({
-  connectionString:process.env.CANDLELIGHT_DATABASE_URL,
+  connectionString:process.env.PLUTRADE_DATABASE_URL,
   max:2,connectionTimeoutMillis:5000,idleTimeoutMillis:10000
 });
 const store=new MarketIngestStore(pool,market);
@@ -28,7 +28,7 @@ const health=http.createServer((_req,res)=>{
   res.statusCode=status.ready?200:503;
   res.end(JSON.stringify(status));
 });
-health.listen(Number(process.env.CANDLELIGHT_HEALTH_PORT||8787),'127.0.0.1');
+health.listen(Number(process.env.PLUTRADE_HEALTH_PORT||8787),'127.0.0.1');
 async function getRecent(last){
   return loadCoinbaseRecovery({
     checkpoint:last,marketId:market,limit:1000,maxPages:12,

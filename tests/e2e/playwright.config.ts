@@ -1,6 +1,6 @@
 import {defineConfig,devices} from '@playwright/test';
 
-const baseURL='http://127.0.0.1:4173/Candlelight/';
+const baseURL='http://127.0.0.1:4173/PluTrade/';
 export default defineConfig({
   testDir:'.',
   testMatch:'**/*.spec.ts',

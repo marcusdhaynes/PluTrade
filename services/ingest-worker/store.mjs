@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {checkSequence} from './protocol.mjs';
 
-const SCHEMA='app_candlelight';
+const SCHEMA='app_plutrade';
 const LEASE_SECONDS=45;
 export class MarketIngestStore {
   constructor(pool,marketId){
@@ -13,12 +13,12 @@ export class MarketIngestStore {
     const client=await this.pool.connect();
     try{
       await client.query('BEGIN');
-      await client.query('SET LOCAL ROLE app_candlelight_market_ingestor');
+      await client.query('SET LOCAL ROLE app_plutrade_market_ingestor');
       const identity=await client.query('SELECT current_user AS role_name, session_user AS login_name, '+
         '(SELECT NOT (rolsuper OR rolbypassrls) FROM pg_roles WHERE rolname=session_user) AS unprivileged');
       const row=identity.rows[0];
-      if(row?.unprivileged!==true || row?.role_name!=='app_candlelight_market_ingestor' ||
-        ['app_candlelight_market_ingestor','postgres','service_role','supabase_admin'].includes(row?.login_name))
+      if(row?.unprivileged!==true || row?.role_name!=='app_plutrade_market_ingestor' ||
+        ['app_plutrade_market_ingestor','postgres','service_role','supabase_admin'].includes(row?.login_name))
         throw Error('Unsafe database identity: dedicated non-privileged login required');
       await client.query("SET LOCAL statement_timeout = '5000ms'");
       const result=await fn(client);
@@ -114,7 +114,7 @@ export class MarketIngestStore {
       // sending a retrospective notification for a move while the feed was absent.
       if(!evaluateAlerts){
         await c.query(
-          "UPDATE app_candlelight.market_alert_rules SET last_price=$4::numeric,"+
+          "UPDATE app_plutrade.market_alert_rules SET last_price=$4::numeric,"+
           "last_event_id=$5::uuid,updated_at=clock_timestamp() "+
           "WHERE provider=$1 AND market_id=$2 AND stream_scope=$3 AND status='active'",
           [this.provider,this.marketId,this.scope,trade.price,r.rows[0].event_id]);
@@ -129,7 +129,7 @@ export class MarketIngestStore {
           "WHEN condition='greater_than' THEN last_price<=threshold AND $4::numeric>threshold "+
           "WHEN condition='less_than' THEN last_price>=threshold AND $4::numeric<threshold "+
           "ELSE false END AS fired "+
-          "FROM app_candlelight.market_alert_rules "+
+          "FROM app_plutrade.market_alert_rules "+
           "WHERE provider=$1 AND market_id=$2 AND stream_scope=$3 AND status='active' "+
           "ORDER BY rule_id LIMIT 2001 FOR UPDATE",
           [this.provider,this.marketId,this.scope,trade.price]);
@@ -138,14 +138,14 @@ export class MarketIngestStore {
           const fired=rule.fired&&rule.trigger_count<rule.max_triggers;
           const increment=fired?1:0;
           await c.query(
-            "UPDATE app_candlelight.market_alert_rules SET last_price=$2::numeric,"+
+            "UPDATE app_plutrade.market_alert_rules SET last_price=$2::numeric,"+
             "last_event_id=$3::uuid,trigger_count=trigger_count+$4,"+
             "status=CASE WHEN trigger_count+$4>=max_triggers THEN 'paused' ELSE status END,"+
             "updated_at=clock_timestamp() WHERE rule_id=$1::uuid",
             [rule.rule_id,trade.price,r.rows[0].event_id,increment]);
           if(fired){
             await c.query(
-              "INSERT INTO app_candlelight.market_alert_outbox "+
+              "INSERT INTO app_plutrade.market_alert_outbox "+
               "(rule_id,owner_id,market_event_id,triggered_price) "+
               "VALUES($1::uuid,$2::uuid,$3::uuid,$4::numeric) ON CONFLICT DO NOTHING",
               [rule.rule_id,rule.owner_id,r.rows[0].event_id,trade.price]);

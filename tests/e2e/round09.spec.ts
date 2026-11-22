@@ -8,7 +8,7 @@ test('installable manifest and offline shell are served',async({page})=>{
  const response=await page.request.get(new URL(manifest!,page.url()).toString());
  expect(response.ok()).toBeTruthy();
  const m=await response.json();
- expect(m.name).toContain('Candlelight');
+ expect(m.name).toContain('PluTrade');
  expect(m.display).toBe('standalone');
  const sw=await page.request.get(new URL('./sw.js',page.url()).toString());
  expect(sw.ok()).toBeTruthy();
@@ -19,11 +19,11 @@ test('installable manifest and offline shell are served',async({page})=>{
 test('shortcuts navigate screener, replay and help without changing URL',async({page})=>{
  await page.goto('./');
  await page.keyboard.press('Shift+S');
- await expect(page.locator('#candlelight-screener')).toBeVisible();
+ await expect(page.locator('#plutrade-screener')).toBeVisible();
  await page.keyboard.press('Shift+R');
- await expect(page.locator('#candlelight-historical-lab')).toBeVisible();
+ await expect(page.locator('#plutrade-historical-lab')).toBeVisible();
  await page.keyboard.press('Shift+Slash');
- await expect(page.getByRole('dialog',{name:'Candlelight Keyboard Shortcuts'})).toBeVisible();
+ await expect(page.getByRole('dialog',{name:'PluTrade Keyboard Shortcuts'})).toBeVisible();
  await page.keyboard.press('Escape');
- await expect(page.getByRole('dialog',{name:'Candlelight Keyboard Shortcuts'})).toHaveCount(0);
+ await expect(page.getByRole('dialog',{name:'PluTrade Keyboard Shortcuts'})).toHaveCount(0);
 });

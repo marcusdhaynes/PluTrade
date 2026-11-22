@@ -5,13 +5,13 @@ test.beforeEach(async({page})=>{await isolateExternalFeeds(page);});
 test('paper trading is disabled when its financial ledger needs recovery',async({page})=>{
   await page.goto('./');
   const invalid='{"accounts":[{"id":"invalid","portfolio":{"account":{},"positions":[],"fills":[]}}]}';
-  await page.evaluate(raw=>localStorage.setItem('candlelight_paper_accounts_v3',raw),invalid);
+  await page.evaluate(raw=>localStorage.setItem('plutrade_paper_accounts_v3',raw),invalid);
   await page.reload();
   await page.getByRole('button',{name:/Paper Trading/}).first().click();
   await expect(page.getByRole('button',{name:'Create order'})).toBeDisabled();
   await expect(page.getByRole('button',{name:'Export recovery backup'})).toBeVisible();
-  expect(await page.evaluate(()=>localStorage.getItem('candlelight_paper_accounts_v3'))).toBe(invalid);
-  expect(await page.evaluate(()=>localStorage.getItem('candlelight_paper_accounts_corrupt_backup_v1'))).toBe(invalid);
+  expect(await page.evaluate(()=>localStorage.getItem('plutrade_paper_accounts_v3'))).toBe(invalid);
+  expect(await page.evaluate(()=>localStorage.getItem('plutrade_paper_accounts_corrupt_backup_v1'))).toBe(invalid);
 });
 
 test('corrupt journal cannot be edited or overwritten and recovery export is offered',async({page})=>{
@@ -23,7 +23,7 @@ test('corrupt journal cannot be edited or overwritten and recovery export is off
   await expect(page.getByRole('button',{name:'Export original journal'})).toBeVisible();
   await expect(page.getByText(/Journal edits are locked/)).toBeVisible();
   expect(await page.evaluate(()=>localStorage.getItem('tradingview_journal_trades'))).toBe(malformed);
-  expect(await page.evaluate(()=>localStorage.getItem('candlelight_journal_recovery_backup_v1'))).toBe(malformed);
+  expect(await page.evaluate(()=>localStorage.getItem('plutrade_journal_recovery_backup_v1'))).toBe(malformed);
 });
 
 test('watchlists quarantine all records rather than silently dropping malformed entries',async({page})=>{
@@ -36,5 +36,5 @@ test('watchlists quarantine all records rather than silently dropping malformed 
   await expect(page.getByRole('button',{name:'Export backup'})).toBeVisible();
   await expect(page.locator('#add-symbol-to-watchlist-btn')).toBeDisabled();
   expect(await page.evaluate(()=>localStorage.getItem('tv_watchlists_v4'))).toBe(broken);
-  expect(await page.evaluate(()=>localStorage.getItem('candlelight_watchlists_recovery_backup_v1'))).toBe(broken);
+  expect(await page.evaluate(()=>localStorage.getItem('plutrade_watchlists_recovery_backup_v1'))).toBe(broken);
 });

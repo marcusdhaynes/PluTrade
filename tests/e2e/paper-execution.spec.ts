@@ -21,8 +21,8 @@ test('paper position close requires confirmation and permits partial execution',
     }
     Object.defineProperty(window,'WebSocket',{configurable:true,value:MockTradeSocket});
     localStorage.setItem('tv_active_symbol','BTCUSDT');
-    localStorage.setItem('candlelight_active_source','Binance');
-    localStorage.setItem('candlelight_active_market_type','spot');
+    localStorage.setItem('plutrade_active_source','Binance');
+    localStorage.setItem('plutrade_active_market_type','spot');
     const now=Date.now();
     const settings={
       currency:'USDT',startingBalance:10000,marginControl:false,
@@ -47,10 +47,10 @@ test('paper position close requires confirmation and permits partial execution',
       }],
       pendingOrders:[],orderEvents:[],
     };
-    localStorage.setItem('candlelight_paper_accounts_v3',JSON.stringify({
+    localStorage.setItem('plutrade_paper_accounts_v3',JSON.stringify({
       activeId:'qa-account',accounts:[{id:'qa-account',portfolio,orders:[]}],
     }));
-    localStorage.setItem('candlelight_paper_one_click_v1','false');
+    localStorage.setItem('plutrade_paper_one_click_v1','false');
   });
   await page.goto('./');
   await page.getByRole('button',{name:/Paper Trading/}).first().click();
