@@ -1,11 +1,11 @@
-# Candlelight architecture assessment
+# PluTrade architecture assessment
 
 Date: October 21, 2026
-Status: design recommendation based on the retrieved current AI Studio TVClone source. Candlelight has been imported into GitHub; GitHub Pages is the publishing target. Features below are proposed unless explicitly described in README as current.
+Status: design recommendation based on the retrieved current AI Studio TVClone source. PluTrade has been imported into GitHub; GitHub Pages is the publishing target. Features below are proposed unless explicitly described in README as current.
 
 ## Recommended direction
 
-Preserve and audit the original application before selecting migration work. Ship a responsive TypeScript web client with Vite, a Canvas financial chart renderer, and independently deployed Rust/Tokio services for streaming market data, order management, and automation. Keep tick updates outside the UI framework's reactive component tree. Add a PWA first and evaluate Tauri 2 desktop/mobile shells after device benchmarks. Retain React if already used by Candlelight; a framework rewrite is not justified without measurements.
+Preserve and audit the original application before selecting migration work. Ship a responsive TypeScript web client with Vite, a Canvas financial chart renderer, and independently deployed Rust/Tokio services for streaming market data, order management, and automation. Keep tick updates outside the UI framework's reactive component tree. Add a PWA first and evaluate Tauri 2 desktop/mobile shells after device benchmarks. Retain React if already used by PluTrade; a framework rewrite is not justified without measurements.
 
 No language or engine is universally fastest, smallest, and most secure. End-to-end speed depends on data subscriptions, broker/exchange proximity, networking, correctness, and workload. Published library size claims vary by version and compression; measure the shipped bundle.
 
@@ -76,8 +76,8 @@ Do not claim to outperform TradingView or TradeZella without reproducible compar
 
 ## Delivery sequence
 
-1. Retrieve original Candlelight source; identify dependencies, data provenance, secret exposure, licenses and current features.
-2. Build and verify it; create the requested Candlelight GitHub repository; configure a stable hosted preview and repository-driven deployments. Clearly label simulated/delayed/live data.
+1. Retrieve original PluTrade source; identify dependencies, data provenance, secret exposure, licenses and current features.
+2. Build and verify it; create the requested PluTrade GitHub repository; configure a stable hosted preview and repository-driven deployments. Clearly label simulated/delayed/live data.
 3. Establish performance traces and budgets before optimizing or changing frameworks.
 4. Add one real feed plus replay and a realistic paper engine; prove recovery and data integrity.
 5. Add journal reconciliation and one broker adapter in paper mode, then validate live capability without placing unrequested trades.

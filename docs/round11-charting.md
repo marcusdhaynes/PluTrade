@@ -1,4 +1,4 @@
-# Candlelight — Round 11: chart rendering integrity (increment 1)
+# PluTrade — Round 11: chart rendering integrity (increment 1)
 
 This increment fixes verified shortcomings in the chart pipeline without rewriting the interface or fabricating market data.
 

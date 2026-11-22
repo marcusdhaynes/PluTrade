@@ -1,7 +1,7 @@
 /* Only immutable app-shell assets; never store or synthesize market quotes,
  * broker sessions, user records, trading events, API responses or credentials. */
-const CACHE='candlelight-app-shell-v2';
-const PREFIX='candlelight-app-shell-';
+const CACHE='plutrade-app-shell-v2';
+const PREFIX='plutrade-app-shell-';
 const scope=self.registration.scope;
 self.addEventListener('install',event=>{
  event.waitUntil((async()=>{
@@ -44,7 +44,7 @@ self.addEventListener('fetch',event=>{
   }).catch(async()=>{
     const cache=await caches.open(CACHE);
     return (await cache.match(req))||(await cache.match(scope))||
-      new Response('Candlelight offline app shell unavailable.',{status:503});
+      new Response('PluTrade offline app shell unavailable.',{status:503});
   }));return;
  }
  if(!/\.(?:js|css|png|jpe?g|svg|woff2?|webmanifest)$/i.test(url.pathname))return;

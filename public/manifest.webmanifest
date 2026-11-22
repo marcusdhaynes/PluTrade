@@ -1,6 +1,6 @@
 {
-  "name": "Candlelight — Trading Workspace",
-  "short_name": "Candlelight",
+  "name": "PluTrade — Trading Workspace",
+  "short_name": "PluTrade",
   "description": "Market charts, replay, simulated trades and journal. Live market execution unavailable offline.",
   "id": "./",
   "start_url": "./",

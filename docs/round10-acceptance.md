@@ -24,7 +24,7 @@ The word **Done** must not be used for Round 10 before all required gates pass.
 - [ ] Prove outbox, journal, ledger and backup consistency across device disconnects, duplicate events, crashes, permission failures and retry storms.
 - [ ] Pass current GitHub Actions on the exact published main SHA and verify live Pages/version identity.
 
-Until then, Candlelight remains a research/paper-trading frontend with a **not-yet-deployed** server infrastructure. New database objects are real, but there is no claim of 24/7 live ingestion, alerts or brokerage.
+Until then, PluTrade remains a research/paper-trading frontend with a **not-yet-deployed** server infrastructure. New database objects are real, but there is no claim of 24/7 live ingestion, alerts or brokerage.
 
 ## Persistent-host setup prepared (not activated)
 

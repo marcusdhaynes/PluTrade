@@ -1,11 +1,11 @@
 # Auto-Update System — Spec
 
-Repo: `marcusdhaynes/Candlelight` · App: Candlelight · Current version (at rollout): `0.0.0`
+Repo: `marcusdhaynes/PluTrade` · App: PluTrade · Current version (at rollout): `0.0.0`
 Category: **B** — no Settings menu — prepared / dormant only, not imported or displayed anywhere.
 
 ## Flow (identical in every app)
 
-1. The app checks `https://api.github.com/repos/marcusdhaynes/Candlelight/releases/latest`.
+1. The app checks `https://api.github.com/repos/marcusdhaynes/PluTrade/releases/latest`.
 2. The release tag (semver `vX.Y.Z`) is compared with the app's current version.
 3. If a newer version exists:
    - **Ribbon:** a thin ribbon at the **top center** of the app, very low height — just
