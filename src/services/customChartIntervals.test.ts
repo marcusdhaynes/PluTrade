@@ -36,7 +36,10 @@ const jan={time:Date.UTC(2026,0,1)/1000,open:4,high:5,low:3,close:4.2,volume:10}
 const feb={time:Date.UTC(2026,1,1)/1000,open:4.2,high:6,low:4,close:5,volume:11};
 const mar={time:Date.UTC(2026,2,1)/1000,open:5,high:7,low:4,close:6,volume:12};
 const a=resampleCustomCandles([jan,feb,mar],{count:2,unit:'months'},'1M',Date.UTC(2026,3,1)/1000);
-assert.equal(a.length,1);
+// The complete January–February bucket is valid; March–April is the current
+// explicitly forming bucket and may display provisionally.
+assert.equal(a.length,2);
 assert.equal(a[0].volume,21);
+assert.equal(a[1].time,mar.time);
 assert.deepEqual(resampleCustomCandles([], {count:3,unit:'years'},'1M'),[]);
 console.log('Custom time intervals: validation, UTC calendar boundaries and verified no-gap aggregation pass');
