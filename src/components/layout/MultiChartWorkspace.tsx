@@ -36,6 +36,7 @@ interface MultiChartWorkspaceProps {
   primaryHistoryState:ChartLoadState;
   onReloadPrimary:()=>void;
   sessionVwapEnabled:boolean;
+  showMobileChartLegend:boolean;
   areDrawingsLocked:boolean;
   stayInDrawingMode:boolean;
   onOpenSymbolSearch:()=>void;
@@ -179,6 +180,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
       primaryHistoryState,
       onReloadPrimary,
       sessionVwapEnabled,
+      showMobileChartLegend,
       areDrawingsLocked,
       stayInDrawingMode,
       onOpenSymbolSearch,
@@ -720,6 +722,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
                 if(template.count===1||syncSettings.interval)setActiveTimeframe('1m');
               }}
               sessionVwapEnabled={sessionVwapEnabled}
+              showMobileChartLegend={showMobileChartLegend}
               areDrawingsLocked={areDrawingsLocked}
               stayInDrawingMode={stayInDrawingMode}
               onOpenSymbolSearch={onOpenSymbolSearch}
