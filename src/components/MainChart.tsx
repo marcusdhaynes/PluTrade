@@ -88,6 +88,7 @@ interface MainChartProps {
   chartRecoveryMarkets?:Asset[];
   onTryOneMinute?:()=>void;
   sessionVwapEnabled?:boolean;
+  showMobileChartLegend?:boolean;
   areDrawingsLocked?:boolean;
   stayInDrawingMode?:boolean;
   onOpenSymbolSearch?:()=>void;
@@ -143,6 +144,7 @@ export const MainChart = React.memo(
       chartRecoveryMarkets=[],
       onTryOneMinute,
       sessionVwapEnabled=false,
+      showMobileChartLegend=false,
       areDrawingsLocked=false,
       stayInDrawingMode=false,
       onOpenSymbolSearch,
@@ -155,8 +157,10 @@ export const MainChart = React.memo(
     const [pinchAxis,setPinchAxis]=useState<PinchAxis|null>(null);
     const [priceVisible,setPriceVisible]=useState(true);
     const [moreOpen,setMoreOpen]=useState(false);
+    const [currencyMenuOpen,setCurrencyMenuOpen]=useState(false);
+    const [priceAxisWidth,setPriceAxisWidth]=useState(28);
     const [,refreshSeries]=useState(0);
-    useEffect(()=>{setPriceVisible(true);setMoreOpen(false);},[asset.symbol,asset.source,asset.exchange,asset.marketType,asset.pairAddress,asset.chainId,timeframe]);
+    useEffect(()=>{setPriceVisible(true);setMoreOpen(false);setCurrencyMenuOpen(false);},[asset.symbol,asset.source,asset.exchange,asset.marketType,asset.pairAddress,asset.chainId,timeframe]);
     const sourceCandlesRef=useRef(candles);
     sourceCandlesRef.current=candles;
     const chartApiRef = useRef<IChartApi | null>(null);
@@ -246,6 +250,7 @@ export const MainChart = React.memo(
     useEffect(() => {
       if (!chartContainerRef.current) return;
 
+      const compactAxes=window.matchMedia('(max-width:767px), (hover:none) and (pointer:coarse)').matches;
       const chart = createChart(chartContainerRef.current, {
         width: Math.max(1,chartContainerRef.current.clientWidth),
         height: Math.max(1,chartContainerRef.current.clientHeight),
@@ -254,7 +259,7 @@ export const MainChart = React.memo(
           attributionLogo: false,
           textColor: '#a5b1c5',
           fontFamily: "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif",
-          fontSize: 10,
+          fontSize: compactAxes ? 8 : 10,
         },
         grid: {
           vertLines: { color: '#1e222d', style: LineStyle.Solid },
@@ -280,7 +285,7 @@ export const MainChart = React.memo(
           visible:true,
           borderVisible:true,
           ticksVisible:true,
-          minimumWidth:24,
+          minimumWidth:compactAxes?28:24,
           borderColor: '#363a45',
           mode: isLogScale
             ? PriceScaleMode.Logarithmic
@@ -294,7 +299,7 @@ export const MainChart = React.memo(
           visible:true,
           borderVisible:true,
           ticksVisible:true,
-          minimumHeight:24,
+          minimumHeight:compactAxes?28:24,
           borderColor: '#2a2e39',
           timeVisible: true,
           secondsVisible: false,
@@ -311,9 +316,17 @@ export const MainChart = React.memo(
         const { width, height } = entries[0].contentRect;
         if (width > 0 && height > 0) {
           chart.applyOptions({ width, height });
+          requestAnimationFrame(()=>{
+            if(chartApiRef.current===chart)
+              setPriceAxisWidth(Math.max(compactAxes?28:24,chart.priceScale('right').width()));
+          });
         }
       });
       resizeObserver.observe(chartContainerRef.current);
+      requestAnimationFrame(()=>{
+        if(chartApiRef.current===chart)
+          setPriceAxisWidth(Math.max(compactAxes?28:24,chart.priceScale('right').width()));
+      });
 
       // Subscribe to Crosshair hover
       const handleCrosshairMove = (param: any) => {
@@ -1103,6 +1116,7 @@ export const MainChart = React.memo(
         {/* TradingView Legend Header in top left (matching screenshot) */}
         <div
           id="chart-top-legend-header"
+          data-mobile-legend={showMobileChartLegend?'shown':'hidden'}
           className="absolute top-1.5 left-2.5 z-20 flex flex-col gap-0.5 pointer-events-auto"
           onClick={e=>e.stopPropagation()}
         >
@@ -1174,9 +1188,32 @@ export const MainChart = React.memo(
           </div>
         </div>
 
-        {/* Currency Label at Top Right of Price Scale */}
-        <div className="absolute top-2 right-2 z-20 pointer-events-none text-[10px] font-mono font-bold text-[#787b86] bg-[#131722] px-1 rounded">
-          {asset.currency} ▾
+        {/* The quote control is anchored to the actual right price scale width.
+            The quote unit is market-defined: changing it requires changing instrument,
+            not relabeling prices without an FX conversion. */}
+        <div id="chart-quote-currency-anchor"
+          className="absolute top-1 right-0 z-[60] flex flex-col items-center"
+          style={{width:priceAxisWidth}}>
+          <button id="chart-quote-currency-trigger" type="button"
+            aria-label={`Quote currency ${asset.currency}`}
+            aria-expanded={currencyMenuOpen}
+            title={`Quoted in ${asset.currency}`}
+            onClick={e=>{e.stopPropagation();setCurrencyMenuOpen(v=>!v);}}
+            className="flex max-w-full items-center justify-center gap-[1px] border-0 bg-transparent p-0 text-[9px] font-semibold text-[#a6b6ca] shadow-none hover:text-white">
+            <span className="truncate">{asset.currency}</span>
+            <ChevronDown size={9} className="shrink-0"/>
+          </button>
+          {currencyMenuOpen&&<div role="menu" aria-label="Quote currency"
+            className="absolute right-0 top-full z-[80] mt-1 w-40 rounded-md border border-[#3b4960] bg-[#1b2738] p-2 text-left text-[11px] text-[#d8e1ed] shadow-xl"
+            onClick={e=>e.stopPropagation()}>
+            <p className="font-semibold">Quoted in {asset.currency}</p>
+            <p className="mt-1 text-[10px] text-[#9faec5]">Currency follows the selected market.</p>
+            <button type="button" role="menuitem" disabled={!onOpenSymbolSearch}
+              onClick={()=>{setCurrencyMenuOpen(false);onOpenSymbolSearch?.();}}
+              className="mt-2 w-full rounded bg-[#283b56] px-2 py-1 text-left hover:bg-[#395074] disabled:opacity-50">
+              Change market
+            </button>
+          </div>}
         </div>
 
         {/* Price ticks remain at right; candle times remain along chart bottom. */}
