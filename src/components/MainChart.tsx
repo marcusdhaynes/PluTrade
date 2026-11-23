@@ -39,6 +39,8 @@ import { DrawingOverlay } from './DrawingOverlay';
 import {candleAtTimestamp} from '../services/chartCandles';
 import {mayUseIncrementalChartUpdate} from '../services/chartUpdatePolicy';
 import {marketIdentity} from '../services/marketIdentity';
+import {calculateUtcSessionVwap} from '../services/sessionVWAP';
+import {chartEmptyExplanation,type ChartLoadState} from '../services/chartRecovery';
 import {
   Eye,
   Settings,
@@ -75,6 +77,12 @@ interface MainChartProps {
   openPosition?: PaperPosition | null;
   onClosePosition?: (id: string) => void;
   onOpenConditionalOrder?: (dep: DependencyContext) => void;
+  chartHistoryState?:ChartLoadState;
+  onRetryChartHistory?:()=>void;
+  onChooseChartMarket?:(market:Asset)=>void;
+  chartRecoveryMarkets?:Asset[];
+  onTryOneMinute?:()=>void;
+  sessionVwapEnabled?:boolean;
 }
 
 function formatHollowCandles(candles: OHLCV[]) {
@@ -119,6 +127,12 @@ export const MainChart = React.memo(
       openPosition,
       onClosePosition,
       onOpenConditionalOrder,
+      chartHistoryState='empty',
+      onRetryChartHistory,
+      onChooseChartMarket,
+      chartRecoveryMarkets=[],
+      onTryOneMinute,
+      sessionVwapEnabled=false,
     },
     ref
   ) => {
@@ -140,7 +154,7 @@ export const MainChart = React.memo(
       renderedCandles:OHLCV[];
     } | null>(null);
 
-    const indicatorsKey = useMemo(() => JSON.stringify(indicators), [indicators]);
+    const indicatorsKey = useMemo(() => JSON.stringify({indicators,sessionVwapEnabled}), [indicators,sessionVwapEnabled]);
 
     // Track crosshair hovered candle for Legend display
     const [hoveredCandle, setHoveredCandle] = useState<OHLCV | null>(null);
@@ -196,8 +210,8 @@ export const MainChart = React.memo(
       if (!chartContainerRef.current) return;
 
       const chart = createChart(chartContainerRef.current, {
-        width: chartContainerRef.current.clientWidth,
-        height: chartContainerRef.current.clientHeight,
+        width: Math.max(1,chartContainerRef.current.clientWidth),
+        height: Math.max(1,chartContainerRef.current.clientHeight),
         layout: {
           background: { type: ColorType.Solid, color: '#131722' },
           textColor: '#787b86',
@@ -778,6 +792,19 @@ export const MainChart = React.memo(
         vwapSeries.setData(vwapData.map((d) => ({ time: d.time as any, value: d.value })));
       }
 
+      if (sessionVwapEnabled) {
+        // UTC midnight reset, using observed venue OHLCV rather than Heikin-Ashi synthetic candles.
+        const sessionPoints=calculateUtcSessionVwap(candles);
+        if(sessionPoints.length){
+          const sessionSeries=trackSeries(chart.addSeries(LineSeries,{
+            color:'#d8a75b',lineWidth:2,lineStyle:LineStyle.Solid,
+            priceLineVisible:false,lastValueVisible:true,
+            title:'UTC Session VWAP (bar)', 
+          },0));
+          sessionSeries.setData(sessionPoints.map(p=>({time:p.time as any,value:p.value})));
+        }
+      }
+
       if (indicators.bollingerBands.enabled) {
         const bbData = calculateBollingerBands(
           chartCandles,
@@ -1012,6 +1039,40 @@ export const MainChart = React.memo(
 
         {/* Lightweight Charts Canvas Container */}
         <div ref={chartContainerRef} className="w-full h-full" />
+        {sessionVwapEnabled&&candles.length>0&&<div className="absolute top-7 right-2 z-20 pointer-events-none text-[10px] text-[#d8a75b] bg-[#131722]/90 rounded px-1">
+          UTC Session VWAP · OHLCV approximation
+        </div>}
+        {candles.length===0&&<section id="chart-data-recovery" role="status"
+          className="absolute inset-0 z-30 flex items-center justify-center p-4 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-[440px] rounded-xl border border-[#3b4b65] bg-[#161e2c]/95 p-4 shadow-xl text-[#dbe6f8] space-y-3">
+            <div className="flex items-center gap-2">
+              <div className={`h-2 w-2 rounded-full ${chartHistoryState==='loading'?'bg-[#e9b872] animate-pulse':'bg-[#fc8796]'}`}/>
+              <strong className="text-sm">{chartHistoryState==='loading'?'Loading chart candles':'Chart history unavailable'}</strong>
+            </div>
+            <p className="text-xs text-[#b7c5d9]">{chartEmptyExplanation(asset,timeframe,chartHistoryState)}</p>
+            <p className="text-[10px] text-[#95a5bc]">
+              {asset.symbol} · {asset.source||asset.exchange} · {timeframe} · Exact venue history.
+              No made-up candles or silent exchange substitution.
+            </p>
+            {chartHistoryState!=='loading'&&<div className="flex gap-2 flex-wrap">
+              {onRetryChartHistory&&<button type="button" onClick={onRetryChartHistory}
+                className="rounded bg-[#2e66df] px-3 py-1.5 text-xs hover:bg-[#4681f5]">Retry history</button>}
+              {timeframe!=='1m'&&onTryOneMinute&&<button type="button" onClick={onTryOneMinute}
+                className="rounded border border-[#4c6381] px-3 py-1.5 text-xs hover:bg-[#28374c]">Try 1 minute</button>}
+            </div>}
+            {chartHistoryState!=='loading'&&chartRecoveryMarkets.length>0&&
+              <div className="border-t border-[#34425a] pt-2 space-y-1">
+                <p className="text-[10px] text-[#9cadc6]">Or select another verified source:</p>
+                <div className="flex flex-wrap gap-1">
+                  {chartRecoveryMarkets.map(m=><button key={marketIdentity(m)}
+                    type="button" onClick={()=>onChooseChartMarket?.(m)}
+                    className="rounded border border-[#46536d] px-2 py-1 text-[11px] hover:bg-[#2b3850]">
+                    {m.symbol} · {m.source||m.exchange}
+                  </button>)}
+                </div>
+              </div>}
+          </div>
+        </section>}
 
         {/* Interactive Open Position Line & Badge (Matching Screenshot!) */}
         {openPosition && positionY !== null && positionY > 30 && (

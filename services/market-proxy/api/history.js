@@ -1,11 +1,26 @@
 const intervals = new Set(['1m','5m','15m','30m','1h','4h','12h','1d','1w']);
+/** Only named first-party frontends may read Kraken Futures history cross-origin. */
+export const ALLOWED_CHART_ORIGINS = new Set([
+  'https://plutrade.com',
+  'https://www.plutrade.com',
+  'https://marcusdhaynes.github.io',
+  'http://127.0.0.1:4173',
+  'http://127.0.0.1:4174',
+  'http://localhost:3000',
+]);
 export default async function handler(req, res) {
   const origin = req.headers.origin;
-  if (origin === 'https://marcusdhaynes.github.io' || origin === 'http://127.0.0.1:4174') {
+  if (typeof origin === 'string' && ALLOWED_CHART_ORIGINS.has(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Vary', 'Origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (req.method === 'OPTIONS') {
+    if (!ALLOWED_CHART_ORIGINS.has(origin)) return res.status(403).end();
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    return res.status(204).end();
+  }
   if (req.method !== 'GET') return res.status(405).json({error:'Method not allowed'});
   const {symbol, resolution = '1m'} = req.query;
   if (typeof symbol !== 'string' || !/^(PF|PI|FI)_[A-Z0-9]{2,32}$/.test(symbol) || !intervals.has(resolution)) {

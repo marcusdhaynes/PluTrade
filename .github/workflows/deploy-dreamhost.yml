@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Run typecheck, strategy/chart regression tests and market proxy CORS checks
+        run: |
+          pnpm run lint
+          pnpm run test:paper
+          node --test services/market-proxy/api/history.test.mjs
+
       - name: Build production bundle
         run: pnpm run build
 

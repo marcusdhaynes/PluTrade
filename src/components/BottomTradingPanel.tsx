@@ -132,7 +132,7 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
     const anchor=document.createElement('a');anchor.href=url;anchor.download='plutrade-paper-ledger-recovery.json';
     anchor.click();URL.revokeObjectURL(url);
   };
-  return <section className={`border-t border-[#2a2e39] bg-[#131722] flex flex-col text-[#d1d4dc] z-20 ${isExpanded?'h-[450px]':'h-[295px]'}`}>
+  return <section className={`border-t border-[#2a2e39] bg-[#131722] flex flex-col text-[#d1d4dc] z-20 ${isExpanded?'h-[min(45vh,450px)]':'h-[min(32vh,295px)]'} shrink-0`}>
     <header className="flex items-center gap-3 px-3 py-1.5 border-b border-[#2a2e39] text-[11px] bg-[#171b25] flex-wrap">
       <strong>Paper Trading</strong>
       <div className="relative">

@@ -42,6 +42,7 @@ import { PaperAccountModal } from './components/PaperAccountModal';
 import { SavedChartsModal } from './components/SavedChartsModal';
 import type { SavedChartIdea } from './services/savedCharts';
 import {combineHistoryWithLive,mergeLiveCandle} from './services/chartCandles';
+import {chartStarterMarket,type ChartLoadState} from './services/chartRecovery';
 import { cancelPaperOrder,evaluatePaperOrders,expirePaperOrders,submitPaperOrder,estimatePaperQty,withOrderReservations,type PaperOrderRequest } from './services/paperOrders';
 import { SymbolSearchModal } from './components/SymbolSearchModal';
 import { IndicatorsModal } from './components/IndicatorsModal';
@@ -87,7 +88,7 @@ const storedAssetValid=(value:unknown):value is Asset=>{
     typeof asset.currency==='string';
 };
 export default function App() {
-  // State: Assets & Selection (Default to PF_ARBUSD / ARBUSD perpetual matching screenshot)
+  // State: Assets & Selection (fresh installs default to a public spot feed; saved exact market is preserved)
   const [assets, setAssets] = useState<Asset[]>(() => {
     const saved = readLocalJson<unknown>('tv_assets',null) ?? readLocalJson<unknown>('tv_assets_v4',null);
     // Old raw asset-list storage is no longer an authoritative exchange directory.
@@ -126,7 +127,7 @@ export default function App() {
         if(matches.length===1)return matches[0];
       }
     }
-    return INITIAL_ASSETS[0];
+    return chartStarterMarket(assets);
   });
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>(() => {
     const saved = localStorage.getItem('tv_timeframe');
@@ -144,6 +145,10 @@ export default function App() {
   // State: Chart Data & Candles
   const [candles, setCandles] = useState<OHLCV[]>([]);
   const [isLoadingCandles, setIsLoadingCandles] = useState(true);
+  const [chartHistoryState,setChartHistoryState]=useState<ChartLoadState>('loading');
+  const [chartRetry,setChartRetry]=useState(0);
+  const [sessionVwapEnabled,setSessionVwapEnabled]=useState<boolean>(()=>readLocalJson<boolean>('plutrade_utc_session_vwap_v1',false)===true);
+  useEffect(()=>{try{localStorage.setItem('plutrade_utc_session_vwap_v1',JSON.stringify(sessionVwapEnabled));}catch{}},[sessionVwapEnabled]);
 
   // State: Watchlists
   const [watchlists,setWatchlistsRaw]=useState<Watchlist[]>(()=>loadWatchlists(INITIAL_WATCHLISTS));
@@ -1283,6 +1288,7 @@ export default function App() {
   useEffect(() => {
     let isCancelled = false;
     setIsLoadingCandles(true);
+    setChartHistoryState('loading');
     // Clear the former instrument immediately; do not display its candles
     // under the next symbol while awaiting the exact-venue history response.
     setCandles([]);
@@ -1290,10 +1296,11 @@ export default function App() {
     fetchHistoricalData(activeAsset, activeTimeframe).then((data) => {
       if (!isCancelled) {
         setCandles(live => combineHistoryWithLive(data,live));
+        setChartHistoryState(data.length>0?'ready':'empty');
         setIsLoadingCandles(false);
       }
     }).catch(() => {
-      if (!isCancelled) setIsLoadingCandles(false);
+      if (!isCancelled){setChartHistoryState('error');setIsLoadingCandles(false);}
     });
 
     // 2. Fetch Real 24h Ticker data (high, low, volume, 24h price change)
@@ -1430,7 +1437,7 @@ export default function App() {
       isCancelled = true;
       unsubscribe();
     };
-  }, [activeAsset.symbol, activeAsset.source, activeAsset.exchange, activeAsset.marketType, activeTimeframe, processPriceAlertTick,executeObservedTick,recordFeedEvent]);
+  }, [activeAsset.symbol, activeAsset.source, activeAsset.exchange, activeAsset.marketType, activeTimeframe, chartRetry,processPriceAlertTick,executeObservedTick,recordFeedEvent]);
 
   // All new paper trades must pass through the validated right-side order ticket.
   const handleSubmitTicketOrder = (request:PaperOrderRequest):string|null => {
@@ -1699,6 +1706,8 @@ export default function App() {
         onOpenSavedCharts={()=>setIsSavedChartsOpen(true)}
         onOpenReplay={()=>requestBottomPanel('replay')}
         onOpenStrategyLab={()=>requestBottomPanel('strategyLab')}
+        sessionVwapEnabled={sessionVwapEnabled}
+        onToggleSessionVwap={()=>setSessionVwapEnabled(v=>!v)}
         marketStatus={marketStatus}
         currentTemplateId={currentTemplateId}
         onSelectTemplate={handleSelectTemplate}
@@ -1738,6 +1747,7 @@ export default function App() {
 
         {/* Center: Multi-Chart Resizable Workspace + Bottom Trading Panel + Bottom Bar */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+          <div className="flex-1 min-h-0 w-full relative" id="chart-workspace-viewport">
           <MultiChartWorkspace
             ref={chartRef}
             template={currentTemplate}
@@ -1748,6 +1758,9 @@ export default function App() {
             setActiveTimeframe={setActiveTimeframe}
             chartType={chartType}
             primaryCandles={candles}
+            primaryHistoryState={chartHistoryState}
+            onReloadPrimary={()=>setChartRetry(n=>n+1)}
+            sessionVwapEnabled={sessionVwapEnabled}
             indicators={indicators}
             activeTool={activeTool}
             setActiveTool={setActiveTool}
@@ -1772,6 +1785,7 @@ export default function App() {
             onUpdateSplitSizes={handleUpdateSplitSizes}
             onOpenConditionalOrder={handleOpenCreateConditionalOrder}
           />
+          </div>
 
           {/* Bottom Trading Dock (Paper Trading Panel) */}
           <BottomTradingPanel

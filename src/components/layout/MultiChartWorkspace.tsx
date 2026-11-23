@@ -21,6 +21,7 @@ import { fetchHistoricalData,subscribeRealMarketData } from '../../services/data
 import {combineHistoryWithLive,mergeLiveCandle} from '../../services/chartCandles';
 import {chartIdentity,marketIdentity,resolveWindowAsset,matchesExactMarket} from '../../services/marketIdentity';
 import {normalizeSyncWindow,windowsEquivalent} from '../../services/chartSyncPolicy';
+import {recoveryMarkets,type ChartLoadState} from '../../services/chartRecovery';
 import { Maximize2, Minimize2, ChevronDown, Check, RotateCcw, Columns } from 'lucide-react';
 
 interface MultiChartWorkspaceProps {
@@ -32,6 +33,9 @@ interface MultiChartWorkspaceProps {
   setActiveTimeframe: (tf: Timeframe) => void;
   chartType: ChartType;
   primaryCandles: OHLCV[];
+  primaryHistoryState:ChartLoadState;
+  onReloadPrimary:()=>void;
+  sessionVwapEnabled:boolean;
   indicators: IndicatorSettings;
   activeTool: DrawingToolType;
   setActiveTool: (tool: DrawingToolType) => void;
@@ -167,6 +171,9 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
       setActiveTimeframe,
       chartType,
       primaryCandles,
+      primaryHistoryState,
+      onReloadPrimary,
+      sessionVwapEnabled,
       indicators,
       activeTool,
       setActiveTool,
@@ -252,6 +259,8 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
 
     // Independent candle cache for multi-window setups with different symbols or timeframes
     const [windowCandles, setWindowCandles] = useState<Record<string, OHLCV[]>>({});
+    const [secondaryHistoryState,setSecondaryHistoryState]=useState<Record<string,ChartLoadState>>({});
+    const [secondaryRetry,setSecondaryRetry]=useState(0);
     const inFlightRequestsRef = useRef<Set<string>>(new Set());
 
     // Track dragging divider
@@ -439,9 +448,15 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
         const key=chartIdentity(asset,win.timeframe);
         if(seen.has(key)||(marketIdentity(asset)===marketIdentity(activeAsset)&&win.timeframe===activeTimeframe))continue;
         seen.add(key);
+        setSecondaryHistoryState(prev=>({...prev,[key]:'loading'}));
         void fetchHistoricalData(asset,win.timeframe).then(history=>{
-          if(!closed)setWindowCandles(prev=>({...prev,[key]:combineHistoryWithLive(history,prev[key]||[])}));
-        }).catch(()=>{if(!closed)setWindowCandles(prev=>({...prev,[key]:prev[key]||[]}));});
+          if(closed)return;
+          setWindowCandles(prev=>({...prev,[key]:combineHistoryWithLive(history,prev[key]||[])}));
+          setSecondaryHistoryState(prev=>({...prev,[key]:history.length>0?'ready':'empty'}));
+        }).catch(()=>{
+          if(closed)return;
+          setSecondaryHistoryState(prev=>({...prev,[key]:'error'}));
+        });
         stops.push(subscribeRealMarketData(asset,win.timeframe,{
           onPriceUpdate:()=>{},onOrderBook:()=>{},onTrade:()=>{},onStatusChange:()=>{},
           onCandleTick:c=>{if(!closed)setWindowCandles(prev=>({...prev,[key]:mergeLiveCandle(prev[key]||[],c)}));},
@@ -449,7 +464,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
       }
       return ()=>{closed=true;stops.forEach(stop=>stop());};
     },[template.count,paneSignature,activeAsset.symbol,activeAsset.source,activeAsset.exchange,activeAsset.marketType,
-      activeAsset.chainId,activeAsset.pairAddress,activeTimeframe,allAssets.length]);
+      activeAsset.chainId,activeAsset.pairAddress,activeTimeframe,allAssets.length,secondaryRetry]);
 
     // Mouse Drag Listeners for Resizing Dividers and Custom Grid
     useEffect(() => {
@@ -673,6 +688,24 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
               timeframe={winTimeframe}
               chartType={template.count === 1 || winIndex === activeWindowIndex ? chartType : (win?.chartType || chartType)}
               candles={currentCandles}
+              chartHistoryState={isPrimary?primaryHistoryState:(secondaryHistoryState[key]||'loading')}
+              onRetryChartHistory={isPrimary?onReloadPrimary:()=>setSecondaryRetry(n=>n+1)}
+              chartRecoveryMarkets={recoveryMarkets(allAssets,winAsset)}
+              onChooseChartMarket={choice=>{
+                setActiveWindowIndex(winIndex);
+                onUpdateWindowStates(windowStates.map((state,i)=>i===winIndex?{
+                  ...state,symbol:choice.symbol,source:choice.source||choice.exchange,marketType:choice.marketType,
+                  chainId:choice.chainId,pairAddress:choice.pairAddress,
+                }:state));
+                setActiveAsset(choice);
+              }}
+              onTryOneMinute={()=>{
+                setActiveWindowIndex(winIndex);
+                onUpdateWindowStates(windowStates.map((state,i)=>i===winIndex?
+                  {...state,timeframe:'1m'}:state));
+                if(template.count===1||syncSettings.interval)setActiveTimeframe('1m');
+              }}
+              sessionVwapEnabled={sessionVwapEnabled}
               indicators={indicators}
               activeTool={activeTool}
               setActiveTool={setActiveTool}

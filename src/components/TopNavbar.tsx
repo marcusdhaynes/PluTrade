@@ -131,6 +131,8 @@ interface TopNavbarProps {
   onOpenSavedCharts?: () => void;
   onOpenReplay?: () => void;
   onOpenStrategyLab?: () => void;
+  sessionVwapEnabled?: boolean;
+  onToggleSessionVwap?: () => void;
   marketStatus?: { connected: boolean; provider: string; latencyMs: number };
   // Window Layout & Multi-Chart Management
   currentTemplateId: string;
@@ -179,6 +181,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   onOpenSavedCharts,
   onOpenReplay,
   onOpenStrategyLab,
+  sessionVwapEnabled=false,
+  onToggleSessionVwap,
   marketStatus,
   currentTemplateId,
   onSelectTemplate,
@@ -834,6 +838,15 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           <TrendingUp className="w-3 h-3"/><span>Strategy</span>
         </button>
 
+        <button id="chart-session-vwap-toggle" type="button"
+          aria-label="Toggle UTC Session VWAP" aria-pressed={sessionVwapEnabled}
+          title="UTC Session VWAP calculated from verified OHLCV bars; not tick-level volume"
+          onClick={onToggleSessionVwap}
+          className={`px-2 py-0.5 rounded text-[11px] border ${sessionVwapEnabled?
+            'border-[#d8a75b] text-[#eec58b] bg-[#3a2d1a]':
+            'border-[#3e4553] text-[#9da8ba] hover:bg-[#242b37]'}`}>
+          Session VWAP
+        </button>
         <div className="h-3 w-px bg-[#2a2e39] mx-0.5" />
 
         {/* Undo / Redo */}

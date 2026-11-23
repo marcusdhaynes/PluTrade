@@ -28,6 +28,8 @@ jobs:
       - run: pnpm run test:paper
       - name: Verify market ingestion recovery tests
         run: node --test services/ingest-worker/protocol.test.mjs services/ingest-worker/recovery.test.mjs services/ingest-worker/store.test.mjs services/ingest-worker/order-intent.test.mjs
+      - name: Verify production market proxy CORS allowlist
+        run: node --test services/market-proxy/api/history.test.mjs
       - name: Check standalone worker syntax
         run: |
           node --check services/ingest-worker/store.mjs
