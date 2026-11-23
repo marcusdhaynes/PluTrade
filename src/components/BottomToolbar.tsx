@@ -140,6 +140,10 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             }}/>
         </label>
         {scaleError&&<p role="alert" className="text-[#ffacb3]">{scaleError}</p>}
+        <p className="border-t border-[#3e4a61] pt-2 text-[10px] text-[#99abc3]">
+          Charting library: <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer"
+            className="text-[#a5c7ff] underline">Lightweight Charts™ by TradingView</a>.
+        </p>
         <button type="button" onClick={()=>setScalePanelOpen(false)}
           className="rounded border border-[#46536c] px-3 py-1">Close</button>
       </section></FloatingPortal>}        </div>,
