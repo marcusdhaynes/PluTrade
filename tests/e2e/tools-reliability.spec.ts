@@ -153,7 +153,7 @@ test('trade journal tools navigate to filters, evaluator, risk center and histor
   await expect(page.locator('#plutrade-risk-center')).toBeVisible();
   await page.locator('#right-tab-trade-journal').click();
   await expect(page.locator('#trade-journal-root-modal')).toBeVisible();
-  await page.getByTitle('Open historical replay').click();
+  await page.locator('#trade-journal-root-modal').getByTitle('Open historical replay',{exact:true}).click();
   await expect(page.locator('#trade-journal-root-modal')).toHaveCount(0);
   await expect(page.locator('#plutrade-historical-lab')).toBeVisible();
   expect(errors).toEqual([]);
