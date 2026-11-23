@@ -767,3 +767,66 @@ test('mobile top header, native time scale, custom price rail and order bar are 
     expect(sizes.nativeCanvasRight).toBeLessThanOrEqual(sizes.rightDockLeft+1);
   }
 });
+
+
+test('mobile toolbar gaps match the right rail at every screen width',async({page})=>{
+  for(const viewport of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(viewport);
+    await page.goto('./');
+    const gaps=await page.evaluate(()=>{
+      const element=(selector:string)=>document.querySelector(selector);
+      const gap=(selector:string)=>element(selector)?getComputedStyle(element(selector)!).gap:null;
+      return {
+        right:gap('#tradingview-right-icon-bar > div:first-child'),
+        left:gap('#tradingview-left-toolbar > div:first-child'),
+        starred:gap('#left-toolbar-starred-tools'),
+        top:gap('#plutrade-mobile-navbar'),
+        chartStyles:gap('#mobile-chart-style-anchor'),
+        favorites:gap('#mobile-chart-style-favorites'),
+        actions:gap('#mobile-top-chart-actions'),
+        window:gap('#mobile-window-actions'),
+      };
+    });
+    expect(gaps.right).toBe('2px');
+    for(const [name,value] of Object.entries(gaps)){
+      if(value!==null)expect(value,`${name} at ${viewport.width}x${viewport.height}`).toBe(gaps.right);
+    }
+  }
+});
+
+test('mobile price marker stays compact and above chart overlays without covering axes',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.route('https://api.exchange.coinbase.com/products/BTC-USD/candles**',route=>{
+    const last=Math.floor(Date.now()/60000)*60-60;
+    const data=Array.from({length:120},(_,i)=>{
+      const time=last-(119-i)*60,open=100+i*0.05,close=open+0.03;
+      return [time,open-0.1,close+0.1,open,close,10+i];
+    }).reverse();
+    return route.fulfill({status:200,contentType:'application/json',
+      headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(data)});
+  });
+  await page.goto('./');
+  const label=page.locator('#chart-current-price-label').first();
+  const axis=page.locator('#plutrade-mobile-price-axis').first();
+  await expect(label).toBeVisible();
+  await expect(axis).toBeVisible();
+  const geometry=await page.evaluate(()=>{
+    const badge=document.querySelector('#chart-current-price-label')!.getBoundingClientRect();
+    const rail=document.querySelector('#plutrade-mobile-price-axis')!.getBoundingClientRect();
+    const plot=document.querySelector('[data-testid="chart-pinch-surface"]')!.getBoundingClientRect();
+    const canvas=document.querySelector('#plutrade-native-chart-canvas')!;
+    const rows=canvas.querySelectorAll('table tr');
+    const timeAxis=rows[rows.length-1].getBoundingClientRect();
+    const style=getComputedStyle(document.querySelector('#chart-current-price-label')!);
+    return {badge:{left:badge.left,right:badge.right,top:badge.top,bottom:badge.bottom,height:badge.height},
+      railLeft:rail.left,plotLeft:plot.left,timeAxisTop:timeAxis.top,
+      background:style.backgroundColor,zIndex:Number(style.zIndex)};
+  });
+  expect(geometry.badge.height).toBeLessThanOrEqual(17);
+  expect(geometry.badge.left).toBeGreaterThanOrEqual(geometry.plotLeft);
+  expect(geometry.badge.right).toBeLessThanOrEqual(geometry.railLeft-1);
+  expect(geometry.badge.bottom).toBeLessThanOrEqual(geometry.timeAxisTop+1);
+  expect(geometry.badge.top).toBeGreaterThanOrEqual(geometry.plotLeft>=0?0:-1);
+  expect(geometry.background).toBe('rgb(41, 98, 255)');
+  expect(geometry.zIndex).toBeGreaterThan(50);
+});
