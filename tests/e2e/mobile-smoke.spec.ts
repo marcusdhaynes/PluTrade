@@ -58,3 +58,37 @@ test('holding TP reveals the advanced entry path without placing an order',async
   await expect(ticket.getByRole('switch',{name:'Enable take profit'})).toHaveAttribute('aria-checked','true');
   await expect(page.locator('#plutrade-mobile-trade-controls')).toBeVisible();
 });
+
+
+test('toolbar Edit applies hidden controls; Default requires two taps to restore',async ({page})=>{
+  await page.goto('./');
+  const edit=page.locator('#left-toolbar-edit');
+  const reset=page.locator('#left-toolbar-reset');
+  const zoom=page.getByRole('button',{name:'Zoom chart in'});
+  await expect(edit).toBeVisible();
+  await expect(reset).toBeVisible();
+  await expect(zoom).toBeVisible();
+  await edit.click();
+  await expect(edit).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'Hide Zoom In'}).click();
+  await expect(page.locator('[data-toolbar-slot="zoom"]')).toHaveAttribute('data-toolbar-visible','false');
+  await edit.click();
+  await expect(zoom).toHaveCount(0);
+  await reset.click();
+  await expect(reset).toHaveAttribute('aria-label','Confirm reset toolbar to default');
+  await expect(zoom).toHaveCount(0);
+  await reset.click();
+  await expect(zoom).toBeVisible();
+  await expect(page.locator('#left-toolbar-starred-tools > button')).toHaveCount(2);
+});
+
+test('mobile chart reserves time/price axes and disables page-touch zoom only on chart',async ({page})=>{
+  await page.goto('./');
+  const chart=page.locator('[data-testid="chart-pinch-surface"]').first();
+  await expect(chart).toBeVisible();
+  await expect(chart).toHaveCSS('touch-action','none');
+  await expect(chart.getByLabel('Trading chart with time axis at bottom and price axis at right')).toBeAttached();
+  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content',/width=device-width/);
+  const root=page.locator('#tradingview-app-root');
+  expect(await root.evaluate(node=>node.scrollWidth<=window.innerWidth+1)).toBe(true);
+});
