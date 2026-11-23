@@ -1864,6 +1864,7 @@ export default function App() {
       {/* Top Navbar */}
       <TopNavbar
         activeAsset={activeAsset}
+        activeTimeframe={activeTimeframe}
         chartType={chartType}
         setChartType={handleSetChartType}
         onOpenSymbolSearch={() => {setAddingWatchlistSymbol(false);setIsSymbolSearchOpen(true);}}
