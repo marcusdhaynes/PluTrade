@@ -211,3 +211,35 @@ html,body,#root {
     border-top:0;
   }
 }
+
+/* Compact journal is scoped to the central body only: the 28px journal dock
+   (and the chart's separate left drawing toolbar) remain full size.
+   Enlarged layout dimensions compensate exactly for the visual scale so
+   controls remain clickable and the interior table can still scroll. */
+@media (max-width:767px) {
+  #trade-journal-window-card #journal-main-content-viewport {
+    flex:1 1 auto;
+    min-width:0;
+    min-height:0;
+    overflow:hidden;
+  }
+  #journal-mobile-scaled-content {
+    flex:0 0 auto;
+    width:147.059%;
+    height:147.059%;
+    transform:scale(.68);
+    transform-origin:top left;
+  }
+  #trade-journal-root-modal #journal-main-content-viewport > #journal-mobile-scaled-content > div {
+    min-height:0;
+  }
+}
+@media (min-width:768px) and (hover:none) and (pointer:coarse) {
+  #journal-mobile-scaled-content {
+    flex:0 0 auto;
+    width:125%;
+    height:125%;
+    transform:scale(.8);
+    transform-origin:top left;
+  }
+}
