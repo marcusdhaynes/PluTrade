@@ -223,8 +223,10 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({
                         e.stopPropagation();
                         onToggleStatus(item.id);
                       }}
-                      className="p-0.5 hover:text-white rounded hover:bg-[#2a2e39]"
-                      title={item.status === 'Active' ? 'Pause Alert' : 'Resume Alert'}
+                      disabled={item.status==='Expired'}
+                      className="p-0.5 hover:text-white rounded hover:bg-[#2a2e39] disabled:opacity-30 disabled:cursor-not-allowed"
+                      title={item.status==='Expired'?'Expired alerts must be recreated':
+                        item.status==='Active'?'Pause Alert':item.status==='Triggered'?'Rearm Alert':'Resume Alert'}
                     >
                       {item.status === 'Active' ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5" />}
                     </button>

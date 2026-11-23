@@ -116,3 +116,25 @@ test('paper order amendment validates marketability, maintains reserved margin a
   await expect(page.getByText('submitted',{exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+
+test('alert manager labels non-crossing conditions correctly and blocks expired reactivation',async({page})=>{
+  await isolateExternalFeeds(page);
+  await page.addInitScript(()=>{
+    const at=Date.now();
+    localStorage.setItem('tv_alerts',JSON.stringify([{
+      id:'qa-expired-alert',symbol:'BTCUSD',exchange:'Coinbase',marketType:'spot',
+      condition:'greater_than',frequency:'once',targetPrice:101,timeframe:'1m',
+      createdAt:at-7200000,expiresAt:at-60000,triggered:false,paused:false,
+    }]));
+  });
+  await page.goto('./');
+  await page.locator('#right-tab-alerts').click();
+  const panel=page.locator('#tradingview-alerts-panel');
+  await expect(panel).toContainText('BTCUSD greater than 101');
+  await expect(panel).toContainText('Expired');
+  await expect(panel.getByTitle('Expired alerts must be recreated')).toBeDisabled();
+  await page.locator('#open-alerts-modal-btn').click();
+  const modal=page.locator('#alerts-modal-window');
+  await expect(modal.getByRole('button',{name:'Expired',exact:true})).toBeDisabled();
+});

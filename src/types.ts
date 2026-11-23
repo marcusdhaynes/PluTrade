@@ -260,7 +260,7 @@ export interface DetailedAlert {
   message: string;
   symbol: string;
   timeframe: string;
-  status: 'Active' | 'Activating' | 'Triggered' | 'Paused';
+  status: 'Active' | 'Activating' | 'Triggered' | 'Paused' | 'Expired';
   dateStr: string;
   type: 'trendline' | 'price' | 'indicator';
 }

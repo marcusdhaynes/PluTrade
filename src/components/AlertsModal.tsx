@@ -238,18 +238,19 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     </div>
                     {alert.notes && <div className="text-[11px] text-[#787b86] mt-0.5">{alert.notes}</div>}
                     <div className="text-[10px] text-[#787b86] mt-1">
-                      {alert.paused?'Paused':alertIsExpired(alert,Date.now())?'Expired':alert.triggered?'Triggered':alert.lastTriggeredAt?'Active · fired '+new Date(alert.lastTriggeredAt).toLocaleTimeString():'Active'}{' '}
+                      {alertIsExpired(alert,Date.now())?'Expired':alert.paused?'Paused':alert.triggered?'Triggered':alert.lastTriggeredAt?'Active · fired '+new Date(alert.lastTriggeredAt).toLocaleTimeString():'Active'}{' '}
                       • {new Date(alert.createdAt).toLocaleTimeString()}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                <button type="button" onClick={()=>setAlerts(prev=>prev.map(a=>a.id===alert.id?
+                <button type="button" disabled={alertIsExpired(alert,Date.now())} onClick={()=>setAlerts(prev=>prev.map(a=>a.id===alert.id?
                   (a.triggered?{...a,paused:false,triggered:false,
                     lastTriggeredAt:undefined,lastTriggeredBar:undefined}:{...a,paused:!a.paused}):a))}
-                  className="text-[10px] text-[#a4bee7] hover:text-white rounded px-1" title={alert.paused?'Resume alert':'Pause alert'}>
-                  {alert.paused?'Resume':alert.triggered?'Rearm':'Pause'}
+                  className="text-[10px] text-[#a4bee7] hover:text-white rounded px-1 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={alertIsExpired(alert,Date.now())?'Expired alerts must be recreated':alert.triggered?'Rearm alert':alert.paused?'Resume alert':'Pause alert'}>
+                  {alertIsExpired(alert,Date.now())?'Expired':alert.paused?'Resume':alert.triggered?'Rearm':'Pause'}
                 </button>
                 <button
                   onClick={() => handleDeleteAlert(alert.id)}

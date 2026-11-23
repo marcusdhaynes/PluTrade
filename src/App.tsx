@@ -422,7 +422,7 @@ export default function App() {
   }, []);
   // Poll dormant/inactive-chart alerts at their exact venue. These snapshots
   // are not tick streams; users must keep the browser open for notifications.
-  const monitoredAlertKeys = alerts.filter(a=>!a.triggered&&!a.paused&&!!a.exchange)
+  const monitoredAlertKeys = alerts.filter(a=>!a.triggered&&!a.paused&&!alertIsExpired(a,Date.now())&&!!a.exchange)
     .map(alertMarketIdentity).sort().join('~');
   useEffect(() => {
     const wanted = new Set(monitoredAlertKeys.split('~').filter(Boolean));
@@ -1930,9 +1930,9 @@ export default function App() {
           trades={recentTrades}
           detailedAlerts={[...alerts.map(a => ({
             id:a.id, symbol:a.symbol,
-            title:`${a.symbol} crosses ${a.condition === 'cross_above' ? 'above' : 'below'} ${a.targetPrice}`,
+            title:`${a.symbol} ${a.condition.replaceAll('_',' ')} ${a.targetPrice}`,
             message:a.notes || `Trigger at ${a.targetPrice}`, timeframe:'Live',
-            status:(a.paused?'Paused':a.triggered?'Triggered':alertIsExpired(a,Date.now())?'Paused':'Active') as DetailedAlert['status'],
+            status:(alertIsExpired(a,Date.now())?'Expired':a.paused?'Paused':a.triggered?'Triggered':'Active') as DetailedAlert['status'],
             dateStr:new Date(a.createdAt).toLocaleString(), type:'price' as const,
           })),...detailedAlerts]}
           alertLog={alertLog}
