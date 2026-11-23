@@ -489,8 +489,13 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   // --------------------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept when typing in modal input
-      if (editingTextId) return;
+      // Never hijack navigation, deletion or browser keys from a text field,
+      // editor, modal, or a keyboard event another handler has consumed.
+      const target=e.target instanceof Element?e.target:document.activeElement;
+      const editing=target instanceof Element&&Boolean(target.closest(
+        'input, textarea, select, [contenteditable="true"], [role="textbox"], [role="combobox"], [role="dialog"]'
+      ));
+      if(editingTextId||editing||e.defaultPrevented||e.isComposing||e.repeat||e.ctrlKey||e.metaKey)return;
 
       if (e.altKey) {
         if (e.key === 't' || e.key === 'T') {
@@ -511,8 +516,9 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         }
       }
 
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedDrawingId) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !e.altKey) {
+        if (selectedDrawingId && !areDrawingsLocked) {
+          e.preventDefault();
           setDrawings((prev) => prev.filter((d) => d.id !== selectedDrawingId));
           setSelectedDrawingId(null);
         }
@@ -529,7 +535,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedDrawingId, editingTextId, setActiveTool, setDrawings]);
+  }, [selectedDrawingId, editingTextId, areDrawingsLocked, setActiveTool, setDrawings]);
 
   if (areDrawingsHidden) return null;
 

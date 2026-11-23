@@ -158,3 +158,32 @@ test('trade journal tools navigate to filters, evaluator, risk center and histor
   await expect(page.locator('#plutrade-historical-lab')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+
+test('drawing Delete and Alt shortcuts do not steal keystrokes from symbol search',async({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('./');
+  await expect(page.locator('#chart-data-recovery')).toHaveCount(0);
+  await page.getByTitle('Trend Line').click();
+  const overlay=page.locator('#tradingview-drawing-overlay');
+  await overlay.click({position:{x:210,y:160}});
+  await overlay.click({position:{x:300,y:200}});
+  await expect(page.locator('#drawing-selected-bar')).toBeVisible();
+  await page.locator('#chart-top-legend-header')
+    .getByRole('button',{name:'Change chart symbol'}).click();
+  const dialog=page.locator('#symbol-search-modal-window');
+  await expect(dialog).toBeVisible();
+  const entry=dialog.locator('input').first();
+  await entry.fill('BTCC');
+  await entry.press('Backspace');
+  await expect(entry).toHaveValue('BTC');
+  await entry.press('Delete');
+  await expect(entry).toHaveValue('BTC');
+  await entry.press('Alt+h');
+  await expect(entry).toBeFocused();
+  await expect(page.locator('#drawing-selected-bar')).toBeAttached();
+  await page.locator('#close-symbol-search-modal').click();
+  await expect(page.locator('#drawing-selected-bar')).toBeVisible();
+  expect(errors).toEqual([]);
+});
