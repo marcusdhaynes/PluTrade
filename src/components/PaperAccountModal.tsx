@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {X,Info} from 'lucide-react';
 import type {PaperAccountRecord} from '../services/paperAccounts';
 import {DEFAULT_PAPER_SETTINGS,normalizePaperSettings,type PaperSettings} from '../services/paperTrading';
+import {parsePaperSettingsPreset,exportPaperSettingsPreset} from '../services/paperSettingsImport';
 
 interface Props{
   existing?:PaperAccountRecord|null;
@@ -24,6 +25,33 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
   const [name,setName]=useState(existing?.portfolio.account.name||proposedName);
   const [settings,setSettings]=useState<PaperSettings>(()=>normalizePaperSettings(existing?.portfolio.settings||DEFAULT_PAPER_SETTINGS));
   const [error,setError]=useState('');
+  const [importNotice,setImportNotice]=useState('');
+  const importSettings=async(event:React.ChangeEvent<HTMLInputElement>)=>{
+    const file=event.target.files?.[0];
+    event.target.value='';
+    if(!file)return;
+    try{
+      if(file.size>65536)throw new Error('Settings preset must be smaller than 64 KB.');
+      if(!/\.(json|csv)$/i.test(file.name))throw new Error('Choose a CSV or JSON settings preset.');
+      const next=parsePaperSettingsPreset(await file.text(),settings,locked);
+      setSettings(next);
+      setError('');
+      setImportNotice('Settings imported for review. Press '+(existing?'Save changes':'Create')+' to apply; no trades or positions were imported.');
+    }catch(e){
+      setImportNotice('');
+      setError(e instanceof Error?e.message:'Could not read the settings preset.');
+    }
+  };
+  const downloadPreset=()=>{
+    try{
+      const data=exportPaperSettingsPreset(settings);
+      const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+      const link=document.createElement('a');
+      link.href=url;link.download='plutrade-paper-account-settings.json';link.click();
+      window.setTimeout(()=>URL.revokeObjectURL(url),500);
+      setError('');
+    }catch(e){setError(e instanceof Error?e.message:'Could not export preset.');}
+  };
   const locked=!!existing&&(existing.portfolio.positions.length>0||existing.portfolio.fills.length>0||(existing.portfolio.pendingOrders?.length||0)>0);
   useEffect(()=>{
     const esc=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};
@@ -45,6 +73,30 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
       <div className="px-5 py-4 space-y-4">
         <label className="block"><span className={label}>Account name</span>
           <input autoFocus className={cls} maxLength={80} value={name} onChange={e=>setName(e.target.value)}/></label>
+        <div className="rounded border border-[#3c4659] bg-[#1b2635] p-2.5 space-y-2">
+          <strong className="block text-[11px] text-[#deebff]">Import account starting capital & fees</strong>
+          <p className="text-[10px] leading-snug text-[#a6b9d2]">
+            Import a CSV or JSON settings preset: startingBalance, currency, feePercent,
+            perContract, spreadBps, slippageBps, and leverage. Fields can still be edited below.
+            This imports settings only—not transactions or a TradingView account connection.
+          </p>
+          <div className="flex items-center flex-wrap gap-2">
+            <label className="cursor-pointer rounded border border-[#52627c] px-2.5 py-1.5 text-[11px] text-[#b9d4ff] hover:bg-[#34445a]">
+              Import CSV / JSON
+              <input aria-label="Import paper account settings file" type="file" accept=".csv,.json,text/csv,application/json"
+                onChange={importSettings} className="sr-only"/>
+            </label>
+            <button type="button" onClick={downloadPreset}
+              className="rounded border border-[#52627c] px-2.5 py-1.5 text-[11px] text-[#b9d4ff] hover:bg-[#34445a]">
+              Export settings JSON
+            </button>
+          </div>
+          {importNotice&&<p role="status" className="text-[10px] text-[#a8e3bd]">{importNotice}</p>}
+          {locked&&<p className="text-[10px] text-[#f1d39a]">
+            This account has trade history: its starting balance and currency are protected.
+            Import those values into a new account instead.
+          </p>}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <label><span className={label}>Starting balance</span>
             <input type="number" min="0" step="any" className={cls} disabled={locked}
@@ -92,6 +144,7 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
           <div className="grid grid-cols-2 gap-3 mt-3">
             <label><span className={label}>Commission</span>
               <input type="number" min="0" step="any" className={cls} disabled={!settings.commission.enabled}
+                aria-label={settings.commission.mode==='percent'?'Commission percent':'Fixed commission per execution'}
                 value={settings.commission.amount}
                 onChange={e=>change({commission:{...settings.commission,amount:Number(e.target.value)}})}/></label>
             <label><span className={label}>Commission type</span>
@@ -102,7 +155,7 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
               </select></label>
           </div>
           <p className="text-[11px] text-[#a9adb7] mt-2">
-            Fees are zero unless enabled. A fixed fee applies once per fill; a percent fee uses notional (enter 0.04 for 0.04%). Each opening, closing or partial-fill execution is calculated independently.
+            Fees are zero unless enabled. Percentage commission uses the notional value of each execution: 0.04 means 0.04% (not 4%). Opening, closing and partial fills each incur their own charge. For futures/options, enabled per-contract fees take precedence.
           </p>
         </div>
         <div className="border-t border-[#33363a] pt-3 space-y-2">
