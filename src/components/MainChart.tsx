@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback, useImperativeHandle, forwardRef } from 'react';
 import {
   createChart,
   ColorType,
