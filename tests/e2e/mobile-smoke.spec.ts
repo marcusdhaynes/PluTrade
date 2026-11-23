@@ -195,5 +195,5 @@ test('mobile chart settings are available from compact menus rather than a scrol
   await expect(actions.getByLabel('Mobile chart layout')).toBeVisible();
   await actions.getByRole('menuitem',{name:'Alert'}).click();
   await expect(actions).toHaveCount(0);
-  await expect(page.getByRole('dialog',{name:/alert/i}).first()).toBeVisible();
+  await expect(page.locator('#alerts-modal-window')).toBeVisible();
 });
