@@ -869,7 +869,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
               <button
                 className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition-colors cursor-pointer"
                 title="Open trade filters"
-                onClick={()=>{setActiveTab('trades');setFilterRequest(n=>n+1);}}
+                onClick={event=>{event.stopPropagation();setActiveTab('trades');setFilterRequest(n=>n+1);}}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
               </button>
