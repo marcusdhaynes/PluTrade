@@ -40,7 +40,7 @@ interface Props{
 }
 
 export const TimeframeBar:React.FC<Props>=({
-  activeAsset,activeTimeframe,onStandardTimeframe,customInterval,onCustomTimeframe
+  activeAsset,activeTimeframe,onStandardTimeframe,customInterval,onCustomTimeframe,calendarControl
 })=>{
   const [favoritesByTicker,setFavoritesByTicker]=useState<IntervalFavorites>(()=>{
     try{return sanitizeTimeframeFavorites(JSON.parse(localStorage.getItem(TIMEFRAME_FAVORITES_KEY)||'{}'));}
