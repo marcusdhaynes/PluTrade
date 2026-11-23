@@ -13,6 +13,9 @@ import {
   EyeOff,
   Trash2,
   Star,
+  Pencil,
+  RotateCcw,
+  Check,
   PenTool,
   ChevronRight,
   Sparkles,
@@ -310,6 +313,58 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [isLineMenuOpen, setIsLineMenuOpen] = useState(false);
   const [isFavoritesOnly,setIsFavoritesOnly]=useState(false);
+  const allToolbarKeys=['crosshair','line-group','fibonacci','rectangle','text','measure',
+    'zoom','magnet','stay','lock','hide','clear','color'];
+  const [visibleTools,setVisibleTools]=useState<Record<string,boolean>>(()=>{
+    try{
+      const raw=JSON.parse(localStorage.getItem('plutrade_toolbar_visibility_v1')||'{}');
+      if(!raw||typeof raw!=='object'||Array.isArray(raw))return {};
+      return Object.fromEntries(allToolbarKeys.map(key=>[key,raw[key]!==false]));
+    }catch{return {};}
+  });
+  const [draftVisible,setDraftVisible]=useState<Record<string,boolean>>(visibleTools);
+  const [editingToolbar,setEditingToolbar]=useState(false);
+  const [resetArmed,setResetArmed]=useState(false);
+  useEffect(()=>{try{localStorage.setItem('plutrade_toolbar_visibility_v1',
+    JSON.stringify(visibleTools));}catch{}},[visibleTools]);
+  const toggleToolbarEdit=()=>{
+    setResetArmed(false);
+    if(editingToolbar){
+      setVisibleTools({...draftVisible});
+      setEditingToolbar(false);
+    }else{
+      setDraftVisible({...visibleTools});
+      setEditingToolbar(true);
+    }
+  };
+  const toolbarSlot=(key:string,label:string,content:React.ReactNode)=>{
+    const enabled=(editingToolbar?draftVisible:visibleTools)[key]!==false;
+    if(!editingToolbar&&!enabled)return null;
+    return <div key={key} className="relative w-full flex justify-center shrink-0"
+      data-toolbar-slot={key} data-toolbar-visible={String(enabled)}>
+      <div className={editingToolbar&&!enabled?'opacity-35 grayscale pointer-events-none':'w-full flex justify-center'}>
+        {content}
+      </div>
+      {editingToolbar&&<button type="button" aria-label={(enabled?'Hide ':'Show ')+label}
+        aria-pressed={enabled} title={(enabled?'Hide ':'Show ')+label}
+        onClick={()=>setDraftVisible(prev=>({...prev,[key]:prev[key]===false}))}
+        className="absolute inset-0 z-[55] rounded-md border border-[#6e8aa7] bg-[#172236]/30 flex items-start justify-end">
+        <span className={'text-[9px] leading-3 rounded-bl px-0.5 '+(enabled?'bg-[#206650] text-white':'bg-[#723746] text-white')}>
+          {enabled?'✓':'×'}
+        </span>
+      </button>}
+    </div>;
+  };
+  const resetToolbar=()=>{
+    if(!resetArmed){setResetArmed(true);return;}
+    setVisibleTools({});
+    setDraftVisible({});
+    setStarredTools(['ray','parallel_channel']);
+    setSelectedLineTool('trendline');
+    setIsLineMenuOpen(false);
+    setResetArmed(false);
+    setEditingToolbar(false);
+  };
   const favoritesBtnRef=useRef<HTMLButtonElement>(null);
   const lineMenuRef = useRef<HTMLDivElement>(null);
   const lineBtnRef = useRef<HTMLDivElement>(null);
@@ -393,11 +448,13 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
   return (
     <aside
       id="tradingview-left-toolbar"
-      className="w-[32px] bg-[#131722] border-r border-[#2a2e39] py-1 px-[2px] flex flex-col items-center justify-between select-none shrink-0 z-30 overflow-visible"
+      className="w-[32px] bg-[#131722] border-r border-[#2a2e39] py-1 px-[2px] flex flex-col items-center justify-between select-none shrink-0 z-30 overflow-y-auto overflow-x-visible scrollbar-none"
     >
       {/* Top Main Tools */}
-      <div className="flex flex-col items-center gap-1 w-full relative">
+      <div className="flex flex-col items-center gap-1 w-full relative min-h-0">
         {/* 1. Crosshair / Cursor */}
+        {toolbarSlot('crosshair','Crosshair',<React.Fragment>
+
         <button
           id="left-tool-crosshair"
           onClick={() => setActiveTool('crosshair')}
@@ -414,7 +471,12 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           </div>
         </button>
 
-        {/* 2. LINES / CHANNELS / PITCHFORKS TOOLBAR BUTTON & FLYOUT MENU */}
+
+        </React.Fragment>)}
+
+                {/* 2. LINES / CHANNELS / PITCHFORKS TOOLBAR BUTTON & FLYOUT MENU */}
+        {toolbarSlot('line-group','Line Tools',<React.Fragment>
+
         <div ref={lineBtnRef} className="relative w-full flex justify-center">
           <button
             id="left-tool-line-group"
@@ -638,10 +700,27 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           )}
         </div>
 
-        {/* 3. Fibonacci, Rectangle, Text, Measure Tools */}
+
+        </React.Fragment>)}
+
+                {starredTools.length>0&&<div id="left-toolbar-starred-tools" className="w-full flex flex-col items-center gap-1 border-l-2 border-[#d5a34c] pl-0.5"
+          title="Starred drawing tools">
+          {starredTools.map(id=>{
+            const tool=LINE_TOOLS_CATALOG.find(entry=>entry.id===id);
+            if(!tool)return null;
+            return <button key={id} type="button" aria-label={'Starred '+tool.label}
+              title={'Starred '+tool.label} onClick={()=>{if(editingToolbar)return;setSelectedLineTool(tool.id);setActiveTool(tool.id);}}
+              className={'w-[24px] h-6 flex items-center justify-center rounded-md '+(activeTool===tool.id?
+                'bg-[#2962ff] text-white':'bg-[#24202b] text-[#e6b85f] hover:bg-[#373244]')}>
+              {tool.icon}
+            </button>;
+          })}
+        </div>}
+
+                {/* 3. Fibonacci, Rectangle, Text, Measure Tools */}
         {otherTools.map((tool) => {
           const isActive = activeTool === tool.id;
-          return (
+          return toolbarSlot(tool.id,tool.label,(
             <button
               key={tool.id}
               id={`left-tool-${tool.id}`}
@@ -660,10 +739,12 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
                 {tool.label}
               </div>
             </button>
-          );
+          ));
         })}
 
         {/* Zoom Tool */}
+        {toolbarSlot('zoom','Zoom In',<React.Fragment>
+
         <button
           className="w-[26px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition-colors cursor-pointer"
           title="Zoom In"
@@ -673,9 +754,14 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           <ZoomIn className="w-3.5 h-3.5" />
         </button>
 
-        <div className="w-4 h-px bg-[#2a2e39] my-0.5" />
+
+        </React.Fragment>)}
+
+                <div className="w-4 h-px bg-[#2a2e39] my-0.5" />
 
         {/* Magnet Mode Toggle */}
+        {toolbarSlot('magnet','Magnet',<React.Fragment>
+
         <button
           id="magnet-mode-toggle-btn"
           onClick={() => setIsMagnetMode((prev) => !prev)}
@@ -689,7 +775,12 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           <Magnet className="w-3.5 h-3.5" />
         </button>
 
-        {/* Stay in Drawing Mode */}
+
+        </React.Fragment>)}
+
+                {/* Stay in Drawing Mode */}
+        {toolbarSlot('stay','Stay in Drawing Mode',<React.Fragment>
+
         <button
           onClick={() => setStayInDrawingMode(prev=>!prev)}
           className={`w-[26px] h-[24px] rounded-md flex items-center justify-center transition-colors cursor-pointer ${
@@ -703,7 +794,12 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           <PenTool className="w-3.5 h-3.5" />
         </button>
 
-        {/* Lock All Drawings */}
+
+        </React.Fragment>)}
+
+                {/* Lock All Drawings */}
+        {toolbarSlot('lock','Lock Drawings',<React.Fragment>
+
         <button
           onClick={() => {
             const next = !lockedState;
@@ -720,7 +816,12 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           <Lock className="w-3.5 h-3.5" />
         </button>
 
-        {/* Hide / Show All Drawings */}
+
+        </React.Fragment>)}
+
+                {/* Hide / Show All Drawings */}
+        {toolbarSlot('hide','Hide Drawings',<React.Fragment>
+
         <button
           id="hide-drawings-toggle-btn"
           onClick={() => setAreDrawingsHidden((prev) => !prev)}
@@ -734,7 +835,12 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           {areDrawingsHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
         </button>
 
-        {/* Clear All Drawings (Trash Can) */}
+
+        </React.Fragment>)}
+
+                {/* Clear All Drawings (Trash Can) */}
+        {toolbarSlot('clear','Clear Drawings',<React.Fragment>
+
         <button
           id="clear-all-drawings-btn"
           onClick={onClearDrawings}
@@ -745,7 +851,12 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           <Trash2 className="w-3.5 h-3.5" />
         </button>
 
-        {/* Color Picker for active drawing tool */}
+
+        </React.Fragment>)}
+
+                {/* Color Picker for active drawing tool */}
+        {toolbarSlot('color','Drawing Color',<React.Fragment>
+
         <div className="relative">
           <button
             id="color-picker-trigger-btn"
@@ -774,6 +885,9 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
             </div>
           )}
         </div>
+        </React.Fragment>)}
+
+        
       </div>
 
       {/* Favorites Star Button directly beneath buttons */}
@@ -792,6 +906,23 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           title={`Favorite Tools (${starredTools.length})`}
         >
           <Star className={`w-3.5 h-3.5 ${starredTools.length > 0 ? 'fill-[#ffb74d]' : ''}`} />
+        </button>
+      </div>
+      <div className="w-full flex flex-col gap-1 items-center border-t border-[#3b4556] pt-1 mt-auto shrink-0"
+        id="left-toolbar-layout-controls">
+        <button type="button" id="left-toolbar-reset" onClick={resetToolbar}
+          aria-label={resetArmed?'Confirm reset toolbar to default':'Reset toolbar to default'}
+          title={resetArmed?'Press again to confirm default layout':'Default toolbar layout'}
+          className={'w-[26px] h-[26px] flex items-center justify-center rounded-md border '+(resetArmed?
+            'border-[#e0b364] bg-[#4a3726] text-[#ffdc9f]':'border-[#3c4557] text-[#92a6c3] hover:bg-[#283348]')}>
+          {resetArmed?<Check size={15}/>:<RotateCcw size={15}/>}
+        </button>
+        <button type="button" id="left-toolbar-edit" onClick={toggleToolbarEdit}
+          aria-pressed={editingToolbar} aria-label={editingToolbar?'Apply toolbar layout':'Edit toolbar layout'}
+          title={editingToolbar?'Apply layout and hide disabled tools':'Edit visible toolbar buttons'}
+          className={'w-[26px] h-[26px] flex items-center justify-center rounded-md border '+(editingToolbar?
+            'border-[#4d9cba] bg-[#225374] text-white':'border-[#3c4557] text-[#92a6c3] hover:bg-[#283348]')}>
+          {editingToolbar?<Check size={15}/>:<Pencil size={15}/>}
         </button>
       </div>
     </aside>
