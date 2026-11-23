@@ -182,7 +182,11 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
     setReducePercent(50);
     setIncreasePercent(50);
     setNotes('');
-  }, [isOpen, initialDependency, orderToEdit, activeAsset, activeAccountId]);
+  // Do not reset a half-completed rule when the selected Asset receives a
+  // live price tick; the market identity, not the transient quote, owns this form.
+  }, [isOpen, initialDependency, orderToEdit, activeAsset.symbol,
+    activeAsset.source, activeAsset.exchange, activeAsset.marketType,
+    activeAsset.chainId, activeAsset.pairAddress, activeAccountId]);
 
   if (!isOpen) return null;
 
