@@ -139,11 +139,10 @@ export const MobileTradingControls:React.FC<Props>=({
     }
     setMode(next);
   };
-  const baseButton='flex-1 min-w-0 h-9 rounded-md border border-[#3c4658] bg-[#232b39] text-[10px] font-semibold tracking-tight text-[#d6e2f4] active:bg-[#355172] touch-manipulation';
+  const baseButton='flex-1 min-w-0 h-[21px] rounded border border-[#3c4658] bg-[#232b39] px-px text-[10px] leading-[19px] font-semibold tracking-tight text-[#d6e2f4] active:bg-[#355172] touch-manipulation';
   const close=()=>{clearHold();setPanel(null);setError('');};
   return <div id="plutrade-mobile-trade-controls"
-    className="relative md:hidden shrink-0 w-full border-t border-[#3f4d62] bg-[#151d2b] px-1.5 py-1.5 z-40"
-    style={{paddingBottom:'max(6px, env(safe-area-inset-bottom))'}}>
+    className="relative md:hidden shrink-0 w-full h-[24px] border-t border-[#3f4d62] bg-[#151d2b] px-1 py-px z-40">
     {panel&&<div role="dialog" aria-label={panel==='equity'?'Equity allocation':panel==='sl'?'Stop loss options':'Take profit options'}
       className="absolute bottom-full left-0 right-0 z-50 max-h-[min(67dvh,440px)] overflow-y-auto rounded-t-xl border border-[#48556a] bg-[#182233] p-3 shadow-[0_-10px_45px_#000a] text-xs">
       <div className="flex items-center justify-between mb-3">
@@ -285,7 +284,7 @@ export const MobileTradingControls:React.FC<Props>=({
       <button type="button" className={baseButton+' '+(position?'border-[#ad4851] bg-[#49272f] text-white':'opacity-40')}
         disabled={!position} aria-label="Exit paper position" onClick={onExit}>Exit</button>
       <button type="button" className={baseButton} onClick={()=>{setEquityDraft(String(equityPercent));setError('');setPanel('equity');}}>
-        {numeric(equityPercent,1)}% <span className="block text-[9px] font-normal leading-none">Equity</span>
+        {numeric(equityPercent,1)}% <span className="text-[9px] font-normal">Eq</span>
       </button>
       {(['sl','tp'] as const).map(kind=><button key={kind} type="button"
         className={baseButton+' '+(panel===kind?'border-[#709fff]':'')}
@@ -294,10 +293,10 @@ export const MobileTradingControls:React.FC<Props>=({
         onContextMenu={e=>{e.preventDefault();clearHold();openExit(kind,true);}}
         onPointerDown={()=>startHold(kind)} onPointerUp={clearHold} onPointerCancel={clearHold} onPointerLeave={clearHold}
         onClick={()=>clickExit(kind)}>
-        {kind.toUpperCase()}
-        <span className="block text-[9px] font-normal leading-none">
-          {position?(kind==='sl'?position.sl:position.tp)?numeric((kind==='sl'?position.sl:position.tp)!,2):kind==='sl'&&position.dynamicTrailing?'ATR':kind==='tp'&&position.tpLevels?.length?position.tpLevels.length+' levels':'Set':'All Types'}
-        </span>
+        {kind.toUpperCase()}{position&&(
+          (kind==='sl'&&(!!position.sl||!!position.trailingPercent||!!position.dynamicTrailing))||
+          (kind==='tp'&&(!!position.tp||!!position.tpLevels?.length))
+        )?<span className="pl-0.5 text-[9px]">●</span>:null}
       </button>)}
     </div>
   </div>;
