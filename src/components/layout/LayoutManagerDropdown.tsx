@@ -57,16 +57,16 @@ export const LayoutManagerDropdown: React.FC<LayoutManagerDropdownProps> = ({
 
   // Close popover on click outside
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
+    const handleOutsideClick = (e: PointerEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         onClose();
       }
     };
     if (isOpen) {
-      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('pointerdown', handleOutsideClick, true);
     }
     return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('pointerdown', handleOutsideClick, true);
     };
   }, [isOpen, onClose]);
 

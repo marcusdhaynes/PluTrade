@@ -66,18 +66,26 @@ test('toolbar Edit applies hidden controls; Default requires two taps to restore
   const reset=page.locator('#left-toolbar-reset');
   const zoom=page.getByRole('button',{name:'Zoom chart in'});
   await expect(edit).toBeVisible();
-  await expect(reset).toBeVisible();
+  await expect(reset).toHaveCount(0);
   await expect(zoom).toBeVisible();
+  await expect(page.getByRole('button',{name:'Toggle favorite drawing tools'})).toHaveCount(0);
   await edit.click();
+  await expect(reset).toBeVisible();
   await expect(edit).toHaveAttribute('aria-pressed','true');
   await page.getByRole('button',{name:'Hide Zoom In'}).click();
   await expect(page.locator('[data-toolbar-slot="zoom"]')).toHaveAttribute('data-toolbar-visible','false');
   await edit.click();
+  await expect(reset).toHaveCount(0);
   await expect(zoom).toHaveCount(0);
+  await edit.click();
+  await expect(reset).toBeVisible();
   await reset.click();
   await expect(reset).toHaveAttribute('aria-label','Confirm reset toolbar to default');
-  await expect(zoom).toHaveCount(0);
+  // In Edit mode, a hidden slot remains as a dimmed placeholder so the user
+  // can re-enable it; it disappears only after Apply is clicked.
+  await expect(page.locator('[data-toolbar-slot="zoom"]')).toHaveAttribute('data-toolbar-visible','false');
   await reset.click();
+  await expect(reset).toHaveCount(0);
   await expect(zoom).toBeVisible();
   await expect(page.locator('#left-toolbar-starred-tools > button')).toHaveCount(2);
 });
@@ -182,26 +190,73 @@ test('portrait and landscape touch layouts fit without scrolling the application
     expect(geometry.tradeRight).toBeLessThanOrEqual(size.width+1);
     expect(geometry.tradeBottom).toBeLessThanOrEqual(size.height+1);
     expect(geometry.chartHeight).toBeGreaterThan(80);
-    await expect(page.getByRole('button',{name:'More mobile chart actions'})).toBeVisible();
+    await expect(page.locator('#chart-timeframe-bar')).toBeVisible();
+    await expect(page.locator('#mobile-chart-action-rows')).toBeVisible();
+    await expect(page.locator('#mobile-top-tools-trigger')).toHaveCount(0);
   }
 });
 
-test('mobile chart settings are available from compact menus rather than a scrolling navbar',async ({page})=>{
+test('mobile chart controls are always visible and visual style favorites can be pinned',async ({page})=>{
   await page.setViewportSize({width:320,height:568});
   await page.goto('./');
-  const menu=page.getByRole('button',{name:'More mobile chart actions'});
   await expect(page.locator('#mobile-symbol-search-trigger')).toBeVisible();
-  await expect(page.locator('#mobile-timeframe-selector')).toBeVisible();
-  await expect(page.locator('#mobile-chart-style-selector')).toBeVisible();
-  await menu.click();
-  const actions=page.getByRole('menu',{name:'Additional chart actions'});
-  await expect(actions).toBeVisible();
-  await expect(actions.getByRole('menuitem',{name:'Alert'})).toBeVisible();
-  await expect(actions.getByLabel('Mobile chart layout')).toBeVisible();
-  await actions.getByRole('menuitem',{name:'Alert'}).click();
-  await expect(actions).toHaveCount(0);
+  await expect(page.locator('#mobile-timeframe-selector')).toHaveCount(0);
+  await expect(page.locator('#mobile-top-tools-trigger')).toHaveCount(0);
+  const rows=page.locator('#mobile-chart-action-rows');
+  await expect(rows).toBeVisible();
+  await expect(rows.getByRole('button',{name:'Alert'})).toBeVisible();
+  await expect(rows.getByRole('button',{name:'Paper Trading'})).toBeVisible();
+  await expect(rows.getByLabel('Mobile chart layout')).toBeVisible();
+
+  const style=page.getByRole('button',{name:'Choose visual chart style'});
+  await expect(style).toBeVisible();
+  await style.click();
+  const styles=page.getByRole('dialog',{name:'Chart styles'});
+  await expect(styles).toBeVisible();
+  await styles.getByRole('button',{name:'Favorite Line'}).click();
+  await expect(page.locator('#mobile-chart-type-btn-line')).toBeVisible();
+  await styles.getByRole('button',{name:'Chart style Line'}).click();
+  await expect(styles).toHaveCount(0);
+  await expect(page.locator('#mobile-chart-type-btn-line')).toHaveClass(/bg-\[#295ee8\]/);
+  await style.click();
+  await expect(styles).toBeVisible();
+  await page.locator('#chart-timeframe-scroll').click({position:{x:3,y:5}});
+  await expect(styles).toHaveCount(0);
+  await rows.getByRole('button',{name:'Alert'}).click();
   await expect(page.locator('#alerts-modal-window')).toBeVisible();
 });
+
+test('all intervals scroll horizontally until ticker favorites are explicitly saved',async ({page})=>{
+  await page.setViewportSize({width:320,height:568});
+  await page.goto('./');
+  const row=page.locator('#chart-timeframe-scroll');
+  await expect(row).toBeVisible();
+  const buttons=row.locator('button');
+  await expect(buttons).toHaveCount(19);
+  expect(await row.evaluate(node=>node.scrollWidth>node.clientWidth)).toBe(true);
+  await expect(page.locator('#timeframe-dropdown-trigger')).toHaveCount(0);
+
+  const star=page.locator('#timeframe-favorites-button');
+  await star.click();
+  const panel=page.getByRole('dialog',{name:/Favorite intervals for /});
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button',{name:'Favorite 1m',exact:true}).click();
+  await panel.getByRole('button',{name:'Favorite 1h',exact:true}).click();
+  await panel.getByRole('button',{name:'Save for ticker'}).click();
+  await expect(panel).toHaveCount(0);
+  await expect(buttons).toHaveCount(2);
+  await expect(row.locator('#tf-btn-1m')).toBeVisible();
+  await expect(row.locator('#tf-btn-1h')).toBeVisible();
+  await expect(row.locator('#tf-btn-3m')).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.locator('#chart-timeframe-scroll button')).toHaveCount(2);
+  await star.click();
+  await panel.getByRole('button',{name:'Clear all'}).click();
+  await panel.getByRole('button',{name:'Save for ticker'}).click();
+  await expect(page.locator('#chart-timeframe-scroll button')).toHaveCount(19);
+});
+
 
 test('mobile has matched 24px execution/range bars and chart-corner settings',async ({page})=>{
   await page.setViewportSize({width:390,height:844});
@@ -240,8 +295,7 @@ test('mobile has matched 24px execution/range bars and chart-corner settings',as
 test('mobile paper workspace remains accessible through actions after removing collapsed strip',async ({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto('./');
-  await page.getByRole('button',{name:'More mobile chart actions'}).click();
-  await page.getByRole('menuitem',{name:'Paper Trading workspace'}).click();
+  await page.locator('#mobile-chart-action-rows').getByRole('button',{name:'Paper Trading'}).click();
   await expect(page.locator('#paper-trading-open-panel')).toBeVisible();
   await expect(page.locator('#plutrade-mobile-trade-controls')).toBeVisible();
   await expect(page.locator('#tradingview-right-icon-bar')).toBeVisible();
@@ -304,8 +358,7 @@ test('mobile trade journal content shrinks independently of its untouched left r
 test('paper account imports starting capital and percent fees without silently creating trades',async ({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto('./');
-  await page.getByRole('button',{name:'More mobile chart actions'}).click();
-  await page.getByRole('menuitem',{name:'Paper Trading workspace'}).click();
+  await page.locator('#mobile-chart-action-rows').getByRole('button',{name:'Paper Trading'}).click();
   await page.getByRole('button',{name:'Select Paper Trading account'}).click();
   await page.getByText('Create account…').click();
   const dialog=page.getByRole('dialog',{name:'Create Paper Trading account'});
@@ -323,4 +376,22 @@ test('paper account imports starting capital and percent fees without silently c
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Select Paper Trading account'})).toContainText('Primary');
   await expect(page.locator('#paper-trading-open-panel')).toContainText('35,000');
+});
+
+
+test('right-side toolbox and time-scale popovers close on outside pointerdown',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const rail=page.locator('#tradingview-right-icon-bar');
+  await rail.locator('#right-tab-watchlist').click();
+  const tools=page.locator('#right-sidebar-content-pane');
+  await expect(tools).toBeVisible();
+  await page.locator('#chart-workspace-viewport').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(tools).toHaveCount(0);
+  await expect(rail).toBeVisible();
+
+  await page.locator('#time-scale-settings-btn').click();
+  await expect(page.getByRole('dialog',{name:'Time scale settings'})).toBeVisible();
+  await page.locator('#chart-timeframe-scroll').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(page.getByRole('dialog',{name:'Time scale settings'})).toHaveCount(0);
 });

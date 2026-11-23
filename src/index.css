@@ -42,8 +42,11 @@ html,body,#root {
     display:flex !important;
     min-width:0;
   }
-  #tradingview-top-navbar > div:not(#plutrade-mobile-navbar) {
+  #tradingview-top-navbar #desktop-primary-navbar {
     display:none !important;
+  }
+  #mobile-chart-action-rows {
+    display:grid !important;
   }
   #plutrade-mobile-trade-controls {
     display:block !important;
@@ -242,4 +245,27 @@ html,body,#root {
     transform:scale(.8);
     transform-origin:top left;
   }
+}
+
+/* Interval shortcuts scroll horizontally within their own chart row, never
+   the page or chart. Keep the Save Favorites star pinned to the right edge. */
+#chart-timeframe-bar {max-width:100%;overflow:visible;}
+#chart-timeframe-scroll {
+  min-width:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+#chart-timeframe-scroll::-webkit-scrollbar {display:none;}
+#timeframe-favorites-button {flex-shrink:0;}
+#mobile-chart-style-favorites {scrollbar-width:none;}
+#mobile-chart-style-favorites::-webkit-scrollbar {display:none;}
+@media (max-width:767px) {
+  #tradingview-top-navbar {height:auto;max-width:100%;width:100%;}
+  #mobile-chart-action-rows {grid-template-columns:repeat(5,minmax(0,1fr));}
+}
+@media (min-width:768px) and (hover:none) and (pointer:coarse) {
+  #tradingview-top-navbar {height:auto;}
+  #mobile-chart-action-rows {grid-template-columns:repeat(5,minmax(0,1fr));}
 }

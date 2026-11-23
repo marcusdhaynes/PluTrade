@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {createPortal} from 'react-dom';
 import type { IChartApi } from 'lightweight-charts';
 import { Calendar, RotateCcw, Settings } from 'lucide-react';
@@ -28,6 +28,25 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const [barSpacing,setBarSpacing]=useState(6);
   const [rightOffset,setRightOffset]=useState(4);
   const [scaleError,setScaleError]=useState('');
+  const datePopoverRef=useRef<HTMLDivElement>(null);
+  const chartCornerRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!datePanelOpen&&!scalePanelOpen)return;
+    const dismiss=(event:PointerEvent)=>{
+      const target=event.target as Node;
+      if(datePanelOpen&&!datePopoverRef.current?.contains(target))setDatePanelOpen(false);
+      if(scalePanelOpen&&!chartCornerRef.current?.contains(target))setScalePanelOpen(false);
+    };
+    const escape=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){setDatePanelOpen(false);setScalePanelOpen(false);}
+    };
+    window.addEventListener('pointerdown',dismiss,true);
+    window.addEventListener('keydown',escape);
+    return ()=>{
+      window.removeEventListener('pointerdown',dismiss,true);
+      window.removeEventListener('keydown',escape);
+    };
+  },[datePanelOpen,scalePanelOpen]);
   const applyScale=(spacing:number,offset:number)=>{
     if(!Number.isFinite(spacing)||!Number.isFinite(offset))return;
     const ok=onApplyTimeScaleSettings({barSpacing:spacing,rightOffset:offset});
@@ -66,7 +85,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   ];
 
   return (
-    <div id="tradingview-bottom-bar"
+    <div id="tradingview-bottom-bar" ref={datePopoverRef}
       data-layout="above-chart"
       aria-label="Chart range and scale controls"
       className="relative z-30 flex h-[24px] w-full min-w-0 shrink-0 items-center justify-between border-b border-[#2a2e39] bg-[#131722] px-0.5 text-[10px] select-none md:h-[22px] md:px-2">
@@ -107,7 +126,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         </div>
       </form>}
       {chartCornerHost&&createPortal(
-        <div id="chart-corner-controls"
+        <div id="chart-corner-controls" ref={chartCornerRef}
           className="absolute bottom-0 right-0 z-[48] flex items-center gap-0.5 rounded-tl border border-r-0 border-b-0 border-[#384559] bg-[#151d2b]/95 p-0.5 text-[#9eaec4] shadow-lg">
           <button type="button" id="fit-chart-content-btn" onClick={onFitContent}
             title="Fit candles and restore automatic price scale"
