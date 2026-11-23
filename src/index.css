@@ -629,3 +629,69 @@ html,body,#root {
   }
   #chart-top-legend-header[data-mobile-legend="hidden"] {display:none !important;}
 }
+
+/* Keep the mobile order, ticker, time and price rails on one 24px grid. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  :root { --plutrade-mobile-bar-size:24px; }
+  #plutrade-mobile-trade-controls,
+  #tradingview-bottom-bar,
+  #tradingview-top-navbar {
+    box-sizing:border-box;
+    height:var(--plutrade-mobile-bar-size) !important;
+    min-height:var(--plutrade-mobile-bar-size) !important;
+    max-height:var(--plutrade-mobile-bar-size) !important;
+    flex:0 0 var(--plutrade-mobile-bar-size);
+  }
+  #tradingview-top-navbar {width:100%;max-width:100%;}
+  #plutrade-mobile-navbar {
+    box-sizing:border-box;
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+    padding:0 2px;
+    gap:2px;
+    flex:1 1 auto;
+  }
+  #mobile-symbol-search-trigger,
+  #plutrade-mobile-navbar button,
+  #plutrade-mobile-navbar #mobile-layout-anchor {
+    box-sizing:border-box;
+    height:20px !important;
+    min-height:20px !important;
+    max-height:20px !important;
+    padding-top:0 !important;
+    padding-bottom:0 !important;
+    line-height:18px;
+  }
+  #mobile-chart-style-trigger {padding-left:2px !important;padding-right:2px !important;}
+  #plutrade-mobile-navbar #mobile-chart-style-favorites {max-height:20px;}
+  /* Unlike Lightweight Charts minimumWidth, this strip is strictly fixed. */
+  #plutrade-native-chart-canvas {
+    box-sizing:border-box;
+    width:calc(100% - var(--plutrade-mobile-bar-size)) !important;
+    height:100%;
+  }
+  #plutrade-mobile-price-axis {
+    position:absolute;
+    top:0;
+    right:0;
+    width:var(--plutrade-mobile-bar-size);
+    height:calc(100% - var(--plutrade-mobile-bar-size));
+    border-left:1px solid #363a45;
+    background:#131722;
+    box-sizing:border-box;
+  }
+  #plutrade-mobile-price-axis-corner {
+    position:absolute;
+    right:0;
+    bottom:0;
+    width:var(--plutrade-mobile-bar-size);
+    height:var(--plutrade-mobile-bar-size);
+    background:#131722;
+    border-top:1px solid #2a2e39;
+    border-left:1px solid #363a45;
+    box-sizing:border-box;
+    pointer-events:none;
+  }
+  #chart-quote-currency-anchor {width:var(--plutrade-mobile-bar-size) !important;}
+}
