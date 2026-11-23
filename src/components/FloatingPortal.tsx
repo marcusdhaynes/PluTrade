@@ -60,7 +60,7 @@ export function FloatingPortal({
   if(typeof document==='undefined')return null;
   return createPortal(<div ref={popup} id={id} role={role} aria-label={ariaLabel}
     className={className}
-    style={{position:'fixed',zIndex:1400,top:position.top,left:position.left,
+    style={{position:'fixed',zIndex,top:position.top,left:position.left,
       width:'min('+width+'px, calc(100vw - 16px))',
       maxHeight:position.maxHeight,overflowY:'auto',
       visibility:position.ready?'visible':'hidden'}}>
