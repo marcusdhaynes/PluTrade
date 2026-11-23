@@ -411,45 +411,10 @@ export const MobileTradingControls:React.FC<Props>=({
         aria-expanded={pnlMenu==='cash'}
         className="flex-[1.35_1_0%] min-w-0 h-[21px] flex flex-col justify-center items-center rounded border border-[#4b586e] bg-[#1c2a3d] px-px leading-[9px]"
         onClick={()=>{setAccountMenuOpen(false);setPanel(null);setPnlMenu(v=>v==='cash'?null:'cash');}}>
-        <span className="text-[7px] text-[#a9bbd2]">UP/L{accountCurrency==='USD'?'
-        aria-label="Order" title="Open order ticket; hold for Paper Trading workspace"
-        className={baseButton+' border-[#4d6994] bg-[#253651] text-white'}
-        onPointerDown={()=>{
-          orderHeld.current=false;
-          clearOrderHold();
-          if(onOpenPaperWorkspace)orderHoldTimer.current=setTimeout(()=>{
-            orderHeld.current=true;onOpenPaperWorkspace();
-          },550);
-        }}
-        onPointerUp={clearOrderHold} onPointerCancel={clearOrderHold} onPointerLeave={clearOrderHold}
-        onContextMenu={e=>{e.preventDefault();clearOrderHold();orderHeld.current=true;onOpenPaperWorkspace?.();}}
-        onClick={()=>{if(!orderHeld.current)onOpenOrder();orderHeld.current=false;}}>
-        Order
-      </button>
-      <button type="button" className={baseButton+' border-[#255da9] bg-[#1c426f] text-white'}
-        onClick={()=>onEnter()}>Enter</button>
-      <button type="button" className={baseButton+' '+(position?'border-[#ad4851] bg-[#49272f] text-white':'opacity-40')}
-        disabled={!position} aria-label="Exit paper position" onClick={onExit}>Exit</button>
-      <button type="button" className={baseButton} onClick={()=>{setEquityDraft(String(equityPercent));setError('');setPanel('equity');}}>
-        {numeric(equityPercent,1)}% <span className="text-[9px] font-normal">Eq</span>
-      </button>
-      {(['sl','tp'] as const).map(kind=><button key={kind} type="button"
-        className={baseButton+' '+(panel===kind?'border-[#709fff]':'')}
-        aria-label={kind==='sl'?'Stop loss; hold for all types':'Take profit; hold for all types'}
-        title="Hold for all types"
-        onContextMenu={e=>{e.preventDefault();clearHold();openExit(kind,true);}}
-        onPointerDown={()=>startHold(kind)} onPointerUp={clearHold} onPointerCancel={clearHold} onPointerLeave={clearHold}
-        onClick={()=>clickExit(kind)}>
-        {kind.toUpperCase()}{position&&(
-          (kind==='sl'&&(!!position.sl||!!position.trailingPercent||!!position.dynamicTrailing))||
-          (kind==='tp'&&(!!position.tp||!!position.tpLevels?.length))
-        )?<span className="pl-0.5 text-[9px]">●</span>:null}
-      </button>)}
-    </div>
-  </div>;
-};
-:accountCurrency}</span>
-        <span className={'block w-full truncate text-center text-[clamp(7px,2vw,9px)] font-semibold tabular-nums '+(displayedPnl>=0?'text-[#64e6b9]':'text-[#ff95a4]')}>{compactMoney(displayedPnl)}</span>
+        <span className="text-[7px] text-[#a9bbd2]">{accountCurrency==='USD'?'UP/L$':'UP/L '+accountCurrency}</span>
+        <span className={'block w-full truncate text-center text-[clamp(7px,2vw,9px)] font-semibold tabular-nums '+(displayedPnl>=0?'text-[#64e6b9]':'text-[#ff95a4]')}>
+          {compactMoney(displayedPnl)}
+        </span>
       </button>
       <button type="button" id="mobile-upl-percent" aria-label="Unrealized profit loss percent"
         title={'Unrealized P/L percent · '+(showPosition?'active position':'whole account')}
