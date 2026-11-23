@@ -39,6 +39,7 @@ jobs:
       - name: Validate build output
         run: |
           test -s dist/index.html
+          test -s dist/api/kraken-history.php
           grep -q 'PluTrade' dist/index.html
 
       - name: Add SPA fallback .htaccess

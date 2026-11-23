@@ -18,7 +18,7 @@ Date: November 22–23, 2026. This is a discrete chart-recovery increment, not t
 - CI gates: TypeScript, unit regression tests, read-only market proxy CORS tests, production bundle, and cross-browser/multi-device UI tests. Browser tests include a real app chart becoming visible after a deterministic mocked provider response without allowing fake data in production.
 
 ## Release boundaries
-- A green GitHub Pages or DreamHost frontend build does not deploy the separately hosted Vercel market-history endpoint. Separately deploy that Vercel function before saying live Kraken Futures history works from plutrade.com.
+- DreamHost now includes a same-origin, fixed-provider PHP Kraken history endpoint, avoiding the Vercel CORS dependency specifically on plutrade.com if PHP is enabled. Verify endpoint behavior and provider data after deployment. GitHub Pages still uses the separately deployed Vercel proxy, so source edits alone do not deploy that Vercel function.
 - Local/browser market CORS/network policy remains outside our control. The recovery UI provides honest status and alternate market selection; it cannot guarantee every venue will be accessible in every region.
 - No broker execution, order permissions, strategy automation, or private account credentials are affected.
 - No market-data integrity claims are made solely from mocked browser UI tests; provider-backed CORS, OHLC accuracy and time alignment still require independent verification.
