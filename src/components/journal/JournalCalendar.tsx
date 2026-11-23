@@ -157,8 +157,8 @@ export const JournalCalendar: React.FC<JournalCalendarProps> = ({
   return (
     <div id="journal-calendar-view" className="flex flex-col h-full bg-[#131722] text-[#d1d4dc] overflow-hidden">
       {/* Top Filter Bar (TradeZella Style) */}
-      <div className="bg-[#1e222d] border-b border-[#2a2e39] px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+      <div id="journal-calendar-top-toolbar" className="bg-[#1e222d] border-b border-[#2a2e39] px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div id="journal-calendar-filters" className="flex flex-wrap items-center gap-2 text-xs">
           {/* Symbol Filter */}
           <div className="flex items-center gap-1 bg-[#131722] px-2.5 py-1 rounded border border-[#2a2e39]">
             <span className="text-[#787b86]">Symbol</span>
@@ -240,7 +240,7 @@ export const JournalCalendar: React.FC<JournalCalendarProps> = ({
         </div>
 
         {/* Action Buttons & Window Controls */}
-        <div className="flex items-center gap-2">
+        <div id="journal-calendar-actions" className="flex items-center gap-2">
           <button
             onClick={onOpenAddTrade}
             className="flex items-center gap-1 bg-[#00c49f] hover:bg-[#00b290] text-white px-3 py-1 rounded-full text-xs font-bold transition shadow-sm"
@@ -333,10 +333,10 @@ export const JournalCalendar: React.FC<JournalCalendarProps> = ({
       </div>
 
       {/* Main Calendar Body + Optional Right Drilldown Drawer */}
-      <div className="flex-1 flex overflow-hidden">
+      <div id="journal-calendar-body" className="flex-1 flex overflow-hidden min-w-0">
         {/* Full Interactive Grid */}
-        <div className="flex-1 flex flex-col overflow-auto p-3 custom-scrollbar">
-          <div className="min-w-[700px] w-full flex-1 flex flex-col">
+        <div id="journal-calendar-scroll" className="flex-1 min-w-0 flex flex-col overflow-auto p-3 custom-scrollbar">
+          <div id="journal-calendar-square-grid" className="min-w-[700px] w-full flex-1 flex flex-col">
             {/* Weekday Column Headers (7 Days + TOTAL) */}
             <div className="grid grid-cols-8 gap-2 mb-2 text-center text-xs font-semibold tracking-wider shrink-0">
               <div className="py-1 text-[#848e9c]">SUN</div>
@@ -352,7 +352,7 @@ export const JournalCalendar: React.FC<JournalCalendarProps> = ({
             {/* Grid Rows */}
             <div className="flex-1 flex flex-col gap-2">
               {monthData.weeks.map((week, wIdx) => (
-                <div key={wIdx} className="grid grid-cols-8 gap-2 flex-1 min-h-[105px]">
+                <div key={wIdx} className="journal-calendar-week grid grid-cols-8 gap-2 flex-1 min-h-[105px]">
                   {week.days.map((day, dIdx) => {
                     const hasTrades = day.tradeCount > 0;
                     const isProfit = day.netReturn > 0;
@@ -362,6 +362,7 @@ export const JournalCalendar: React.FC<JournalCalendarProps> = ({
                     return (
                       <div
                         key={dIdx}
+                        data-journal-calendar-square="day"
                         onClick={() => hasTrades && handleDaySelect(day)}
                         className={`${cornerClass} p-2 sm:p-2.5 flex flex-col justify-between transition-all duration-150 relative border select-none overflow-hidden h-full ${
                           !day.inCurrentMonth
@@ -449,6 +450,7 @@ export const JournalCalendar: React.FC<JournalCalendarProps> = ({
 
                   {/* 8th Column: Weekly Total Block */}
                   <div
+                    data-journal-calendar-square="total"
                     className={`${cornerClass} p-2 sm:p-2.5 flex flex-col justify-between text-center font-mono border transition-colors overflow-hidden h-full ${
                       week.totalTrades > 0
                         ? week.totalReturn > 0
