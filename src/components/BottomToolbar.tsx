@@ -5,6 +5,7 @@ import { Calendar, RotateCcw, Settings } from 'lucide-react';
 import type {Asset,Timeframe} from '../types';
 import type {CustomInterval} from '../services/customChartIntervals';
 import {TimeframeBar} from './TimeframeBar';
+import {FloatingPortal} from './FloatingPortal';
 
 interface BottomToolbarProps {
   chart: IChartApi | null;
@@ -38,13 +39,15 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const dateFormRef=useRef<HTMLFormElement>(null);
   const calendarButtonRef=useRef<HTMLButtonElement>(null);
   const chartCornerRef=useRef<HTMLDivElement>(null);
+  const scalePanelRef=useRef<HTMLElement>(null);
   useEffect(()=>{
     if(!datePanelOpen&&!scalePanelOpen)return;
     const dismiss=(event:PointerEvent)=>{
       const target=event.target as Node;
       if(datePanelOpen&&!dateFormRef.current?.contains(target)&&
          !calendarButtonRef.current?.contains(target))setDatePanelOpen(false);
-      if(scalePanelOpen&&!chartCornerRef.current?.contains(target))setScalePanelOpen(false);
+      if(scalePanelOpen&&!chartCornerRef.current?.contains(target)&&
+         !scalePanelRef.current?.contains(target))setScalePanelOpen(false);
     };
     const escape=(event:KeyboardEvent)=>{
       if(event.key==='Escape'){setDatePanelOpen(false);setScalePanelOpen(false);}
@@ -81,8 +84,10 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           <Calendar size={14}/>
         </button>}
       />
-      {datePanelOpen&&<form ref={dateFormRef} role="dialog" aria-label="Go to chart date"
-        className="absolute left-1 top-full mt-1 z-50 min-w-[min(240px,calc(100vw-42px))] rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl flex flex-col gap-2 text-[#dce4f0]"
+      {datePanelOpen&&<FloatingPortal anchor={calendarButtonRef} width={240} placement="bottom-end"
+        id="chart-date-popup" ariaLabel="Go to chart date"
+        className="rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl text-[#dce4f0]">
+      <form ref={dateFormRef} className="flex flex-col gap-2"
         onSubmit={event=>{
           event.preventDefault();
           if(!dateValue||!onGoToDate(dateValue)){setDateError('No loaded market candles for that UTC date.');return;}
@@ -97,7 +102,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           <button type="submit" className="rounded bg-[#2962ff] px-3 py-1 text-white">Go</button>
           <button type="button" onClick={()=>setDatePanelOpen(false)} className="rounded border border-[#46536c] px-3 py-1">Cancel</button>
         </div>
-      </form>}
+      </form></FloatingPortal>}
       {chartCornerHost&&createPortal(
         <div id="chart-corner-controls" ref={chartCornerRef}
           className="absolute bottom-0 right-0 z-[48] flex items-center gap-0.5 rounded-tl border border-r-0 border-b-0 border-[#384559] bg-[#151d2b]/95 p-0.5 text-[#9eaec4] shadow-lg">
@@ -113,8 +118,10 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             className="flex h-[19px] w-[19px] items-center justify-center rounded hover:bg-[#30405c] hover:text-white">
             <Settings size={13}/>
           </button>
-      {scalePanelOpen&&<section role="dialog" aria-label="Time scale settings"
-        className="absolute bottom-full right-0 mb-1 z-[70] w-[min(240px,calc(100vw-58px))] max-h-[min(66dvh,310px)] overflow-y-auto rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl text-[#dce4f0] space-y-2">
+      {scalePanelOpen&&<FloatingPortal anchor={chartCornerRef} width={240} placement="top-end"
+        id="chart-time-scale-popup" ariaLabel="Time scale settings"
+        className="rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl text-[#dce4f0]">
+      <section ref={scalePanelRef} className="space-y-2">
         <strong>Chart time scale</strong>
         <label className="block">Bar spacing
           <input type="number" aria-label="Bar spacing" min={2} max={30} step={1} value={barSpacing}
@@ -135,7 +142,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         {scaleError&&<p role="alert" className="text-[#ffacb3]">{scaleError}</p>}
         <button type="button" onClick={()=>setScalePanelOpen(false)}
           className="rounded border border-[#46536c] px-3 py-1">Close</button>
-      </section>}        </div>,
+      </section></FloatingPortal>}        </div>,
         chartCornerHost
       )}
     </div>
