@@ -24,7 +24,7 @@ export const JournalInsightsPanel:React.FC<{trades:JournalTrade[]}>=({trades})=>
    </div>
    <p className="text-[#acb8ca]">Expectancy is the average recorded net P&L per closed trade. Profit factor is gross recorded wins divided by absolute recorded losses; “—” means no losses were recorded. R-multiples use only trades with explicit realized R. “Known fees” excludes trades without trustworthy fee records.</p>
    {insight.multiTagged&&<p className="text-[#e5c38a]">Trades with multiple strategy tags appear in each relevant group; adding group totals together double-counts those trades.</p>}
-   <div className="max-h-[65vh] overflow-auto rounded border border-[#333d51]">
+   <div id="journal-insights-data-panel" className="max-h-[65vh] overflow-auto rounded border border-[#333d51]">
      <table className="min-w-[830px] w-full text-left">
        <thead className="sticky top-0 bg-[#1e2b41] text-[#b1c4de]"><tr>
         {['Group','Closed','Wins','Losses','Breakeven','Win Rate','Net P&L','Expectancy','Profit Factor','Known Fees','Missing Fees','Mean R'].map(x=>
@@ -42,6 +42,19 @@ export const JournalInsightsPanel:React.FC<{trades:JournalTrade[]}>=({trades})=>
          <td>{row.averageR===null?'—':number(row.averageR)+' ('+row.rObservations+')'}</td>
        </tr>)}</tbody>
      </table>
+     <div id="journal-insights-mobile-cards" className="hidden flex-col gap-1.5 p-2">
+       {insight.rows.map(row=><article key={row.name} className="min-w-0 rounded border border-[#36465c] bg-[#182638] p-2 text-[11px]">
+         <strong className="block truncate pb-1 text-[#dceaff]">{row.name}</strong>
+         <div className="grid grid-cols-3 gap-1 text-[#aebcd0]">
+           <span>Trades {row.trades}</span><span>Wins {row.wins}</span><span>Losses {row.losses}</span>
+           <span>Win {number(row.winRate)}%</span>
+           <span className={row.net>=0?'text-[#4bd9ac]':'text-[#ff8496]'}>P/L {number(row.net)}</span>
+           <span>Exp. {number(row.expectancy)}</span>
+           <span>PF {row.profitFactor===null?'—':number(row.profitFactor)}</span>
+           <span>Fees {number(row.knownFees)}</span><span>Mean R {row.averageR===null?'—':number(row.averageR)}</span>
+         </div>
+       </article>)}
+     </div>
      {!insight.rows.length&&<p className="p-4 text-[#b1bac9]">No settled journal trades have been recorded. Open trades are not included in win rates or expectancy.</p>}
    </div>
    <p className="text-[#92a1b4]">Session groupings use this browser’s local time. No assumed exchange time zone or exchange-rate conversion is used. Imported broker fills remain distinct from hypothetical paper trades.</p>

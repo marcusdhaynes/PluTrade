@@ -248,7 +248,7 @@ export const JournalDashboard: React.FC<JournalDashboardProps> = ({
   return (
     <div className="flex flex-col h-full bg-[#0f131c] text-[#d1d4dc] overflow-hidden select-none font-sans text-xs">
       {/* Top Header Bar with attached Window Controls on the rightmost side */}
-      <div className="bg-[#131722] px-3 py-1.5 border-b border-[#232836] flex flex-wrap items-center justify-between gap-2 shrink-0 z-20">
+      <div id="journal-overview-top-toolbar" className="bg-[#131722] px-3 py-1.5 border-b border-[#232836] flex flex-wrap items-center justify-between gap-2 shrink-0 z-20">
         {/* Left: Tab Title & Quick Summary Badges */}
         <div className="flex items-center gap-2.5">
           <div className="w-6 h-6 rounded bg-[#2563eb] text-white flex items-center justify-center shadow-xs">
@@ -371,7 +371,7 @@ export const JournalDashboard: React.FC<JournalDashboardProps> = ({
       </div>
 
       {/* Main Tab Content */}
-      <div id="journal-dashboard-tab" className={`flex-1 overflow-y-auto ${getPaddingClass()} ${getGapClass()} flex flex-col`}>
+      <div id="journal-dashboard-tab" className={`flex-1 min-w-0 overflow-y-auto overflow-x-hidden ${getPaddingClass()} ${getGapClass()} flex flex-col`}>
         {/* ROW 1: METRIC TILES + WAVESCORE RADAR + EQUITY BALANCE */}
         <div className={`grid grid-cols-1 lg:grid-cols-12 ${getGapClass()}`}>
           {/* Column 1 (4 Cols): Key Metrics + Streaks */}
@@ -731,8 +731,8 @@ export const JournalDashboard: React.FC<JournalDashboardProps> = ({
             </div>
 
             {/* Calendar Grid Table */}
-            <div className="mt-2.5 overflow-x-auto">
-              <div className="min-w-[600px]">
+            <div id="journal-dashboard-calendar-scroller" className="mt-2.5 min-w-0 overflow-x-auto">
+              <div id="journal-dashboard-calendar-grid" className="min-w-[600px]">
                 {/* Weekday Column Headers (7 Days + TOTAL) */}
                 <div className="grid grid-cols-8 gap-1.5 sm:gap-2 mb-2 text-center text-xs font-semibold tracking-wider">
                   <div className="py-1 text-[#848e9c]">SUN</div>
@@ -759,6 +759,7 @@ export const JournalDashboard: React.FC<JournalDashboardProps> = ({
                           <div
                             key={dIdx}
                             onClick={() => hasTrades && handleDayClick(day)}
+                            data-journal-calendar-square="day"
                             className={`${smCornerClass} p-2 flex flex-col justify-between transition-all duration-150 relative border select-none min-h-[74px] ${
                               !day.inCurrentMonth
                                 ? 'bg-[#10141e]/40 border-[#1a1f2c]/50 text-[#434651]'
@@ -844,6 +845,7 @@ export const JournalDashboard: React.FC<JournalDashboardProps> = ({
 
                       {/* 8th Column: Weekly Total Block */}
                       <div
+                        data-journal-calendar-square="total"
                         className={`min-h-[74px] p-2 ${smCornerClass} border flex flex-col justify-between text-center font-mono transition-colors ${
                           week.totalTrades > 0
                             ? week.totalReturn > 0

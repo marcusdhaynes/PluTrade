@@ -10,13 +10,14 @@ interface FloatingPortalProps {
   ariaLabel?:string;
   className?:string;
   width?:number;
+  zIndex?:number;
   placement?:Placement;
 }
 /** Draw transient tool windows in the document-level overlay layer so that
  * chart canvases, sidebars, clipped scroll containers and sticky headers
  * cannot cover them. Positioning follows the anchor on scroll and resize. */
 export function FloatingPortal({
-  anchor,children,id,role='dialog',ariaLabel,className='',width=290,placement='bottom-end'
+  anchor,children,id,role='dialog',ariaLabel,className='',width=290,zIndex=1400,placement='bottom-end'
 }:FloatingPortalProps){
   const popup=useRef<HTMLDivElement>(null);
   const [position,setPosition]=useState<{top:number;left:number;maxHeight:number;ready:boolean}>({
@@ -59,7 +60,7 @@ export function FloatingPortal({
   if(typeof document==='undefined')return null;
   return createPortal(<div ref={popup} id={id} role={role} aria-label={ariaLabel}
     className={className}
-    style={{position:'fixed',zIndex:1400,top:position.top,left:position.left,
+    style={{position:'fixed',zIndex,top:position.top,left:position.left,
       width:'min('+width+'px, calc(100vw - 16px))',
       maxHeight:position.maxHeight,overflowY:'auto',
       visibility:position.ready?'visible':'hidden'}}>

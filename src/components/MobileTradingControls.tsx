@@ -10,6 +10,13 @@ interface Props {
   position:PaperPosition|null;
   accountEquity:number;
   accountBalance:number;
+  activeAccountName?:string|null;
+  activeAccountId?:string|null;
+  availableAccounts?:Array<{id:string;name:string;currency:string}>;
+  onSelectAccount?:(id:string)=>void;
+  onManageAccounts?:()=>void;
+  accountCurrency?:string;
+  accountUnrealizedPnl?:number;
   equityPercent:number;
   onEquityPercent:(value:number)=>void;
   onEnter:(focus?:ExitKind)=>void;
@@ -31,7 +38,9 @@ const numeric=(n:number,digits=6)=>Number.isFinite(n)?n.toLocaleString(undefined
 /** A single, always-visible mobile trade row. Long-press SL/TP to reveal all
  * supported exit types without making a tap on a small screen execute a trade. */
 export const MobileTradingControls:React.FC<Props>=({
-  asset,position,accountEquity,accountBalance,equityPercent,onEquityPercent,
+  asset,position,accountEquity,accountBalance,activeAccountName,activeAccountId,
+  availableAccounts=[],onSelectAccount,onManageAccounts,accountCurrency='USD',
+  accountUnrealizedPnl=0,equityPercent,onEquityPercent,
   onEnter,onOpenOrder,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
 })=>{
   const [panel,setPanel]=useState<'equity'|ExitKind|null>(null);
@@ -46,6 +55,27 @@ export const MobileTradingControls:React.FC<Props>=({
   const [trailPercent,setTrailPercent]=useState('0.50');
   const [equityDraft,setEquityDraft]=useState(String(equityPercent));
   const [error,setError]=useState('');
+  const [accountMenuOpen,setAccountMenuOpen]=useState(false);
+  const [pnlMenu,setPnlMenu]=useState<'cash'|'percent'|null>(null);
+  const [pnlScope,setPnlScope]=useState<'account'|'position'>(()=>{
+    try{return localStorage.getItem('plutrade_mobile_unrealized_scope_v1')==='position'?'position':'account';}
+    catch{return 'account';}
+  });
+  const [pnlCompact,setPnlCompact]=useState<boolean>(()=>{
+    try{return localStorage.getItem('plutrade_mobile_unrealized_compact_v1')!=='false';}
+    catch{return true;}
+  });
+  const [pnlDigits,setPnlDigits]=useState<0|1|2>(()=>{
+    try{const saved=Number(localStorage.getItem('plutrade_mobile_unrealized_digits_v1'));return saved===0||saved===1||saved===2?saved:2;}
+    catch{return 2;}
+  });
+  useEffect(()=>{
+    try{
+      localStorage.setItem('plutrade_mobile_unrealized_scope_v1',pnlScope);
+      localStorage.setItem('plutrade_mobile_unrealized_compact_v1',String(pnlCompact));
+      localStorage.setItem('plutrade_mobile_unrealized_digits_v1',String(pnlDigits));
+    }catch(error){console.warn('Could not persist mobile unrealized P/L preferences',error);}
+  },[pnlScope,pnlCompact,pnlDigits]);
   const holdTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const held=useRef(false);
   const orderHoldTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -146,20 +176,40 @@ export const MobileTradingControls:React.FC<Props>=({
     }
     setMode(next);
   };
-  const baseButton='flex-1 min-w-0 h-[21px] rounded border border-[#3c4658] bg-[#232b39] px-px text-[10px] leading-[19px] font-semibold tracking-tight text-[#d6e2f4] active:bg-[#355172] touch-manipulation';
+  const hasPosition=!!position;
+  const showPosition=pnlScope==='position'&&hasPosition;
+  const displayedPnl=showPosition?position!.unrealizedPnL:accountUnrealizedPnl;
+  const pnlDenominator=showPosition?0:Math.abs(accountBalance);
+  const displayedPct=showPosition?position!.unrealizedPnLPct:
+    (pnlDenominator>1e-9?accountUnrealizedPnl/pnlDenominator*100:null);
+  const compactMoney=(value:number)=>{
+    const amount=Math.abs(value);
+    if(!Number.isFinite(value))return '—';
+    if(!pnlCompact)return value.toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2});
+    const abbr=amount>=1e9?(amount/1e9).toFixed(1)+'B':
+      amount>=1e6?(amount/1e6).toFixed(1)+'M':
+      amount>=1e3?(amount/1e3).toFixed(1)+'K':
+      amount>=100?amount.toFixed(0):amount.toFixed(2);
+    return (value<0?'-':value>0?'+':'')+abbr;
+  };
+  const moneyLabel=(value:number)=>value.toLocaleString(undefined,{style:'currency',
+    currency:accountCurrency||'USD',maximumFractionDigits:2});
+  const baseButton='flex-[1_1_0%] min-w-0 h-[21px] rounded border border-[#3c4658] bg-[#232b39] px-px text-[10px] leading-[19px] font-semibold tracking-tight text-[#d6e2f4] active:bg-[#355172] touch-manipulation';
   const close=()=>{clearHold();setPanel(null);setError('');};
   const orderControlsRef=useRef<HTMLDivElement>(null);
   const quickPanelRef=useRef<HTMLDivElement>(null);
+  const scopeMenuRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
-    if(!panel)return;
+    if(!panel&&!accountMenuOpen&&!pnlMenu)return;
     const outside=(event:PointerEvent)=>{
       if(!orderControlsRef.current?.contains(event.target as Node)&&
-         !quickPanelRef.current?.contains(event.target as Node)){
-        clearHold();setPanel(null);setError('');
+         !quickPanelRef.current?.contains(event.target as Node)&&
+         !scopeMenuRef.current?.contains(event.target as Node)){
+        clearHold();setPanel(null);setAccountMenuOpen(false);setPnlMenu(null);setError('');
       }
     };
     const escape=(event:KeyboardEvent)=>{
-      if(event.key==='Escape'){clearHold();setPanel(null);setError('');}
+      if(event.key==='Escape'){clearHold();setPanel(null);setAccountMenuOpen(false);setPnlMenu(null);setError('');}
     };
     window.addEventListener('pointerdown',outside,true);
     window.addEventListener('keydown',escape);
@@ -167,7 +217,7 @@ export const MobileTradingControls:React.FC<Props>=({
       window.removeEventListener('pointerdown',outside,true);
       window.removeEventListener('keydown',escape);
     };
-  },[panel]);
+  },[panel,accountMenuOpen,pnlMenu]);
   return <div ref={orderControlsRef} id="plutrade-mobile-trade-controls"
     className="relative md:hidden shrink-0 w-full h-[24px] border-t border-[#3f4d62] bg-[#151d2b] px-1 py-px z-40">
     {panel&&<div ref={quickPanelRef} role="dialog" aria-label={panel==='equity'?'Equity allocation':panel==='sl'?'Stop loss options':'Take profit options'}
@@ -305,7 +355,57 @@ export const MobileTradingControls:React.FC<Props>=({
       </>}
       {error&&<p role="alert" className="mt-2 text-[#ff9eac]">{error}</p>}
     </div>}
-    <div className="flex w-full items-center gap-1" aria-label="Mobile trading controls">
+    <div ref={scopeMenuRef} className="absolute bottom-full left-0 right-0 z-[80] text-[11px]">
+      {accountMenuOpen&&<section id="mobile-account-picker" role="dialog" aria-label="Choose trading account"
+        className="mb-1 max-h-[min(50dvh,320px)] overflow-y-auto rounded border border-[#425574] bg-[#172538] p-2 text-[#e2ebfb] shadow-2xl">
+        <div className="mb-1 text-[11px] font-bold">Active trading account</div>
+        {availableAccounts.length===0&&<p className="text-[#94a6c0]">No account loaded</p>}
+        {availableAccounts.map(account=><button type="button" key={account.id}
+          aria-label={'Use account '+account.name} aria-pressed={account.id===activeAccountId}
+          className={'flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left hover:bg-[#344763] '+(account.id===activeAccountId?'bg-[#263e60]':'')}
+          onClick={()=>{onSelectAccount?.(account.id);setAccountMenuOpen(false);}}>
+          <span className="min-w-0 flex-1 truncate">{account.name}</span>
+          <span className="shrink-0 text-[9px] text-[#9cacc2]">{account.currency}</span>
+        </button>)}
+        {onManageAccounts&&<button type="button" onClick={()=>{setAccountMenuOpen(false);onManageAccounts();}}
+          className="mt-1 w-full rounded border border-[#506383] px-2 py-1.5 text-center text-[#b3ccf2]">
+          Manage accounts
+        </button>}
+      </section>}
+      {pnlMenu&&<section id="mobile-unrealized-options" role="dialog" aria-label="Unrealized P/L display options"
+        className="mb-1 rounded border border-[#425574] bg-[#172538] p-2 text-[#e2ebfb] shadow-2xl">
+        <strong className="block pb-1 text-[11px]">Unrealized P/L · {accountCurrency}</strong>
+        <p className="pb-2 text-[9px] text-[#9caecc]">From your simulated account ledger, not an editable profit amount.</p>
+        <div className="flex gap-1.5">
+          <button type="button" aria-pressed={pnlScope==='account'} onClick={()=>setPnlScope('account')}
+            className={'flex-1 rounded border px-2 py-1.5 '+(pnlScope==='account'?'border-[#72a5fa] bg-[#264a77]':'border-[#41516a]')}>Whole account</button>
+          <button type="button" disabled={!hasPosition} aria-pressed={pnlScope==='position'}
+            onClick={()=>setPnlScope('position')}
+            className={'flex-1 rounded border px-2 py-1.5 disabled:opacity-40 '+(pnlScope==='position'?'border-[#72a5fa] bg-[#264a77]':'border-[#41516a]')}>Active position</button>
+        </div>
+        {pnlMenu==='cash'?<label className="mt-2 flex items-center gap-2">
+          <input type="checkbox" checked={pnlCompact} onChange={e=>setPnlCompact(e.target.checked)}/>
+          Compact money (K/M/B)
+        </label>:<label className="mt-2 flex items-center justify-between gap-2">
+          Decimal places
+          <select aria-label="UP/L percent precision" className="rounded border border-[#52627d] bg-[#132033] px-2 py-1"
+            value={pnlDigits} onChange={e=>setPnlDigits(Number(e.target.value) as 0|1|2)}>
+            <option value={0}>0</option><option value={1}>1</option><option value={2}>2</option>
+          </select>
+        </label>}
+        <button type="button" className="mt-2 w-full rounded bg-[#2962ff] py-1" onClick={()=>setPnlMenu(null)}>Done</button>
+      </section>}
+    </div>
+    <div className="flex w-full min-w-0 items-center gap-[2px]" aria-label="Mobile trading controls">
+      <button type="button" id="mobile-active-account-btn"
+        aria-label={'Trading account '+(activeAccountName||'Account')}
+        aria-expanded={accountMenuOpen}
+        title={'Active account: '+(activeAccountName||'Account')}
+        className="flex-[1.45_1_0%] min-w-0 h-[21px] rounded border border-[#56637b] bg-[#243147] px-[1px] text-[clamp(7px,2.2vw,10px)] font-semibold text-[#e3ecfc] truncate"
+        onClick={()=>{setPanel(null);setPnlMenu(null);setAccountMenuOpen(v=>!v);}}>
+        <span className="block truncate">{activeAccountName||'Account'}</span>
+      </button>
+
       <button type="button" id="mobile-order-ticket-btn"
         aria-label="Order" title="Open order ticket; hold for Paper Trading workspace"
         className={baseButton+' border-[#4d6994] bg-[#253651] text-white'}
@@ -320,6 +420,26 @@ export const MobileTradingControls:React.FC<Props>=({
         onContextMenu={e=>{e.preventDefault();clearOrderHold();orderHeld.current=true;onOpenPaperWorkspace?.();}}
         onClick={()=>{if(!orderHeld.current)onOpenOrder();orderHeld.current=false;}}>
         Order
+      </button>
+      <button type="button" id="mobile-upl-cash" aria-label="Unrealized profit loss amount"
+        title={'Unrealized P/L: '+moneyLabel(displayedPnl)+' · '+(showPosition?'active position':'whole account')}
+        aria-expanded={pnlMenu==='cash'}
+        className="flex-[1.35_1_0%] min-w-0 h-[21px] flex flex-col justify-center items-center rounded border border-[#4b586e] bg-[#1c2a3d] px-px leading-[9px]"
+        onClick={()=>{setAccountMenuOpen(false);setPanel(null);setPnlMenu(v=>v==='cash'?null:'cash');}}>
+        <span className="text-[7px] text-[#a9bbd2]">{accountCurrency==='USD'?'UP/L$':'UP/L '+accountCurrency}</span>
+        <span className={'block w-full truncate text-center text-[clamp(7px,2vw,9px)] font-semibold tabular-nums '+(displayedPnl>=0?'text-[#64e6b9]':'text-[#ff95a4]')}>
+          {compactMoney(displayedPnl)}
+        </span>
+      </button>
+      <button type="button" id="mobile-upl-percent" aria-label="Unrealized profit loss percent"
+        title={'Unrealized P/L percent · '+(showPosition?'active position':'whole account')}
+        aria-expanded={pnlMenu==='percent'}
+        className="flex-[1.3_1_0%] min-w-0 h-[21px] flex flex-col justify-center items-center rounded border border-[#4b586e] bg-[#1c2a3d] px-px leading-[9px]"
+        onClick={()=>{setAccountMenuOpen(false);setPanel(null);setPnlMenu(v=>v==='percent'?null:'percent');}}>
+        <span className="text-[7px] text-[#a9bbd2]">UP/L%</span>
+        <span className={'block w-full truncate text-center text-[clamp(7px,2vw,9px)] font-semibold tabular-nums '+(displayedPct===null?'text-[#d1d9e7]':displayedPct>=0?'text-[#64e6b9]':'text-[#ff95a4]')}>
+          {displayedPct===null?'—':(displayedPct>0?'+':'')+displayedPct.toFixed(pnlDigits)+'%'}
+        </span>
       </button>
       <button type="button" className={baseButton+' border-[#255da9] bg-[#1c426f] text-white'}
         onClick={()=>onEnter()}>Enter</button>

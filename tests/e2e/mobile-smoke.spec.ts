@@ -13,34 +13,38 @@ test('narrow-screen application launches without a fatal browser exception',asyn
 });
 
 
-test('mobile keeps a single six-action trading row and preloads equity sizing',async ({page})=>{
+test('mobile keeps one account/UPL/order/execution row and preloads equity sizing',async ({page})=>{
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('./');
   const bar=page.locator('#plutrade-mobile-trade-controls');
   await expect(bar).toBeVisible();
   const actions=bar.locator('div[aria-label="Mobile trading controls"] > button');
-  await expect(actions).toHaveCount(6);
+  await expect(actions).toHaveCount(9);
   const rects=await actions.evaluateAll(buttons=>buttons.map(button=>({
     top:Math.round(button.getBoundingClientRect().top),
     right:button.getBoundingClientRect().right,
   })));
   expect(new Set(rects.map(r=>r.top)).size).toBe(1);
   expect(rects.at(-1)!.right).toBeLessThanOrEqual(await page.evaluate(()=>innerWidth+1));
-  await actions.nth(3).click();
+  await expect(actions.nth(0)).toHaveAttribute('id','mobile-active-account-btn');
+  await expect(actions.nth(1)).toHaveAttribute('id','mobile-order-ticket-btn');
+  await expect(actions.nth(2)).toHaveAttribute('id','mobile-upl-cash');
+  await expect(actions.nth(3)).toHaveAttribute('id','mobile-upl-percent');
+  await actions.nth(6).click();
   const equity=page.getByRole('dialog',{name:'Equity allocation'});
   await expect(equity).toBeVisible();
   await equity.getByRole('spinbutton',{name:'Percent of equity'}).fill('50');
   await equity.getByRole('button',{name:'Apply to Entry'}).click();
-  await expect(actions.nth(3)).toContainText('50%');
-  await expect(actions.first()).toContainText('Order');
-  await actions.nth(1).click();
+  await expect(actions.nth(6)).toContainText('50%');
+  await expect(actions.nth(1)).toContainText('Order');
+  await actions.nth(4).click();
   const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
   await expect(ticket).toBeVisible();
   await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('50');
   await expect(ticket.getByRole('button',{name:'% Equity'})).toBeVisible();
   await ticket.getByTitle('Close order panel').click();
-  await actions.nth(4).click();
+  await actions.nth(7).click();
   await expect(page.getByRole('dialog',{name:'Stop loss options'})).toBeVisible();
   await page.getByRole('button',{name:/Open Entry Ticket/}).click();
   await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','true');
@@ -49,7 +53,7 @@ test('mobile keeps a single six-action trading row and preloads equity sizing',a
 
 test('holding TP reveals the advanced entry path without placing an order',async ({page})=>{
   await page.goto('./');
-  const button=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button').nth(5);
+  const button=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button').nth(8);
   await button.dispatchEvent('pointerdown',{pointerType:'touch'});
   await page.waitForTimeout(510);
   await button.dispatchEvent('pointerup',{pointerType:'touch'});
@@ -509,14 +513,17 @@ test('popups render above chart/sidebar and outside tapping dismisses them',asyn
   await expect(date).toHaveCount(0);
 });
 
-test('right Indicators and Alerts are sole launchers and Order is first',async ({page})=>{
+test('right Indicators and Alerts are sole launchers; account, Order, UPL amount and percent fit one row',async ({page})=>{
   await page.goto('./');
   await expect(page.locator('#open-alerts-modal-btn')).toHaveCount(0);
   await expect(page.locator('#open-indicators-modal-btn')).toHaveCount(0);
   await expect(page.locator('#mobile-chart-action-rows')).toHaveCount(0);
   const buttons=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button');
-  await expect(buttons.first()).toHaveAttribute('id','mobile-order-ticket-btn');
-  await buttons.first().click();
+  await expect(buttons.first()).toHaveAttribute('id','mobile-active-account-btn');
+  await expect(buttons.nth(1)).toHaveAttribute('id','mobile-order-ticket-btn');
+  await expect(buttons.nth(2)).toHaveAttribute('id','mobile-upl-cash');
+  await expect(buttons.nth(3)).toHaveAttribute('id','mobile-upl-percent');
+  await buttons.nth(1).click();
   await expect(page.getByRole('dialog',{name:'Paper Trading order entry'})).toBeVisible();
   await page.getByTitle('Close order panel').click();
   await page.locator('#right-tab-indicators').click();
@@ -543,4 +550,145 @@ test('mobile equity and stop-loss tool windows layer above sidebar and close off
   await expect(stops).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(stops).toHaveCount(0);
+});
+
+
+test('mobile account displays active ledger name and configurable UPL amount and percent without rewriting P/L',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const bar=page.locator('#plutrade-mobile-trade-controls');
+  const account=page.locator('#mobile-active-account-btn');
+  await expect(account).toBeVisible();
+  await expect(account).toContainText('Primary');
+  await account.click();
+  const picker=page.getByRole('dialog',{name:'Choose trading account'});
+  await expect(picker).toBeVisible();
+  await expect(picker.getByRole('button',{name:/Use account Primary/})).toBeVisible();
+  await picker.getByRole('button',{name:/Use account Primary/}).click();
+  await expect(picker).toHaveCount(0);
+
+  const cash=page.locator('#mobile-upl-cash'),pct=page.locator('#mobile-upl-percent');
+  await expect(cash).toContainText('UP/L$');
+  await expect(pct).toContainText('UP/L%');
+  await cash.click();
+  const display=page.getByRole('dialog',{name:'Unrealized P/L display options'});
+  await expect(display).toContainText('simulated account ledger');
+  await expect(display.getByRole('button',{name:'Whole account'})).toHaveAttribute('aria-pressed','true');
+  await display.getByRole('checkbox',{name:'Compact money (K/M/B)'}).uncheck();
+  await display.getByRole('button',{name:'Done'}).click();
+  await pct.click();
+  await display.getByLabel('UP/L percent precision').selectOption('1');
+  await display.getByRole('button',{name:'Done'}).click();
+  await expect(pct).toContainText('0.0%');
+  await page.reload();
+  await expect(pct).toContainText('0.0%');
+  await expect(bar).toBeVisible();
+  const buttons=bar.locator('div[aria-label="Mobile trading controls"] > button');
+  expect(new Set(await buttons.evaluateAll(items=>items.map(b=>Math.round(b.getBoundingClientRect().top)))).size).toBe(1);
+  expect((await buttons.last().boundingBox())!.x+(await buttons.last().boundingBox())!.width).toBeLessThanOrEqual(391);
+});
+
+test('Trade Journal has always-visible X and one-line filter/search/sort with screen-fitted analytics cards',async ({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844}]){
+    await page.setViewportSize(size);
+    await page.goto('./');
+    await page.locator('#right-tab-trade-journal').click();
+    const journal=page.locator('#trade-journal-window-card');
+    await expect(journal).toBeVisible();
+    await expect(page.locator('#journal-global-close')).toBeVisible();
+    const main=page.locator('#journal-main-content-viewport');
+    const toolbar=page.locator('#journal-mobile-filter-strip');
+    await expect(toolbar).toBeVisible();
+    const children=toolbar.locator(':scope > *');
+    expect(new Set(await children.evaluateAll(items=>items.map(el=>Math.round(el.getBoundingClientRect().y)))).size).toBe(1);
+    await expect(toolbar.getByRole('combobox',{name:'Sort journal trades'})).toBeVisible();
+    await toolbar.getByRole('combobox',{name:'Sort journal trades'}).selectOption('best');
+    await toolbar.getByRole('button',{name:'Journal filters'}).click();
+    const filters=page.getByRole('dialog',{name:'Journal filter options'});
+    await expect(filters).toBeVisible();
+    expect(await filters.evaluate(el=>el.parentElement===document.body)).toBe(true);
+    await filters.getByRole('combobox',{name:'Filter Date'}).selectOption('Today');
+    await filters.getByRole('button',{name:'Done'}).click();
+    await expect(filters).toHaveCount(0);
+    await expect(page.locator('#journal-desktop-filter-row')).toBeHidden();
+    await expect(page.locator('#journal-mobile-trade-cards')).toBeVisible();
+    await expect(page.locator('#journal-desktop-trades-table')).toBeHidden();
+    const grid=page.locator('#journal-trade-main-grid');
+    const table=page.locator('#journal-trade-table-panel');
+    const right=page.locator('#journal-trade-widgets-column');
+    await expect(grid).toBeVisible();
+    await expect(right).toBeVisible();
+    const rightRect=(await right.boundingBox())!,tableRect=(await table.boundingBox())!;
+    const mainRect=(await main.boundingBox())!;
+    expect(rightRect.x).toBeGreaterThanOrEqual(mainRect.x-1);
+    expect(rightRect.x+rightRect.width).toBeLessThanOrEqual(mainRect.x+mainRect.width+2);
+    expect(rightRect.y).toBeGreaterThanOrEqual(tableRect.y+tableRect.height-2);
+    const rail=journal.locator('aside').first();
+    expect((await rail.boundingBox())!.width).toBeGreaterThanOrEqual(27);
+    await page.locator('#journal-global-close').click();
+    await expect(journal).toHaveCount(0);
+  }
+});
+
+test('full and overview journal calendars keep all eight equal square cells inside screen, with vertical drilldown',async({page})=>{
+  await page.setViewportSize({width:320,height:568});
+  await page.goto('./');
+  await page.locator('#right-tab-trade-journal').click();
+  const rail=page.locator('#trade-journal-window-card aside').first();
+  await rail.getByTitle('Calendar Heatmap').click();
+  const full=page.locator('#journal-calendar-square-grid');
+  await expect(full).toBeVisible();
+  const week=full.locator('.journal-calendar-week').first();
+  await expect(week).toBeVisible();
+  const squares=week.locator('[data-journal-calendar-square]');
+  await expect(squares).toHaveCount(8);
+  const fullRect=(await full.boundingBox())!;
+  const all=await squares.evaluateAll(items=>items.map(el=>{
+    const rect=el.getBoundingClientRect();
+    return {x:rect.x,width:rect.width,height:rect.height};
+  }));
+  for(const rect of all){
+    expect(Math.abs(rect.width-rect.height)).toBeLessThanOrEqual(2);
+    expect(rect.x).toBeGreaterThanOrEqual(fullRect.x-1);
+    expect(rect.x+rect.width).toBeLessThanOrEqual(fullRect.x+fullRect.width+2);
+  }
+  await expect(page.locator('#journal-calendar-filters')).toBeVisible();
+  const filterRows=await page.locator('#journal-calendar-filters > div:visible').evaluateAll(items=>
+    items.map(el=>Math.round(el.getBoundingClientRect().y)));
+  expect(new Set(filterRows).size).toBe(1);
+  const fullScroll=page.locator('#journal-calendar-scroll');
+  expect(await fullScroll.evaluate(el=>el.scrollWidth<=el.clientWidth+2)).toBe(true);
+  await rail.getByTitle('Account Analytics & WaveScore').click();
+  const mini=page.locator('#journal-dashboard-calendar-grid');
+  await expect(mini).toBeVisible();
+  const miniSquares=mini.locator('[data-journal-calendar-square]');
+  expect(await miniSquares.count()).toBeGreaterThan(6);
+  const miniRect=(await mini.boundingBox())!;
+  expect(miniRect.x+miniRect.width).toBeLessThanOrEqual(321);
+  const first=(await miniSquares.first().boundingBox())!;
+  expect(Math.abs(first.width-first.height)).toBeLessThanOrEqual(2);
+});
+
+test('journal Insights show responsive analytics cards and hide wide desktop table',async({page})=>{
+  await page.setViewportSize({width:320,height:568});
+  await page.goto('./');
+  await page.locator('#right-tab-trade-journal').click();
+  await page.locator('#trade-journal-window-card aside').first().getByRole('button',{name:'Journal Strategy Insights'}).click();
+  await expect(page.locator('#journal-insights-mobile-cards')).toBeVisible();
+  await expect(page.locator('#journal-insights-data-panel > table')).toBeHidden();
+  expect(await page.locator('#journal-insights-data-panel').evaluate(el=>el.scrollWidth<=el.clientWidth+2)).toBe(true);
+});
+
+test('mobile top-left chart icons have no boxes and chart has no TV lower-left logo',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  for(const id of ['mobile-chart-style-trigger','mobile-save-chart-btn','mobile-chart-snapshot-btn','mobile-save-data-btn','mobile-pip-btn','mobile-fullscreen-btn']){
+    const button=page.locator('#'+id);
+    await expect(button).toBeVisible();
+    expect(await button.evaluate(el=>getComputedStyle(el).borderTopWidth)).toBe('0px');
+    expect(await button.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  }
+  await expect(page.locator('#tv-attr-logo')).toHaveCount(0);
+  await page.locator('#time-scale-settings-btn').click();
+  await expect(page.getByRole('dialog',{name:'Time scale settings'}).getByRole('link',{name:/Lightweight Charts/})).toBeVisible();
 });
