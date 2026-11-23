@@ -111,7 +111,8 @@ export function parsePaperSettingsPreset(
         settings.commission.mode=value;break;
       case 'commissionAmount':settings.commission.amount=numberValue(value,field);break;
       case 'perContract':settings.futuresOptions.perContract=numberValue(value,field);
-        settings.futuresOptions.enabled=true;break;
+        if(!parsed.has('perContractEnabled'))settings.futuresOptions.enabled=true;
+        break;
       case 'perContractEnabled':settings.futuresOptions.enabled=boolValue(value,field);break;
       case 'spreadBps':settings.execution.spreadBps=numberValue(value,field);break;
       case 'slippageBps':settings.execution.slippageBps=numberValue(value,field);break;
