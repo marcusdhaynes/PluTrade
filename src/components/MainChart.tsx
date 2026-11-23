@@ -1068,7 +1068,7 @@ export const MainChart = React.memo(
 
           {/* Actual indicator status replaces the inert "14" mock controls. */}
           <div className="flex items-center gap-1 text-[10px] text-[#98a8bf] pl-5">
-            <span>Indicators: {Object.values(indicators).filter(i=>i.enabled).length} enabled</span>
+            <span>Indicators: {Object.keys(indicators).filter(key=>indicators[key as keyof IndicatorSettings].enabled).length} enabled</span>
             <button type="button" title="Edit indicators" onClick={onOpenIndicators} disabled={!onOpenIndicators}
               className="text-[#9bbdff] hover:text-white underline">Edit</button>
           </div>
