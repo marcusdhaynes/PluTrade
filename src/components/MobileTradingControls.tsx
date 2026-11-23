@@ -13,6 +13,8 @@ interface Props {
   equityPercent:number;
   onEquityPercent:(value:number)=>void;
   onEnter:(focus?:ExitKind)=>void;
+  onOpenOrder:()=>void;
+  onOpenPaperWorkspace?:()=>void;
   onExit:()=>void;
   onEditStops:(id:string,tp?:number,sl?:number,trailing?:number|null,dynamic?:DynamicTrailingSettings|null)=>void;
   onEditTargets:(id:string,levels:Array<{price:number;sharePercent:number}>)=>void;
@@ -30,7 +32,7 @@ const numeric=(n:number,digits=6)=>Number.isFinite(n)?n.toLocaleString(undefined
  * supported exit types without making a tap on a small screen execute a trade. */
 export const MobileTradingControls:React.FC<Props>=({
   asset,position,accountEquity,accountBalance,equityPercent,onEquityPercent,
-  onEnter,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
+  onEnter,onOpenOrder,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
 })=>{
   const [panel,setPanel]=useState<'equity'|ExitKind|null>(null);
   const [advanced,setAdvanced]=useState(false);
@@ -46,6 +48,11 @@ export const MobileTradingControls:React.FC<Props>=({
   const [error,setError]=useState('');
   const holdTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const held=useRef(false);
+  const orderHoldTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const orderHeld=useRef(false);
+  const clearOrderHold=()=>{
+    if(orderHoldTimer.current){clearTimeout(orderHoldTimer.current);orderHoldTimer.current=null;}
+  };
   const lastPosition=useRef<string|null>(null);
   const clearHold=()=>{if(holdTimer.current!==null){clearTimeout(holdTimer.current);holdTimer.current=null;}};
 
@@ -279,6 +286,21 @@ export const MobileTradingControls:React.FC<Props>=({
       {error&&<p role="alert" className="mt-2 text-[#ff9eac]">{error}</p>}
     </div>}
     <div className="flex w-full items-center gap-1" aria-label="Mobile trading controls">
+      <button type="button" id="mobile-order-ticket-btn"
+        aria-label="Order" title="Open order ticket; hold for Paper Trading workspace"
+        className={baseButton+' border-[#4d6994] bg-[#253651] text-white'}
+        onPointerDown={()=>{
+          orderHeld.current=false;
+          clearOrderHold();
+          if(onOpenPaperWorkspace)orderHoldTimer.current=setTimeout(()=>{
+            orderHeld.current=true;onOpenPaperWorkspace();
+          },550);
+        }}
+        onPointerUp={clearOrderHold} onPointerCancel={clearOrderHold} onPointerLeave={clearOrderHold}
+        onContextMenu={e=>{e.preventDefault();clearOrderHold();orderHeld.current=true;onOpenPaperWorkspace?.();}}
+        onClick={()=>{if(!orderHeld.current)onOpenOrder();orderHeld.current=false;}}>
+        Order
+      </button>
       <button type="button" className={baseButton+' border-[#255da9] bg-[#1c426f] text-white'}
         onClick={()=>onEnter()}>Enter</button>
       <button type="button" className={baseButton+' '+(position?'border-[#ad4851] bg-[#49272f] text-white':'opacity-40')}
