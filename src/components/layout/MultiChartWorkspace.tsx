@@ -55,6 +55,7 @@ interface MultiChartWorkspaceProps {
   openPosition?: PaperPosition | null;
   openPositions?: PaperPosition[];
   onClosePosition?: (id: string) => void;
+  onEditPositionStop?: (id:string,kind:'sl'|'tp')=>void;
   allAssets: Asset[];
   windowStates: ChartWindowState[];
   onUpdateWindowStates: (states: ChartWindowState[]) => void;
@@ -197,6 +198,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
       openPosition,
       openPositions,
       onClosePosition,
+      onEditPositionStop,
       allAssets,
       windowStates,
       onUpdateWindowStates,
@@ -734,6 +736,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
               isPercentScale={isPercentScale}
               openPosition={openPositions?.find(pos=>matchesExactMarket(pos,winAsset)) || null}
               onClosePosition={onClosePosition}
+              onEditPositionStop={onEditPositionStop}
               onOpenConditionalOrder={onOpenConditionalOrder}
             />
           </div>
