@@ -186,6 +186,7 @@ export const MainChart = React.memo(
     // Expose methods to parent via ref
     useImperativeHandle(ref, () => ({
       fitContent: () => {
+        chartApiRef.current?.priceScale('right').setAutoScale(true);
         chartApiRef.current?.timeScale().fitContent();
       },
       goToUtcDate:(date:string)=>{
@@ -414,6 +415,7 @@ export const MainChart = React.memo(
           if(Number.isFinite(range.from)&&Number.isFinite(range.to)&&range.to>range.from+1e-12){
             priceScale.setAutoScale(false);
             priceScale.setVisibleRange(range);
+            window.dispatchEvent(new CustomEvent('plutrade-chart-price-zoom',{detail:{chart}}));
           }
         }
       };
@@ -1310,6 +1312,7 @@ export const MainChart = React.memo(
           areDrawingsHidden={areDrawingsHidden}
           currentColor={currentColor}
           candles={candles}
+          priceDigits={asset.digits}
           onOpenConditionalOrder={onOpenConditionalOrder}
         />
       </div>
