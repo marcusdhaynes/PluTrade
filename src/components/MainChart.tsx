@@ -95,6 +95,33 @@ interface MainChartProps {
   onOpenIndicators?:()=>void;
 }
 
+const MOBILE_ORDER_RAIL_PX=24;
+
+/** Width-bounded labels for the genuinely fixed mobile price rail. The exact
+ * price is always available through the current-price marker and axis tooltip. */
+function compactMobilePrice(price:number):string {
+  if(!Number.isFinite(price))return '–';
+  const abs=Math.abs(price);
+  if(abs===0)return '0';
+  const prefix=price<0?'-':'';
+  const shorten=(scaled:number,suffix:string)=>{
+    const width=prefix.length+suffix.length;
+    const precision=scaled>=100?0:scaled>=10?0:width>=2?0:1;
+    return prefix+scaled.toFixed(precision).replace(/\\.0$/,'')+suffix;
+  };
+  if(abs>=1e9)return shorten(abs/1e9,'B');
+  if(abs>=1e6)return shorten(abs/1e6,'M');
+  if(abs>=1e3)return shorten(abs/1e3,'k');
+  if(abs>=100)return prefix+Math.round(abs).toString();
+  if(abs>=10)return prefix+Math.round(abs).toString();
+  if(abs>=1)return prefix+abs.toFixed(1).replace(/\\.0$/,'');
+  if(abs>=0.1)return prefix+abs.toFixed(2).replace(/^0/,'');
+  if(abs>=0.01)return prefix+abs.toFixed(3).replace(/^0/,'');
+  if(abs>=1e-3)return shorten(abs*1e3,'m');
+  if(abs>=1e-6)return shorten(abs*1e6,'µ');
+  return shorten(abs*1e9,'n');
+}
+
 function formatHollowCandles(candles: OHLCV[]) {
   return candles.map((c, i) => {
     const prevClose = i > 0 ? candles[i - 1].close : c.open;
@@ -158,7 +185,11 @@ export const MainChart = React.memo(
     const [priceVisible,setPriceVisible]=useState(true);
     const [moreOpen,setMoreOpen]=useState(false);
     const [currencyMenuOpen,setCurrencyMenuOpen]=useState(false);
-    const [priceAxisWidth,setPriceAxisWidth]=useState(28);
+    const [priceAxisWidth,setPriceAxisWidth]=useState(24);
+    const [compactMobileAxes,setCompactMobileAxes]=useState(()=>window.matchMedia('(max-width:767px), (hover:none) and (pointer:coarse)').matches);
+    const [mobileAxisTicks,setMobileAxisTicks]=useState<Array<{y:number;value:number;label:string}>>([]);
+    const [mobileAxisHover,setMobileAxisHover]=useState<{y:number;price:number}|null>(null);
+    const mobileAxisDrag=useRef<{id:number;startY:number;range:{from:number;to:number}}|null>(null);
     const [,refreshSeries]=useState(0);
     useEffect(()=>{setPriceVisible(true);setMoreOpen(false);setCurrencyMenuOpen(false);},[asset.symbol,asset.source,asset.exchange,asset.marketType,asset.pairAddress,asset.chainId,timeframe]);
     const sourceCandlesRef=useRef(candles);
@@ -250,7 +281,9 @@ export const MainChart = React.memo(
     useEffect(() => {
       if (!chartContainerRef.current) return;
 
-      const compactAxes=window.matchMedia('(max-width:767px), (hover:none) and (pointer:coarse)').matches;
+      const mobileQuery=window.matchMedia('(max-width:767px), (hover:none) and (pointer:coarse)');
+      const compactAxes=mobileQuery.matches;
+      const compactSize=Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--plutrade-mobile-bar-size'))||MOBILE_ORDER_RAIL_PX;
       const chart = createChart(chartContainerRef.current, {
         width: Math.max(1,chartContainerRef.current.clientWidth),
         height: Math.max(1,chartContainerRef.current.clientHeight),
@@ -282,10 +315,10 @@ export const MainChart = React.memo(
         },
         handleScale:{pinch:false,mouseWheel:true,axisPressedMouseMove:true,axisDoubleClickReset:true},
         rightPriceScale: {
-          visible:true,
+          visible:!compactAxes,
           borderVisible:true,
           ticksVisible:true,
-          minimumWidth:compactAxes?28:24,
+          minimumWidth:compactAxes?0:24,
           borderColor: '#363a45',
           mode: isLogScale
             ? PriceScaleMode.Logarithmic
@@ -299,7 +332,7 @@ export const MainChart = React.memo(
           visible:true,
           borderVisible:true,
           ticksVisible:true,
-          minimumHeight:compactAxes?28:24,
+          minimumHeight:compactAxes?compactSize:24,
           borderColor: '#2a2e39',
           timeVisible: true,
           secondsVisible: false,
@@ -309,6 +342,16 @@ export const MainChart = React.memo(
       });
 
       chartApiRef.current = chart;
+      const syncResponsiveAxes=()=>{
+        const small=mobileQuery.matches;
+        setCompactMobileAxes(small);
+        chart.applyOptions({
+          rightPriceScale:{visible:!small,minimumWidth:small?0:24},
+          timeScale:{minimumHeight:small?compactSize:24},
+          layout:{fontSize:small?8:10},
+        });
+      };
+      mobileQuery.addEventListener('change',syncResponsiveAxes);
 
       // Handle ResizeObserver
       const resizeObserver = new ResizeObserver((entries) => {
@@ -362,6 +405,7 @@ export const MainChart = React.memo(
       return () => {
         chart.unsubscribeCrosshairMove(handleCrosshairMove);
         resizeObserver.disconnect();
+        mobileQuery.removeEventListener('change',syncResponsiveAxes);
         activeSeriesRef.current.forEach((s) => {
           try {
             chart.removeSeries(s);
@@ -382,10 +426,72 @@ export const MainChart = React.memo(
     useEffect(()=>{
       const frame=requestAnimationFrame(()=>{
         const scale=chartApiRef.current?.priceScale('right');
-        if(scale)setPriceAxisWidth(Math.max(28,scale.width()));
+        if(scale)setPriceAxisWidth(Math.max(compactMobileAxes?MOBILE_ORDER_RAIL_PX:24,scale.width()));
       });
       return ()=>cancelAnimationFrame(frame);
-    },[candles,asset.digits,asset.symbol,chartType,indicatorsKey]);
+    },[candles,asset.digits,asset.symbol,chartType,indicatorsKey,compactMobileAxes]);
+
+    const updateMobileAxisTicks=useCallback(()=>{
+      const series=mainSeriesRef.current;
+      const element=chartContainerRef.current;
+      if(!series||!element)return;
+      const height=element.clientHeight-MOBILE_ORDER_RAIL_PX;
+      if(height<70)return;
+      const yTop=30,yBottom=height-12;
+      const topPrice=series.coordinateToPrice(yTop);
+      const bottomPrice=series.coordinateToPrice(yBottom);
+      if(topPrice===null||bottomPrice===null||
+        !Number.isFinite(topPrice)||!Number.isFinite(bottomPrice))return;
+      const range=Math.abs(topPrice-bottomPrice);
+      if(range<=0)return;
+      const targetSteps=Math.max(2,Math.floor((yBottom-yTop)/52));
+      const stepIdeal=range/targetSteps;
+      const base=Math.pow(10,Math.floor(Math.log10(stepIdeal)));
+      const multiple=[1,2,5,10].find(n=>n*base>=stepIdeal)||10;
+      const step=multiple*base;
+      const low=Math.min(topPrice,bottomPrice),high=Math.max(topPrice,bottomPrice);
+      const first=Math.ceil(low/step)*step;
+      const next:Array<{y:number;value:number;label:string}>=[];
+      for(let value=first,i=0;i<35&&value<=high+step*0.00001;i++,value=first+step*(i+1)){
+        const y=series.priceToCoordinate(value);
+        if(y!==null&&y>=yTop&&y<=yBottom&&
+          (next.length===0||Math.abs(y-next[next.length-1].y)>14))
+          next.push({y,value,label:compactMobilePrice(value)});
+      }
+      next.sort((a,b)=>a.y-b.y);
+      setMobileAxisTicks(previous=>{
+        if(previous.length===next.length&&previous.every((old,i)=>
+          old.label===next[i].label&&Math.abs(old.y-next[i].y)<0.3))return previous;
+        return next;
+      });
+    },[]);
+    useEffect(()=>{
+      if(!compactMobileAxes){setMobileAxisTicks([]);return;}
+      const chart=chartApiRef.current;
+      const node=chartContainerRef.current;
+      if(!chart||!node)return;
+      let frame=0;
+      const refresh=()=>{
+        cancelAnimationFrame(frame);
+        frame=requestAnimationFrame(updateMobileAxisTicks);
+      };
+      chart.timeScale().subscribeVisibleLogicalRangeChange(refresh);
+      window.addEventListener('plutrade-chart-price-zoom',refresh);
+      const observer=new ResizeObserver(refresh);
+      observer.observe(node);
+      refresh();
+      return ()=>{
+        cancelAnimationFrame(frame);
+        observer.disconnect();
+        chart.timeScale().unsubscribeVisibleLogicalRangeChange(refresh);
+        window.removeEventListener('plutrade-chart-price-zoom',refresh);
+      };
+    },[compactMobileAxes,updateMobileAxisTicks]);
+    useEffect(()=>{
+      if(!compactMobileAxes)return;
+      const frame=requestAnimationFrame(updateMobileAxisTicks);
+      return ()=>cancelAnimationFrame(frame);
+    },[compactMobileAxes,candles,asset.symbol,asset.digits,chartType,indicatorsKey,updateMobileAxisTicks]);
 
     // Native browser/page pinch and the library's horizontal-only pinch are
     // disabled for this chart surface. Apply directional pinch to the chart's
@@ -1227,7 +1333,55 @@ export const MainChart = React.memo(
         </div>
 
         {/* Price ticks remain at right; candle times remain along chart bottom. */}
-        <div ref={chartContainerRef} className="w-full h-full" aria-label="Trading chart with time axis at bottom and price axis at right" />
+        <div ref={chartContainerRef} id="plutrade-native-chart-canvas"
+          className="w-full h-full" aria-label="Trading chart with time axis at bottom and price axis at right" />
+        {compactMobileAxes&&<>
+          <div id="plutrade-mobile-price-axis" aria-label="Price axis; drag to zoom, double tap to reset"
+            title="Drag to zoom price scale · double-tap to reset"
+            className="z-[50] touch-none select-none"
+            onPointerDown={event=>{
+              if(event.button!==0)return;
+              const scale=chartApiRef.current?.priceScale('right');
+              const range=scale?.getVisibleRange();
+              if(!range)return;
+              mobileAxisDrag.current={id:event.pointerId,startY:event.clientY,
+                range:{from:range.from,to:range.to}};
+              try{event.currentTarget.setPointerCapture(event.pointerId);}catch{}
+            }}
+            onPointerMove={event=>{
+              const rect=event.currentTarget.getBoundingClientRect();
+              const y=event.clientY-rect.top;
+              const scale=chartApiRef.current?.priceScale('right');
+              if(mobileAxisDrag.current?.id===event.pointerId&&scale){
+                const drag=mobileAxisDrag.current;
+                const center=(drag.range.from+drag.range.to)/2;
+                const half=(drag.range.to-drag.range.from)/2*Math.exp((event.clientY-drag.startY)/160);
+                if(Number.isFinite(half)&&half>0){
+                  scale.setAutoScale(false);
+                  scale.setVisibleRange({from:center-half,to:center+half});
+                  window.dispatchEvent(new CustomEvent('plutrade-chart-price-zoom',{detail:{chart:chartApiRef.current}}));
+                }
+              }
+              const price=mainSeriesRef.current?.coordinateToPrice(y);
+              setMobileAxisHover(price!=null&&Number.isFinite(price)?{y,price}:null);
+            }}
+            onPointerUp={event=>{if(mobileAxisDrag.current?.id===event.pointerId)mobileAxisDrag.current=null;}}
+            onPointerCancel={event=>{if(mobileAxisDrag.current?.id===event.pointerId)mobileAxisDrag.current=null;setMobileAxisHover(null);}}
+            onPointerLeave={()=>{if(!mobileAxisDrag.current)setMobileAxisHover(null);}}
+            onDoubleClick={()=>{chartApiRef.current?.priceScale('right').setAutoScale(true);
+              window.dispatchEvent(new CustomEvent('plutrade-chart-price-zoom',{detail:{chart:chartApiRef.current}}));}}>
+            {mobileAxisTicks.map((tick,i)=><span key={i}
+              title={tick.value.toFixed(asset.digits??2)}
+              className="absolute right-0 block w-full truncate px-[1px] text-center font-mono leading-[10px] text-[#b4bdd0] pointer-events-none"
+              style={{top:tick.y-5,fontSize:7}}>{tick.label}</span>)}
+            {mobileAxisHover&&<span role="status"
+              className="absolute right-full z-[70] whitespace-nowrap rounded-l border border-[#546581] bg-[#192538] px-1.5 py-0.5 font-mono text-[10px] text-white pointer-events-none"
+              style={{top:Math.max(18,Math.min((chartContainerRef.current?.clientHeight||200)-35,mobileAxisHover.y))-9}}>
+              {mobileAxisHover.price.toFixed(asset.digits??2)}
+            </span>}
+          </div>
+          <div id="plutrade-mobile-price-axis-corner" aria-hidden="true"/>
+        </>}
         {pinchAxis&&<span aria-live="off" className="absolute bottom-7 left-2 z-20 rounded bg-[#202c40]/90 px-1.5 py-0.5 text-[9px] text-[#b8cee8] pointer-events-none">
           {pinchAxis==='horizontal'?'Time zoom':pinchAxis==='vertical'?'Price zoom':'Time + price zoom'}
         </span>}
