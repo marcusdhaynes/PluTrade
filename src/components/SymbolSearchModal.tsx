@@ -439,7 +439,7 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
   return (
     <div
       id="symbol-search-modal-backdrop"
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 select-none"
+      className="fixed inset-0 z-[1800] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 select-none"
       onClick={onClose}
     >
       <div
