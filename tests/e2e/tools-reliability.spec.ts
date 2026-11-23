@@ -189,25 +189,34 @@ test('drawing Delete and Alt shortcuts do not steal keystrokes from symbol searc
 });
 
 
-test('favorite tool button opens only starred drawing tools and closes reliably',async({page})=>{
+test('starred drawing shortcuts stay visible; redundant favorites button is gone and flyouts dismiss instantly',async({page})=>{
   const errors:string[]=[];
-  page.on('pageerror',e=>errors.push(e.message));
+  page.on('pageerror',error=>errors.push(error.message));
   await page.goto('./');
-  const favorites=page.getByRole('button',{name:'Toggle favorite drawing tools'});
-  await favorites.click();
+  const shortcut=page.locator('#left-toolbar-starred-tools');
+  await expect(shortcut.locator('button')).toHaveCount(2);
+  await expect(page.getByRole('button',{name:'Toggle favorite drawing tools'})).toHaveCount(0);
+
   const flyout=page.locator('#tradingview-lines-flyout-menu');
+  await page.locator('#left-tool-line-group').click();
   await expect(flyout).toBeVisible();
-  await expect(flyout).toContainText('Favorite drawing tools');
-  await expect(flyout.locator('#line-flyout-ray')).toBeVisible();
-  await expect(flyout.locator('#channel-flyout-parallel_channel')).toBeVisible();
-  await expect(flyout.locator('#line-flyout-trendline')).toHaveCount(0);
-  await favorites.click();
-  await expect(flyout).toHaveCount(0);
-  await favorites.click();
+  await expect(flyout.locator('#line-flyout-trendline')).toBeVisible();
   await flyout.locator('#line-flyout-ray').click();
   await expect(flyout).toHaveCount(0);
   await expect(page.locator('#left-tool-line-group')).toHaveAttribute('title','Ray');
+
   await page.locator('#left-tool-line-group').click();
-  await expect(flyout.locator('#line-flyout-trendline')).toBeVisible();
+  await expect(flyout).toBeVisible();
+  await page.locator('#chart-timeframe-bar').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(flyout).toHaveCount(0);
+  await page.locator('#left-tool-line-group').click();
+  await expect(flyout).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(flyout).toHaveCount(0);
+
+  await page.locator('#color-picker-trigger-btn').click();
+  await expect(page.locator('#color-picker-trigger-btn').locator('xpath=following-sibling::div')).toBeVisible();
+  await page.locator('#chart-timeframe-bar').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(page.locator('#color-picker-trigger-btn').locator('xpath=following-sibling::div')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
