@@ -406,6 +406,21 @@ export const MobileTradingControls:React.FC<Props>=({
         <span className="block truncate">{activeAccountName||'Account'}</span>
       </button>
 
+      <button type="button" id="mobile-order-ticket-btn"
+        aria-label="Order" title="Open order ticket; hold for Paper Trading workspace"
+        className={baseButton+' border-[#4d6994] bg-[#253651] text-white'}
+        onPointerDown={()=>{
+          orderHeld.current=false;
+          clearOrderHold();
+          if(onOpenPaperWorkspace)orderHoldTimer.current=setTimeout(()=>{
+            orderHeld.current=true;onOpenPaperWorkspace();
+          },550);
+        }}
+        onPointerUp={clearOrderHold} onPointerCancel={clearOrderHold} onPointerLeave={clearOrderHold}
+        onContextMenu={e=>{e.preventDefault();clearOrderHold();orderHeld.current=true;onOpenPaperWorkspace?.();}}
+        onClick={()=>{if(!orderHeld.current)onOpenOrder();orderHeld.current=false;}}>
+        Order
+      </button>
       <button type="button" id="mobile-upl-cash" aria-label="Unrealized profit loss amount"
         title={'Unrealized P/L: '+moneyLabel(displayedPnl)+' · '+(showPosition?'active position':'whole account')}
         aria-expanded={pnlMenu==='cash'}
@@ -425,21 +440,6 @@ export const MobileTradingControls:React.FC<Props>=({
         <span className={'block w-full truncate text-center text-[clamp(7px,2vw,9px)] font-semibold tabular-nums '+(displayedPct===null?'text-[#d1d9e7]':displayedPct>=0?'text-[#64e6b9]':'text-[#ff95a4]')}>
           {displayedPct===null?'—':(displayedPct>0?'+':'')+displayedPct.toFixed(pnlDigits)+'%'}
         </span>
-      </button>
-      <button type="button" id="mobile-order-ticket-btn"
-        aria-label="Order" title="Open order ticket; hold for Paper Trading workspace"
-        className={baseButton+' border-[#4d6994] bg-[#253651] text-white'}
-        onPointerDown={()=>{
-          orderHeld.current=false;
-          clearOrderHold();
-          if(onOpenPaperWorkspace)orderHoldTimer.current=setTimeout(()=>{
-            orderHeld.current=true;onOpenPaperWorkspace();
-          },550);
-        }}
-        onPointerUp={clearOrderHold} onPointerCancel={clearOrderHold} onPointerLeave={clearOrderHold}
-        onContextMenu={e=>{e.preventDefault();clearOrderHold();orderHeld.current=true;onOpenPaperWorkspace?.();}}
-        onClick={()=>{if(!orderHeld.current)onOpenOrder();orderHeld.current=false;}}>
-        Order
       </button>
       <button type="button" className={baseButton+' border-[#255da9] bg-[#1c426f] text-white'}
         onClick={()=>onEnter()}>Enter</button>
