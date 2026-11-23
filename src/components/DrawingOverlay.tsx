@@ -609,7 +609,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     <div
       ref={containerRef}
       id="tradingview-drawing-overlay"
-      className={`absolute inset-0 z-10 select-none overflow-hidden ${
+      className={`absolute inset-0 z-[45] select-none overflow-hidden ${
         isBending
           ? 'cursor-grabbing pointer-events-auto'
           : hoveredBendInfo
