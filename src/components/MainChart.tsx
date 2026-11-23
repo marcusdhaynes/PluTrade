@@ -1049,7 +1049,7 @@ export const MainChart = React.memo(
               <div className={`h-2 w-2 rounded-full ${chartHistoryState==='loading'?'bg-[#e9b872] animate-pulse':'bg-[#fc8796]'}`}/>
               <strong className="text-sm">{chartHistoryState==='loading'?'Loading chart candles':'Chart history unavailable'}</strong>
             </div>
-            <p className="text-xs text-[#b7c5d9]">{chartEmptyExplanation(asset,timeframe,chartHistoryState)}</p>
+            <p className="text-xs text-[#b7c5d9]">{chartEmptyExplanation(asset,timeframe,chartHistoryState as ChartLoadState)}</p>
             <p className="text-[10px] text-[#95a5bc]">
               {asset.symbol} · {asset.source||asset.exchange} · {timeframe} · Exact venue history.
               No made-up candles or silent exchange substitution.
