@@ -251,6 +251,7 @@ export const MainChart = React.memo(
         height: Math.max(1,chartContainerRef.current.clientHeight),
         layout: {
           background: { type: ColorType.Solid, color: '#131722' },
+          attributionLogo: false,
           textColor: '#a5b1c5',
           fontFamily: "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif",
           fontSize: 10,
