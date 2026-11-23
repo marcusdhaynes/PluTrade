@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import type {Asset,PaperPosition} from '../types';
 import type {PaperExitMode} from '../services/paperOrders';
 import {exitPriceFromValue,exitValueFromPrice} from '../services/paperOrders';
+import {DEFAULT_DYNAMIC_TRAIL,validDynamicTrail,DYNAMIC_TRAIL_TIMEFRAMES,type DynamicTrailingSettings} from '../services/dynamicTrailing';
 
 type ExitKind='sl'|'tp';
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
   onEquityPercent:(value:number)=>void;
   onEnter:(focus?:ExitKind)=>void;
   onExit:()=>void;
-  onEditStops:(id:string,tp?:number,sl?:number,trailing?:number|null)=>void;
+  onEditStops:(id:string,tp?:number,sl?:number,trailing?:number|null,dynamic?:DynamicTrailingSettings|null)=>void;
   onAdvancedConditional:()=>void;
   editRequest?:{id:string;kind:ExitKind;seq:number}|null;
 }
@@ -35,6 +36,8 @@ export const MobileTradingControls:React.FC<Props>=({
   const [mode,setMode]=useState<PaperExitMode>('percent');
   const [value,setValue]=useState('1');
   const [trail,setTrail]=useState(false);
+  const [dynamic,setDynamic]=useState(false);
+  const [dynamicSettings,setDynamicSettings]=useState<DynamicTrailingSettings>({...DEFAULT_DYNAMIC_TRAIL});
   const [trailPercent,setTrailPercent]=useState('0.50');
   const [equityDraft,setEquityDraft]=useState(String(equityPercent));
   const [error,setError]=useState('');
@@ -47,7 +50,9 @@ export const MobileTradingControls:React.FC<Props>=({
     setError('');
     setPanel(kind);
     setAdvanced(showAll);
-    setTrail(false);
+    setTrail(kind==='sl'&&!!position?.trailingPercent);
+    setDynamic(kind==='sl'&&!!position?.dynamicTrailing);
+    setDynamicSettings(position?.dynamicTrailing||{...DEFAULT_DYNAMIC_TRAIL});
     setTrailPercent(String(position?.trailingPercent||0.5));
     const existing=kind==='sl'?position?.sl:position?.tp;
     if(existing!==undefined&&existing>0){
@@ -89,9 +94,12 @@ export const MobileTradingControls:React.FC<Props>=({
   const validTrail=Number.isFinite(Number(trailPercent))&&Number(trailPercent)>0&&Number(trailPercent)<100;
   const saveExit=()=>{
     if(!position||!selectedKind)return;
-    if(selectedKind==='sl'&&trail){
+    if(selectedKind==='sl'&&dynamic){
+      if(!validDynamicTrail(dynamicSettings)){setError('Dynamic ATR period/lookback must be 2–100 and the multiplier 0.25–10.');return;}
+      onEditStops(position.id,position.tp,position.sl,null,dynamicSettings);
+    }else if(selectedKind==='sl'&&trail){
       if(!validTrail){setError('Trail must be greater than 0% and less than 100%.');return;}
-      onEditStops(position.id,position.tp,position.sl,Number(trailPercent));
+      onEditStops(position.id,position.tp,position.sl,Number(trailPercent),null);
     }else{
       if(!validTarget){setError('Choose a positive price on the correct side of the entry.');return;}
       if(selectedKind==='tp'&&position.tpLevels?.length){
@@ -156,13 +164,45 @@ export const MobileTradingControls:React.FC<Props>=({
         </label>
         <p className="text-[#93a8c4] mt-1">Price level: {validTarget?numeric(target!,asset.digits):'Invalid'} {asset.currency}</p>
         {selectedKind==='sl'&&advanced&&<div className="mt-3 border-t border-[#39495f] pt-3">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={trail} onChange={e=>setTrail(e.target.checked)}/> Trailing stop (follows favorable price only)</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={trail}
+            onChange={e=>{setTrail(e.target.checked);if(e.target.checked)setDynamic(false);}}/>
+            Percent trailing stop (follows favorable price only)
+          </label>
           {trail&&<label className="block mt-2">Trailing distance %
             <input type="number" aria-label="Trailing stop percent" min="0" max="99.99" step="any"
               className="block mt-1 h-9 w-full rounded border border-[#53627a] bg-[#111b2a] px-2 text-white"
               value={trailPercent} onChange={e=>setTrailPercent(e.target.value)}/>
           </label>}
-          <p className="mt-1 text-[10px] text-[#93a8c4]">A trailing stop never loosens a previously protected level. All executions are simulated.</p>
+          <label className="flex items-center gap-2 mt-3"><input type="checkbox" checked={dynamic}
+            onChange={e=>{setDynamic(e.target.checked);if(e.target.checked)setTrail(false);}}/>
+            Dynamic ATR Chandelier trailing stop
+          </label>
+          {dynamic&&<div className="grid grid-cols-2 gap-2 mt-2">
+            <label>ATR period
+              <input type="number" aria-label="Mobile ATR period" min="2" max="100" step="1"
+                className="block w-full h-9 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2"
+                value={dynamicSettings.period} onChange={e=>setDynamicSettings(p=>({...p,period:Number(e.target.value)}))}/>
+            </label>
+            <label>High/low lookback
+              <input type="number" aria-label="Mobile ATR lookback" min="2" max="100" step="1"
+                className="block w-full h-9 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2"
+                value={dynamicSettings.lookback} onChange={e=>setDynamicSettings(p=>({...p,lookback:Number(e.target.value)}))}/>
+            </label>
+            <label>ATR multiplier
+              <input type="number" aria-label="Mobile ATR multiplier" min=".25" max="10" step=".25"
+                className="block w-full h-9 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2"
+                value={dynamicSettings.multiplier} onChange={e=>setDynamicSettings(p=>({...p,multiplier:Number(e.target.value)}))}/>
+            </label>
+            <label>Timeframe
+              <select aria-label="Mobile ATR timeframe"
+                className="block w-full h-9 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2"
+                value={dynamicSettings.timeframe}
+                onChange={e=>setDynamicSettings(p=>({...p,timeframe:e.target.value as DynamicTrailingSettings['timeframe']}))}>
+                {DYNAMIC_TRAIL_TIMEFRAMES.map(tf=><option key={tf} value={tf}>{tf}</option>)}
+              </select>
+            </label>
+          </div>}
+          <p className="mt-1 text-[10px] text-[#93a8c4]">Trailing protection never loosens an achieved stop. Dynamic ATR requires completed verified candle history; no stop level is invented while awaiting bars.</p>
         </div>}
         {selectedKind==='tp'&&position.tpLevels?.length>0&&<p className="mt-3 text-[#e4b978]">
           {position.tpLevels.length} partial take-profit levels are active. Their allocation must be reviewed in Positions.</p>}
@@ -170,7 +210,7 @@ export const MobileTradingControls:React.FC<Props>=({
           className="mt-2 text-[#9cc2ff] underline">Advanced conditional price/drawing rule</button>}
         <button type="button" onClick={saveExit}
           className="mt-3 w-full rounded bg-[#2962ff] text-white p-2.5 font-semibold">
-          {selectedKind==='sl'&&trail?'Enable Trailing SL':'Save '+(selectedKind==='sl'?'Stop Loss':'Take Profit')}
+          {selectedKind==='sl'&&dynamic?'Enable Dynamic ATR SL':selectedKind==='sl'&&trail?'Enable Trailing SL':'Save '+(selectedKind==='sl'?'Stop Loss':'Take Profit')}
         </button>
       </>:<>
         <p className="text-[#b7c6da]">No open position for this exact market. Configure {panel==='sl'?'all stop-loss types, including trailing':'all take-profit target types and multiple levels'} in a reviewed entry ticket.</p>
@@ -196,7 +236,7 @@ export const MobileTradingControls:React.FC<Props>=({
         onClick={()=>clickExit(kind)}>
         {kind.toUpperCase()}
         <span className="block text-[9px] font-normal leading-none">
-          {position?(kind==='sl'?position.sl:position.tp)?numeric((kind==='sl'?position.sl:position.tp)!,2):kind==='tp'&&position.tpLevels?.length?position.tpLevels.length+' levels':'Set':'All Types'}
+          {position?(kind==='sl'?position.sl:position.tp)?numeric((kind==='sl'?position.sl:position.tp)!,2):kind==='sl'&&position.dynamicTrailing?'ATR':kind==='tp'&&position.tpLevels?.length?position.tpLevels.length+' levels':'Set':'All Types'}
         </span>
       </button>)}
     </div>
