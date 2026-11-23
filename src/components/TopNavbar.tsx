@@ -421,76 +421,63 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   return (
     <header
       id="tradingview-top-navbar"
-      className="h-9 md:h-8 bg-[#131722] border-b border-[#2a2e39] px-1.5 flex items-center justify-between text-[11px] select-none z-50 shrink-0 relative overflow-visible"
+      className="flex h-auto w-full min-w-0 shrink-0 flex-col border-b border-[#2a2e39] bg-[#131722] text-[11px] select-none relative z-50 overflow-visible"
     >
-      {/* Phone header: essential controls stay visible without sideways scroll.
-          Secondary actions have a compact menu instead of overflowing the chart. */}
-      <div id="plutrade-mobile-navbar" className="flex md:hidden h-full w-full min-w-0 items-center gap-1">
+      {/* Mobile: keep symbol and a genuine visual favorite-able chart-style picker.
+          No interval selector or hamburger is needed: both get dedicated rows. */}
+      <div id="plutrade-mobile-navbar" className="flex md:hidden h-9 min-h-9 w-full min-w-0 items-center gap-1 px-1">
         <button type="button" id="mobile-symbol-search-trigger" onClick={onOpenSymbolSearch}
           className="min-w-0 flex-1 truncate rounded border border-[#3a4356] bg-[#1b2434] px-1.5 py-1.5 text-left font-semibold text-[#e6edfa]"
           title={activeAsset.symbol+' · '+(activeAsset.source||activeAsset.exchange)}>
           <span className="block truncate">{activeAsset.symbol}</span>
         </button>
-        <select id="mobile-timeframe-selector" aria-label="Mobile chart timeframe" value={activeTimeframe}
-          onChange={event=>setActiveTimeframe(event.target.value as Timeframe)}
-          className="h-7 w-[54px] shrink-0 rounded border border-[#3a4356] bg-[#1b2434] px-0.5 text-[10px] text-[#e3ebfb]">
-          {ALL_TIMEFRAMES_CHRONOLOGICAL.map(tf=><option key={tf} value={tf}>{tf}</option>)}
-        </select>
-        <select id="mobile-chart-style-selector" aria-label="Mobile chart style" value={chartType}
-          onChange={event=>setChartType(event.target.value as ChartType)}
-          className="h-7 w-[73px] shrink-0 rounded border border-[#3a4356] bg-[#1b2434] px-0.5 text-[10px] text-[#e3ebfb]">
-          {chartTypes.map(type=><option key={type.id} value={type.id}>{type.label}</option>)}
-        </select>
+        <div id="mobile-chart-style-anchor" ref={mobileChartStyleRef} className="relative z-[110] flex shrink-0 items-center gap-0.5">
+          <button type="button" id="mobile-chart-style-trigger" aria-label="Choose visual chart style"
+            aria-expanded={isMobileChartStyleOpen} title={'Chart type: '+(chartTypes.find(t=>t.id===chartType)?.label||chartType)}
+            onClick={()=>setIsMobileChartStyleOpen(open=>!open)}
+            className="flex h-7 items-center gap-0.5 rounded border border-[#435371] bg-[#1d2b40] px-1.5 text-[#c9ddff]">
+            {chartTypes.find(t=>t.id===chartType)?.icon||<CandlestickChart size={15}/>}
+            <ChevronDown size={11}/>
+          </button>
+          <div id="mobile-chart-style-favorites" className="flex min-w-0 max-w-[70px] gap-0.5 overflow-x-auto scrollbar-none">
+            {chartTypes.filter(item=>favoriteChartTypes.includes(item.id)).map(item=>
+              <button type="button" key={item.id} id={'mobile-chart-type-btn-'+item.id}
+                aria-label={'Favorite chart type '+item.label} title={item.label}
+                onClick={()=>setChartType(item.id)}
+                className={'flex h-7 w-6 shrink-0 items-center justify-center rounded '+(chartType===item.id?'bg-[#295ee8] text-white':'bg-[#212a3b] text-[#b6c8e1]')}>
+                {item.icon}
+              </button>)}
+          </div>
+          {isMobileChartStyleOpen&&<div id="mobile-chart-type-dropdown-menu" role="dialog" aria-label="Chart styles"
+            className="absolute right-0 top-full z-[120] mt-1 max-h-[min(73dvh,450px)] w-[min(258px,calc(100vw-16px))] overflow-y-auto rounded-lg border border-[#47546c] bg-[#1b2534] p-1.5 shadow-2xl">
+            <p className="px-2 py-1 text-[10px] text-[#aabbcf]">Select a view · Star favorites for quick access</p>
+            {chartTypes.map(item=>{
+              const selected=chartType===item.id,starred=favoriteChartTypes.includes(item.id);
+              return <div key={item.id} className="flex items-center gap-1 rounded hover:bg-[#303d52]">
+                <button type="button" id={'mobile-chart-type-option-'+item.id}
+                  aria-label={'Chart style '+item.label} aria-pressed={selected}
+                  onClick={()=>{setChartType(item.id);setIsMobileChartStyleOpen(false);}}
+                  className={'flex flex-1 items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] '+(selected?'text-[#9cc0ff] bg-[#273b58]':'text-[#d1dced]')}>
+                  {item.icon}<span>{item.label}</span>
+                </button>
+                <button type="button" id={'mobile-star-chart-type-'+item.id}
+                  aria-label={(starred?'Unfavorite ':'Favorite ')+item.label}
+                  aria-pressed={starred} title={starred?'Remove chart-style favorite':'Add chart-style favorite'}
+                  onClick={event=>toggleFavoriteChartType(item.id,event)}
+                  className={'grid h-7 w-7 shrink-0 place-items-center rounded '+(starred?'text-[#ffc25d]':'text-[#8391a9]')}>
+                  <Star size={14} fill={starred?'currentColor':'none'}/>
+                </button>
+              </div>;
+            })}
+          </div>}
+        </div>
         <button type="button" aria-label="Open mobile indicators" onClick={onOpenIndicators}
           className="grid h-7 w-7 shrink-0 place-items-center rounded border border-[#3a4356] text-[#9eb3d1]">
           <SlidersHorizontal size={15}/>
         </button>
-        <button type="button" id="mobile-top-tools-trigger" aria-label="More mobile chart actions"
-          aria-expanded={mobileMoreOpen} onClick={()=>setMobileMoreOpen(v=>!v)}
-          className="grid h-7 w-7 shrink-0 place-items-center rounded border border-[#3a4356] text-[#b2c7e2]">
-          <Menu size={16}/>
-        </button>
-        {mobileMoreOpen&&<>
-          <div className="fixed inset-0 z-[90]" onClick={()=>setMobileMoreOpen(false)} aria-hidden="true"/>
-          <div id="mobile-top-tools-menu" role="menu" aria-label="Additional chart actions"
-            className="absolute right-1 top-full z-[100] mt-1 w-[min(300px,calc(100vw-8px))] max-h-[min(70dvh,440px)] overflow-y-auto rounded-lg border border-[#3f4b60] bg-[#182232] p-2 text-[#d9e4f7] shadow-2xl">
-            <label className="flex items-center justify-between gap-2 border-b border-[#303c4f] pb-2 text-[11px]">
-              <span>Chart layout</span>
-              <select aria-label="Mobile chart layout" value={currentTemplateId}
-                onChange={event=>{
-                  const selected=LAYOUT_TEMPLATES.find(template=>template.id===event.target.value);
-                  if(selected)onSelectTemplate(selected);
-                  setMobileMoreOpen(false);
-                }}
-                className="max-w-[185px] rounded border border-[#45526a] bg-[#111b2b] p-1 text-[10px]">
-                {LAYOUT_TEMPLATES.map(template=><option key={template.id} value={template.id}>{template.name}</option>)}
-              </select>
-            </label>
-            <div className="mt-2 grid grid-cols-2 gap-1">
-              {([
-                ['Alert',onOpenAlerts,false],
-                ['Replay',onOpenReplay,false],
-                ['Strategy',onOpenStrategyLab,false],
-                ['Undo',onUndoDrawing,!canUndo],
-                ['Redo',onRedoDrawing,!canRedo],
-                ['Save chart',onOpenSavedCharts,false],
-                ['Save layout',onSaveLayout,false],
-                ['Snapshot',onTakeSnapshot,false],
-                [isFullscreen?'Exit fullscreen':'Fullscreen',onToggleFullscreen,false],
-                [isPipActive?'Close PiP':'Picture in picture',onTogglePip,false],
-                [sessionVwapEnabled?'Disable VWAP':'Session VWAP',onToggleSessionVwap,false],
-                ['Trade ticket',onToggleTradingPanel,false],
-                ['Paper Trading workspace',onTogglePaperWorkspace,false],
-              ] as Array<[string,(()=>void)|undefined,boolean]>).map(([label,action,disabled])=>
-                <button key={label} type="button" role="menuitem" disabled={disabled}
-                  className="min-w-0 rounded border border-[#34445c] bg-[#222d40] px-2 py-1.5 text-left text-[11px] disabled:opacity-35 hover:bg-[#334564]"
-                  onClick={()=>{setMobileMoreOpen(false);action?.();}}>{label}</button>
-              )}
-            </div>
-          </div>
-        </>}
       </div>
 
+      <div id="desktop-primary-navbar" className="hidden md:flex w-full min-w-0 items-center justify-between gap-1">
       {/* Left Section: User Avatar, Symbol Search, Timeframes, Chart Styles, Indicators, Tools */}
       <div className="hidden md:flex items-center gap-0.5 py-0.5 overflow-visible">
         {/* User Avatar with Green Circle 'M' and Red Badge '7' */}
@@ -927,6 +914,100 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
         >
           Save chart
         </button>
+      </div>
+      </div>
+
+      {/* Every chart interval lives in this permanently visible horizontal row.
+          An empty ticker-specific favorite set means show *all* intervals. */}
+      <div id="chart-timeframe-bar" className="flex h-[25px] min-h-[25px] w-full min-w-0 items-center border-t border-[#2b3443] bg-[#151c29] px-1">
+        <div id="chart-timeframe-scroll" role="toolbar" aria-label="Chart timeframes"
+          className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain whitespace-nowrap scrollbar-none"
+          style={{touchAction:'pan-x'}}>
+          {visibleTimeframes.map(tf=>
+            <button type="button" id={'tf-btn-'+tf} key={tf} aria-label={'Timeframe '+tf}
+              title={'Show '+tf+' chart'} aria-pressed={activeTimeframe===tf}
+              onClick={()=>setActiveTimeframe(tf)}
+              className={'h-[21px] shrink-0 rounded px-2 text-[10px] font-semibold '+(activeTimeframe===tf?
+                'bg-[#2962ff] text-white':'text-[#aab7cc] hover:bg-[#283448] hover:text-white')}>
+              {tf}
+            </button>)}
+        </div>
+        <div ref={timeframeFavoritesRef} className="relative z-[100] ml-1 shrink-0 border-l border-[#364358] pl-1">
+          <button type="button" id="timeframe-favorites-button"
+            aria-label={'Favorite timeframes for '+activeAsset.symbol}
+            title={'Save favorite timeframe loadout for '+activeAsset.symbol}
+            aria-expanded={isTimeframeFavoritesOpen} onClick={toggleTimeframeFavoriteMenu}
+            className={'flex h-6 w-7 items-center justify-center rounded '+(favoriteTimeframes.length?
+              'text-[#ffbe55] bg-[#3b3328]':'text-[#9baac0] hover:bg-[#293649]')}>
+            <Star size={15} fill={favoriteTimeframes.length?'currentColor':'none'}/>
+          </button>
+          {isTimeframeFavoritesOpen&&<div id="ticker-timeframe-favorites-menu" role="dialog"
+            aria-label={'Favorite intervals for '+activeAsset.symbol}
+            className="absolute right-0 top-full z-[130] mt-1 w-[min(290px,calc(100vw-14px))] rounded-lg border border-[#485770] bg-[#1b2638] p-2 text-[#dae6f8] shadow-2xl">
+            <p className="mb-2 text-[11px] font-semibold">Favorite intervals · {activeAsset.symbol}</p>
+            <p className="mb-2 text-[10px] leading-snug text-[#9fb0c9]">
+              Save favorite timeframes for this exact ticker. With none saved, the bar shows all intervals.
+            </p>
+            <div className="grid grid-cols-4 gap-1">
+              {CHART_INTERVALS.map(tf=>
+                <button type="button" key={tf} id={'favorite-timeframe-option-'+tf}
+                  aria-label={(draftTimeframes.includes(tf)?'Remove ':'Favorite ')+tf}
+                  aria-pressed={draftTimeframes.includes(tf)}
+                  onClick={()=>setDraftTimeframes(prev=>prev.includes(tf)?
+                    prev.filter(item=>item!==tf):[...prev,tf])}
+                  className={'flex h-7 items-center justify-center gap-1 rounded border text-[10px] '+(draftTimeframes.includes(tf)?
+                    'border-[#ae8746] bg-[#4b3a27] text-[#ffd288]':'border-[#394860] text-[#c0cde0]')}>
+                  {draftTimeframes.includes(tf)&&<Star size={10} fill="currentColor"/>}{tf}
+                </button>)}
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-1">
+              <button type="button" onClick={()=>setDraftTimeframes([])}
+                className="rounded px-2 py-1.5 text-[10px] text-[#a8bacf] hover:bg-[#344156]">Clear all</button>
+              <div className="flex gap-1">
+                <button type="button" onClick={()=>setIsTimeframeFavoritesOpen(false)}
+                  className="rounded border border-[#43516b] px-2.5 py-1.5 text-[10px]">Cancel</button>
+                <button type="button" id="save-ticker-timeframe-favorites" onClick={saveTickerTimeframeFavorites}
+                  className="rounded bg-[#2962ff] px-3 py-1.5 text-[10px] font-semibold text-white">Save for ticker</button>
+              </div>
+            </div>
+          </div>}
+        </div>
+      </div>
+
+      {/* Replace the mobile three-lines popup with always-visible compact rows.
+          Important actions stay reachable without hiding the actual chart. */}
+      <div id="mobile-chart-action-rows" className="grid md:hidden w-full min-w-0 grid-cols-5 gap-px border-t border-[#30394a] bg-[#121923] p-px">
+        <label className="flex h-[23px] min-w-0 items-center rounded bg-[#253146] px-0.5">
+          <span className="sr-only">Mobile chart layout</span>
+          <select aria-label="Mobile chart layout" value={currentTemplateId}
+            onChange={event=>{
+              const template=LAYOUT_TEMPLATES.find(item=>item.id===event.target.value);
+              if(template)onSelectTemplate(template);
+            }}
+            className="h-full w-full min-w-0 bg-transparent text-center text-[9px] font-medium text-[#c2d3e8]">
+            {LAYOUT_TEMPLATES.map(template=><option key={template.id} value={template.id}>{template.name}</option>)}
+          </select>
+        </label>
+        {([
+          ['Alert',onOpenAlerts,false],
+          ['Replay',onOpenReplay,false],
+          ['Strategy',onOpenStrategyLab,false],
+          ['Undo',onUndoDrawing,!canUndo],
+          ['Redo',onRedoDrawing,!canRedo],
+          ['Save Chart',onOpenSavedCharts,false],
+          ['Save Layout',onSaveLayout,false],
+          ['Snapshot',onTakeSnapshot,false],
+          [isFullscreen?'Exit Full':'Fullscreen',onToggleFullscreen,false],
+          [isPipActive?'Close PiP':'PiP',onTogglePip,false],
+          [sessionVwapEnabled?'VWAP On':'VWAP',onToggleSessionVwap,false],
+          ['Trade Ticket',onToggleTradingPanel,false],
+          ['Paper Trading',onTogglePaperWorkspace,false],
+          ['Download Data',onDownloadData,false],
+        ] as Array<[string,(()=>void)|undefined,boolean]>).map(([label,action,disabled])=>
+          <button type="button" key={label} disabled={disabled}
+            title={label} aria-label={label}
+            className="h-[23px] min-w-0 truncate rounded bg-[#202b3d] px-0.5 text-[9px] font-medium text-[#c2d3e8] disabled:opacity-30 hover:bg-[#35435a] active:bg-[#4169a0]"
+            onClick={()=>action?.()}>{label}</button>)}
       </div>
     </header>
   );
