@@ -1,0 +1,15 @@
+import {strict as assert} from 'node:assert';
+import {rulerMetrics} from './rulerMetrics';
+const start={time:100,price:50},end={time:280,price:55};
+const bars=[100,160,220,280].map(time=>({time,open:50,high:55,low:49,close:54,volume:2}));
+const result=rulerMetrics(start,end,bars,2);
+assert.equal(result.priceLabel,'+5.00');
+assert.equal(result.percentLabel,'+10.00%');
+assert.equal(result.bars,3);
+assert.equal(result.tickLabel,'500 ticks');
+assert.equal(result.timeLabel,'3m · 3 bars');
+const reverse=rulerMetrics(end,start,bars,2);
+assert.equal(reverse.percentLabel,'−9.09%');
+assert.equal(reverse.timeLabel,'−3m · 3 bars');
+assert.equal(rulerMetrics({time:0,price:0},end,[],4).percentLabel,'0.00%');
+console.log('Ruler price, percent, ticks and observed bars: pass');

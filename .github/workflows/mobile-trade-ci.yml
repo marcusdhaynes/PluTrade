@@ -1,0 +1,38 @@
+name: Mobile trading validation
+on:
+  push:
+    branches: [feature/mobile-trade-dock-20261122]
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/e2e/mobile-smoke.spec.ts'
+      - 'package.json'
+      - '.github/workflows/mobile-trade-ci.yml'
+concurrency:
+  group: plutrade-mobile-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: npm install --global pnpm@11.25.0
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run lint
+      - run: pnpm run test:paper
+      - run: pnpm run build
+        env:
+          GITHUB_PAGES: 'true'
+      - name: Install Playwright browser tests
+        run: npm install --prefix tests/e2e --no-package-lock --ignore-scripts
+      - name: Verify mobile Chrome/WebKit trade flows
+        run: cd tests/e2e && npx playwright test mobile-smoke.spec.ts
+        env:
+          HOME: /root

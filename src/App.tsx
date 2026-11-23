@@ -38,6 +38,7 @@ import { RightSidebar, RightSidebarTab } from './components/RightSidebar';
 import { BottomToolbar } from './components/BottomToolbar';
 import { BottomTradingPanel } from './components/BottomTradingPanel';
 import { PaperTradeTicket } from './components/PaperTradeTicket';
+import { MobileTradingControls } from './components/MobileTradingControls';
 import { PaperAccountModal } from './components/PaperAccountModal';
 import { SavedChartsModal } from './components/SavedChartsModal';
 import type { SavedChartIdea } from './services/savedCharts';
@@ -71,7 +72,7 @@ import {loadRiskPolicy,saveRiskPolicy,evaluateRiskPolicy} from './services/riskC
 import {updateFeedHealth,type MarketEvent,type FeedHealth} from './services/marketEvents';
 import {createPaperWriterLease} from './services/paperTabOwnership';
 import {loadWatchlists,persistWatchlists,isWatchlistStorageBlocked,readWatchlistBackupRaw,WATCHLIST_KEY,WATCHLIST_LEGACY_KEY} from './services/watchlistStorage';
-import { emptyPaperPortfolio, closePaperPosition, updatePaperStops, enableTrailingPaperStop, disableTrailingPaperStop, isFreshPaperQuote, accountLeverage, paperCommission, paperExecutionPrice, configurePaperPortfolio, type PaperPortfolio, type PaperSettings } from './services/paperTrading';
+import { emptyPaperPortfolio, closePaperPosition, updatePaperStops, updatePaperTargetLevels, enableTrailingPaperStop, disableTrailingPaperStop, isFreshPaperQuote, accountLeverage, paperCommission, paperExecutionPrice, configurePaperPortfolio, type PaperPortfolio, type PaperSettings } from './services/paperTrading';
 import { loadPaperAccounts, savePaperAccounts, updateActivePaperAccount, createPaperAccountRecord, initialPaperAccounts,isPaperStorageBlocked,PAPER_ACCOUNTS_STORAGE_KEY, type PaperAccountsState } from './services/paperAccounts';
 
 const assetIdentity = marketIdentity;
@@ -860,6 +861,18 @@ export default function App() {
   },[persistPaperNow]);
   const [isBottomTradingOpen, setIsBottomTradingOpen] = useState(false);
   const [isTradeTicketOpen,setIsTradeTicketOpen]=useState(false);
+  const [mobileEquityPercent,setMobileEquityPercent]=useState(()=>{
+    try {const saved=Number(localStorage.getItem('plutrade_mobile_equity_percent_v1'));
+      return Number.isFinite(saved)&&saved>0&&saved<=100?saved:99;
+    }catch{return 99;}
+  });
+  const [mobileQuickTicket,setMobileQuickTicket]=useState<{focus?:'sl'|'tp';seq:number}|null>(null);
+  const [mobileExitRequest,setMobileExitRequest]=useState<{id:string;kind:'sl'|'tp';seq:number}|null>(null);
+  useEffect(()=>{try{localStorage.setItem('plutrade_mobile_equity_percent_v1',String(mobileEquityPercent));}catch{}},[mobileEquityPercent]);
+  const openMobileEntry=(focus?:'sl'|'tp')=>{
+    setMobileQuickTicket(prev=>({focus,seq:(prev?.seq||0)+1}));
+    setIsTradeTicketOpen(true);
+  };
   const [tradeTicketAccountSettings,setTradeTicketAccountSettings]=useState(false);
   const [isBottomTradingExpanded, setIsBottomTradingExpanded] = useState(false);
 
@@ -1584,6 +1597,15 @@ export default function App() {
   const handleEditPaperStops = (id:string,tp?:number,sl?:number,trailing?:number|null,
     dynamic?:DynamicTrailingSettings|null) => {
     try {
+      const position=paperPositions.find(item=>item.id===id);
+      if(!position)throw new Error('Position unavailable.');
+      if(tp!==undefined&&(!Number.isFinite(tp)||tp<=0||(position.side==='Long'?tp<=position.entryPrice:tp>=position.entryPrice)))
+        throw new Error('Take-profit target must be on the profitable side of the entry.');
+      // A ratcheted stop may legitimately lock in profit past entry. Changed
+      // levels must instead remain untriggered relative to the observed mark.
+      if(sl!==undefined&&(!Number.isFinite(sl)||sl<=0||
+        (sl!==position.sl&&(position.side==='Long'?sl>=position.currentPrice:sl<=position.currentPrice))))
+        throw new Error('Stop-loss target must be beyond the currently observed price.');
       let next=updatePaperStops(paperPortfolio,id,tp,sl);
       if(trailing===null)next=disableTrailingPaperStop(next,id);
       else if(trailing!==undefined)next=enableTrailingPaperStop(next,id,trailing);
@@ -1592,6 +1614,18 @@ export default function App() {
       setPaperPortfolio(next);
       setPaperError('');
     }catch(e){setPaperError(e instanceof Error?e.message:'Invalid stops');}
+  };
+  const handleEditPaperTargets=(id:string,targets:Array<{price:number;sharePercent:number}>)=>{
+    try{
+      const next=updatePaperTargetLevels(paperPortfolio,id,targets);
+      setPaperPortfolio(next);
+      setPaperError('');
+    }catch(e){setPaperError(e instanceof Error?e.message:'Invalid take-profit levels');}
+  };
+  const handleChartEditPositionStop=(id:string,kind:'sl'|'tp')=>{
+    if(typeof window!=='undefined'&&window.matchMedia('(max-width: 767px)').matches)
+      setMobileExitRequest(prev=>({id,kind,seq:(prev?.seq||0)+1}));
+    else requestBottomPanel('positions');
   };
   const handleCancelPendingOrder=(id:string)=>{setPaperPortfolio(p=>cancelPaperOrder(p,id));setPaperError('');};
   const handleAmendPendingOrder=(id:string,request:PaperAmendRequest):string|null=>{
@@ -1787,7 +1821,7 @@ export default function App() {
   return (
     <div
       id="tradingview-app-root"
-      className="flex flex-col h-screen w-screen overflow-hidden bg-[#131722] text-[#d1d4dc] font-sans antialiased"
+      className="flex flex-col h-[100dvh] w-full max-w-full min-h-0 overflow-hidden bg-[#131722] text-[#d1d4dc] font-sans antialiased"
     >
       <WebBuildBanner />
       {/* Keep the trading workspace full-size. Data/quote availability is shown at the
@@ -1904,6 +1938,7 @@ export default function App() {
             openPosition={activePosition}
             openPositions={paperPositions}
             onClosePosition={handleClosePosition}
+            onEditPositionStop={handleChartEditPositionStop}
             allAssets={assets}
             windowStates={windowStates}
             onUpdateWindowStates={handleUpdateWindowStates}
@@ -1978,12 +2013,26 @@ export default function App() {
             isPercentScale={isPercentScale}
             setIsPercentScale={setIsPercentScale}
           />
+          <MobileTradingControls
+            asset={activeAsset} position={activePosition}
+            accountEquity={paperAccount.equity} accountBalance={paperAccount.balance}
+            equityPercent={mobileEquityPercent} onEquityPercent={setMobileEquityPercent}
+            onEnter={openMobileEntry}
+            onExit={()=>{if(activePosition)handleClosePosition(activePosition.id);}}
+            onEditStops={handleEditPaperStops}
+            onEditTargets={handleEditPaperTargets}
+            editRequest={mobileExitRequest}
+            onAdvancedConditional={()=>handleOpenCreateConditionalOrder({
+              type:'position',label:(activePosition?.symbol||activeAsset.symbol)+' position'})}
+          />
         </div>
 
         {/* Live market order entry slides in from the right; none is open at startup. */}
         <PaperTradeTicket open={isTradeTicketOpen} onClose={()=>setIsTradeTicketOpen(false)}
           asset={activeAsset} portfolio={paperPortfolio} bids={orderBook.bids} asks={orderBook.asks}
           onSubmit={handleSubmitTicketOrder} error={paperError}
+          quickEquityPercent={mobileEquityPercent}
+          quickFocus={mobileQuickTicket?.focus} quickOpenSequence={mobileQuickTicket?.seq}
           onOpenAccount={()=>setTradeTicketAccountSettings(true)}/>
         {tradeTicketAccountSettings&&<PaperAccountModal existing={activePaperRecord}
           proposedName={paperAccount.name}

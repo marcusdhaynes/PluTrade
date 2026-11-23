@@ -31,6 +31,7 @@ import {
   HelpCircle,
   BookOpen,
   Camera,
+  Menu,
 } from 'lucide-react';
 
 export type RightSidebarTab =
@@ -109,8 +110,15 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
   onTakeSnapshot,
   onOpenConditionalOrder,
 }) => {
+  const [mobileMenuOpen,setMobileMenuOpen]=React.useState(false);
   return (
     <div id="tradingview-right-dock" className="flex h-full shrink-0 select-none z-20">
+      <button type="button" id="mobile-right-sidebar-menu"
+        className="md:hidden fixed top-10 right-1 z-[55] h-7 w-7 flex items-center justify-center rounded-md border border-[#4a5263] bg-[#1b2639]/95 text-[#b5c9e5] shadow-lg"
+        aria-label="Mobile chart tools menu" aria-expanded={mobileMenuOpen}
+        onClick={()=>setMobileMenuOpen(open=>!open)}>
+        <Menu size={15}/>
+      </button>
       {/* Expandable Panel Content */}
       {isOpen && (
         <div
@@ -220,7 +228,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
       {/* Rightmost Vertical Icon Tab Bar */}
       <div
         id="tradingview-right-icon-bar"
-        className="w-[32px] bg-[#131722] border-l border-[#2a2e39] py-1 flex flex-col items-center justify-between shrink-0"
+        onClick={e=>{if((e.target as HTMLElement).closest('button'))setMobileMenuOpen(false);}}
+        className={`w-[32px] bg-[#131722] border-l border-[#2a2e39] py-1 flex-col items-center justify-between shrink-0 ${mobileMenuOpen?'flex':'hidden md:flex'}`}
       >
         <div className="flex flex-col items-center gap-1 w-full">
           {/* Watchlist with red badge 1 */}
