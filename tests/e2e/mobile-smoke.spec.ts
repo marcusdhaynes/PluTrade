@@ -513,14 +513,17 @@ test('popups render above chart/sidebar and outside tapping dismisses them',asyn
   await expect(date).toHaveCount(0);
 });
 
-test('right Indicators and Alerts are sole launchers and Order is first',async ({page})=>{
+test('right Indicators and Alerts are sole launchers; account and UPL precede Order',async ({page})=>{
   await page.goto('./');
   await expect(page.locator('#open-alerts-modal-btn')).toHaveCount(0);
   await expect(page.locator('#open-indicators-modal-btn')).toHaveCount(0);
   await expect(page.locator('#mobile-chart-action-rows')).toHaveCount(0);
   const buttons=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button');
-  await expect(buttons.first()).toHaveAttribute('id','mobile-order-ticket-btn');
-  await buttons.first().click();
+  await expect(buttons.first()).toHaveAttribute('id','mobile-active-account-btn');
+  await expect(buttons.nth(1)).toHaveAttribute('id','mobile-upl-cash');
+  await expect(buttons.nth(2)).toHaveAttribute('id','mobile-upl-percent');
+  await expect(buttons.nth(3)).toHaveAttribute('id','mobile-order-ticket-btn');
+  await buttons.nth(3).click();
   await expect(page.getByRole('dialog',{name:'Paper Trading order entry'})).toBeVisible();
   await page.getByTitle('Close order panel').click();
   await page.locator('#right-tab-indicators').click();
