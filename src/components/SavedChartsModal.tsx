@@ -35,7 +35,7 @@ export const SavedChartsModal:React.FC<Props>=({open,onClose,asset,timeframe,cha
     a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
   if(!open)return null;
-  return <div className="fixed inset-0 z-[250] bg-black/70 flex justify-center items-center p-3" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+  return <div className="fixed inset-0 z-[1800] bg-black/70 flex justify-center items-center p-3" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
     <section role="dialog" aria-modal="true" aria-label="Save and restore charts"
       className="w-full max-w-[550px] max-h-[88vh] overflow-y-auto bg-[#1a202b] border border-[#454b59] rounded-xl text-[#e5eaf5] shadow-2xl">
       <header className="sticky top-0 z-10 flex items-center gap-2 bg-[#1c2532] border-b border-[#343a45] px-5 py-4">
