@@ -42,6 +42,7 @@ import {marketIdentity} from '../services/marketIdentity';
 import {calculateUtcSessionVwap} from '../services/sessionVWAP';
 import {chartEmptyExplanation,type ChartLoadState} from '../services/chartRecovery';
 import {chartPositionExitLevels,type ChartExitLevel} from '../services/chartPositionLevels';
+import {pinchGeometry,pinchFactor,scaleAboutAnchor,type PinchAxis} from '../services/chartPinch';
 import {
   Eye,
   Settings,
@@ -150,6 +151,8 @@ export const MainChart = React.memo(
     ref
   ) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
+    const chartGestureRef=useRef<HTMLDivElement>(null);
+    const [pinchAxis,setPinchAxis]=useState<PinchAxis|null>(null);
     const [priceVisible,setPriceVisible]=useState(true);
     const [moreOpen,setMoreOpen]=useState(false);
     const [,refreshSeries]=useState(0);
@@ -270,7 +273,11 @@ export const MainChart = React.memo(
             labelBackgroundColor: '#2a2e39',
           },
         },
+        handleScale:{pinch:false,mouseWheel:true,axisPressedMouseMove:true,axisDoubleClickReset:true},
         rightPriceScale: {
+          visible:true,
+          borderVisible:true,
+          ticksVisible:true,
           borderColor: '#363a45',
           mode: isLogScale
             ? PriceScaleMode.Logarithmic
@@ -281,6 +288,9 @@ export const MainChart = React.memo(
           alignLabels: true,
         },
         timeScale: {
+          visible:true,
+          borderVisible:true,
+          ticksVisible:true,
           borderColor: '#2a2e39',
           timeVisible: true,
           secondsVisible: false,
@@ -349,6 +359,80 @@ export const MainChart = React.memo(
         seriesBundleRef.current = null;
       };
     }, []);
+
+    // Native browser/page pinch and the library's horizontal-only pinch are
+    // disabled for this chart surface. Apply directional pinch to the chart's
+    // public logical/time and price ranges, anchored under the two fingers.
+    useEffect(()=>{
+      const element=chartGestureRef.current;
+      if(!element)return;
+      type Range={from:number;to:number};
+      let gesture:null|{distance:number;axis:PinchAxis;logical:Range;price:Range;
+        logicalAnchor:number;priceAnchor:number}=null;
+      const pair=(event:TouchEvent)=>{
+        if(event.touches.length!==2)return null;
+        const rect=element.getBoundingClientRect();
+        return [
+          {x:event.touches[0].clientX-rect.left,y:event.touches[0].clientY-rect.top},
+          {x:event.touches[1].clientX-rect.left,y:event.touches[1].clientY-rect.top},
+        ] as const;
+      };
+      const start=(event:TouchEvent)=>{
+        const fingers=pair(event),chart=chartApiRef.current,series=mainSeriesRef.current;
+        if(!fingers||!chart||!series){gesture=null;return;}
+        event.preventDefault();
+        const geometry=pinchGeometry(...fingers);
+        const logical=chart.timeScale().getVisibleLogicalRange();
+        const scale=chart.priceScale('right');
+        const price=scale.getVisibleRange();
+        if(!logical||!price||price.to<=price.from)return;
+        const logicalAnchor=chart.timeScale().coordinateToLogical(geometry.midX);
+        const priceAnchor=series.coordinateToPrice(geometry.midY);
+        if(logicalAnchor===null||priceAnchor===null)return;
+        gesture={distance:geometry.distance,axis:geometry.axis,
+          logical:{from:Number(logical.from),to:Number(logical.to)},
+          price:{from:price.from,to:price.to},
+          logicalAnchor:Number(logicalAnchor),priceAnchor:Number(priceAnchor)};
+        setPinchAxis(geometry.axis);
+      };
+      const move=(event:TouchEvent)=>{
+        const fingers=pair(event);
+        if(!fingers)return;
+        event.preventDefault();
+        if(!gesture){start(event);return;}
+        const chart=chartApiRef.current;
+        if(!chart)return;
+        const factor=pinchFactor(gesture.distance,pinchGeometry(...fingers).distance);
+        if(gesture.axis!=='vertical'){
+          const range=scaleAboutAnchor(gesture.logical,gesture.logicalAnchor,factor);
+          if(range.to>range.from+2)chart.timeScale().setVisibleLogicalRange({
+            from:range.from as any,to:range.to as any});
+        }
+        if(gesture.axis!=='horizontal'){
+          const priceScale=chart.priceScale('right');
+          const range=scaleAboutAnchor(gesture.price,gesture.priceAnchor,factor);
+          if(Number.isFinite(range.from)&&Number.isFinite(range.to)&&range.to>range.from+1e-12){
+            priceScale.setAutoScale(false);
+            priceScale.setVisibleRange(range);
+          }
+        }
+      };
+      const end=(event:TouchEvent)=>{
+        if(event.touches.length<2){gesture=null;setPinchAxis(null);}
+      };
+      // Capture listeners also receive touches starting on the drawing overlay,
+      // but a single touch still pans or draws normally.
+      element.addEventListener('touchstart',start,{passive:false,capture:true});
+      element.addEventListener('touchmove',move,{passive:false,capture:true});
+      element.addEventListener('touchend',end,{passive:true,capture:true});
+      element.addEventListener('touchcancel',end,{passive:true,capture:true});
+      return ()=>{
+        element.removeEventListener('touchstart',start,true);
+        element.removeEventListener('touchmove',move,true);
+        element.removeEventListener('touchend',end,true);
+        element.removeEventListener('touchcancel',end,true);
+      };
+    },[]);
 
     // Visibility is a chart API option, never a CSS overlay that leaves deceptive candles.
     useEffect(()=>{try{mainSeriesRef.current?.applyOptions({visible:priceVisible});}catch{}},[priceVisible]);
@@ -1010,7 +1094,7 @@ export const MainChart = React.memo(
     }, [openPosition?.entryPrice,exitSignature,asset.price,asset.symbol,chartType]);
 
     return (
-      <div className="relative flex-1 w-full h-full min-h-0 overflow-hidden bg-[#131722] select-none">
+      <div ref={chartGestureRef} data-testid="chart-pinch-surface" className="relative flex-1 w-full h-full min-h-0 overflow-hidden bg-[#131722] select-none" style={{touchAction:'none'}}>
         {/* TradingView Legend Header in top left (matching screenshot) */}
         <div
           id="chart-top-legend-header"
@@ -1090,8 +1174,11 @@ export const MainChart = React.memo(
           {asset.currency} ▾
         </div>
 
-        {/* Lightweight Charts Canvas Container */}
-        <div ref={chartContainerRef} className="w-full h-full" />
+        {/* Price ticks remain at right; candle times remain along chart bottom. */}
+        <div ref={chartContainerRef} className="w-full h-full" aria-label="Trading chart with time axis at bottom and price axis at right" />
+        {pinchAxis&&<span aria-live="off" className="absolute bottom-7 left-2 z-20 rounded bg-[#202c40]/90 px-1.5 py-0.5 text-[9px] text-[#b8cee8] pointer-events-none">
+          {pinchAxis==='horizontal'?'Time zoom':pinchAxis==='vertical'?'Price zoom':'Time + price zoom'}
+        </span>}
         {sessionVwapEnabled&&candles.length>0&&<div className="absolute top-7 right-2 z-20 pointer-events-none text-[10px] text-[#d8a75b] bg-[#131722]/90 rounded px-1">
           UTC Session VWAP · OHLCV approximation
         </div>}
