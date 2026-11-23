@@ -130,6 +130,7 @@ interface TopNavbarProps {
   onSelectQuickTool?: (tool: DrawingToolType) => void;
   activeTool?: DrawingToolType;
   onToggleTradingPanel?: () => void;
+  onTogglePaperWorkspace?:()=>void;
   onOpenSavedCharts?: () => void;
   onOpenReplay?: () => void;
   onOpenStrategyLab?: () => void;
@@ -180,6 +181,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   onSelectQuickTool,
   activeTool,
   onToggleTradingPanel,
+  onTogglePaperWorkspace,
   onOpenSavedCharts,
   onOpenReplay,
   onOpenStrategyLab,
@@ -558,6 +560,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
                 [isPipActive?'Close PiP':'Picture in picture',onTogglePip,false],
                 [sessionVwapEnabled?'Disable VWAP':'Session VWAP',onToggleSessionVwap,false],
                 ['Trade ticket',onToggleTradingPanel,false],
+                ['Paper Trading workspace',onTogglePaperWorkspace,false],
               ] as Array<[string,(()=>void)|undefined,boolean]>).map(([label,action,disabled])=>
                 <button key={label} type="button" role="menuitem" disabled={disabled}
                   className="min-w-0 rounded border border-[#34445c] bg-[#222d40] px-2 py-1.5 text-left text-[11px] disabled:opacity-35 hover:bg-[#334564]"
