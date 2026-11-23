@@ -187,3 +187,27 @@ test('drawing Delete and Alt shortcuts do not steal keystrokes from symbol searc
   await expect(page.locator('#drawing-selected-bar')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+
+test('favorite tool button opens only starred drawing tools and closes reliably',async({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('./');
+  const favorites=page.getByRole('button',{name:'Toggle favorite drawing tools'});
+  await favorites.click();
+  const flyout=page.locator('#tradingview-lines-flyout-menu');
+  await expect(flyout).toBeVisible();
+  await expect(flyout).toContainText('Favorite drawing tools');
+  await expect(flyout.locator('#line-flyout-ray')).toBeVisible();
+  await expect(flyout.locator('#channel-flyout-parallel_channel')).toBeVisible();
+  await expect(flyout.locator('#line-flyout-trendline')).toHaveCount(0);
+  await favorites.click();
+  await expect(flyout).toHaveCount(0);
+  await favorites.click();
+  await flyout.locator('#line-flyout-ray').click();
+  await expect(flyout).toHaveCount(0);
+  await expect(page.locator('#left-tool-line-group')).toHaveAttribute('title','Ray');
+  await page.locator('#left-tool-line-group').click();
+  await expect(flyout.locator('#line-flyout-trendline')).toBeVisible();
+  expect(errors).toEqual([]);
+});

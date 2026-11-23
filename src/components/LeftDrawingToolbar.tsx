@@ -309,6 +309,8 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
 }) => {
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [isLineMenuOpen, setIsLineMenuOpen] = useState(false);
+  const [isFavoritesOnly,setIsFavoritesOnly]=useState(false);
+  const favoritesBtnRef=useRef<HTMLButtonElement>(null);
   const lineMenuRef = useRef<HTMLDivElement>(null);
   const lineBtnRef = useRef<HTMLDivElement>(null);
 
@@ -349,7 +351,8 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
         lineMenuRef.current &&
         !lineMenuRef.current.contains(e.target as Node) &&
         lineBtnRef.current &&
-        !lineBtnRef.current.contains(e.target as Node)
+        !lineBtnRef.current.contains(e.target as Node) &&
+        !favoritesBtnRef.current?.contains(e.target as Node)
       ) {
         setIsLineMenuOpen(false);
       }
@@ -416,12 +419,14 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
           <button
             id="left-tool-line-group"
             onClick={() => {
+              setIsFavoritesOnly(false);
               setActiveTool(activeLineToolDef.id);
               setSelectedLineTool(activeLineToolDef.id);
               setIsLineMenuOpen((prev) => !prev);
             }}
             onContextMenu={(e) => {
               e.preventDefault();
+              setIsFavoritesOnly(false);
               setIsLineMenuOpen(true);
             }}
             className={`w-[26px] h-[24px] rounded-md flex items-center justify-center transition-colors relative group cursor-pointer ${
@@ -440,6 +445,7 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
             <span
               onClick={(e) => {
                 e.stopPropagation();
+                setIsFavoritesOnly(false);
                 setIsLineMenuOpen((prev) => !prev);
               }}
               className={`absolute right-0 bottom-0 top-0 flex items-center pr-[1px] transition-opacity cursor-pointer ${
@@ -465,12 +471,14 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
               id="tradingview-lines-flyout-menu"
               className="absolute left-[30px] top-[-4px] bg-[#1e222d] border border-[#2a2e39] rounded shadow-2xl py-1.5 w-[260px] max-h-[calc(100vh-60px)] overflow-y-auto text-[#d1d4dc] text-xs z-50 select-none divide-y divide-[#2a2e39]/80 scrollbar-thin"
             >
+              {isFavoritesOnly&&<div className="px-3 py-2 font-semibold text-[#f7b75a]">Favorite drawing tools</div>}
+              {isFavoritesOnly&&starredTools.length===0&&<div className="px-3 py-3 text-[#a4adbd]">No favorite drawing tools. Star tools in the complete list.</div>}
               {/* SECTION 1: LINES */}
               <div className="pb-1">
                 <div className="px-3 pt-1 pb-1 text-[11px] font-semibold text-[#787b86] uppercase tracking-wider">
                   LINES
                 </div>
-                {LINE_TOOLS_CATALOG.filter((t) => t.category === 'LINES').map((tool) => {
+                {LINE_TOOLS_CATALOG.filter((t) => t.category === 'LINES' && (!isFavoritesOnly || starredTools.includes(t.id))).map((tool) => {
                   const isStarred = starredTools.includes(tool.id);
                   const isToolActive = activeTool === tool.id;
                   return (
@@ -524,7 +532,7 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
                 <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-[#787b86] uppercase tracking-wider">
                   CHANNELS
                 </div>
-                {LINE_TOOLS_CATALOG.filter((t) => t.category === 'CHANNELS').map((tool) => {
+                {LINE_TOOLS_CATALOG.filter((t) => t.category === 'CHANNELS' && (!isFavoritesOnly || starredTools.includes(t.id))).map((tool) => {
                   const isStarred = starredTools.includes(tool.id);
                   const isToolActive = activeTool === tool.id;
                   return (
@@ -578,7 +586,7 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
                 <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-[#787b86] uppercase tracking-wider">
                   PITCHFORKS
                 </div>
-                {LINE_TOOLS_CATALOG.filter((t) => t.category === 'PITCHFORKS').map((tool) => {
+                {LINE_TOOLS_CATALOG.filter((t) => t.category === 'PITCHFORKS' && (!isFavoritesOnly || starredTools.includes(t.id))).map((tool) => {
                   const isStarred = starredTools.includes(tool.id);
                   const isToolActive = activeTool === tool.id;
                   return (
@@ -771,7 +779,13 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
       {/* Favorites Star Button directly beneath buttons */}
       <div className="w-full flex justify-center pt-1 border-t border-[#2a2e39]/60 mt-1">
         <button
-          onClick={() => setIsLineMenuOpen((prev) => !prev)}
+          ref={favoritesBtnRef}
+          aria-label="Toggle favorite drawing tools"
+          aria-expanded={isLineMenuOpen&&isFavoritesOnly}
+          onClick={() => {
+            setIsLineMenuOpen(previous=>isFavoritesOnly?!previous:true);
+            setIsFavoritesOnly(true);
+          }}
           className={`w-[26px] h-[24px] rounded-md border border-[#2a2e39] bg-[#1e222d] flex items-center justify-center transition-colors cursor-pointer ${
             starredTools.length > 0 ? 'text-[#ffb74d] hover:border-[#ffb74d]' : 'text-[#787b86] hover:text-[#d1d4dc]'
           }`}
