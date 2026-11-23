@@ -90,46 +90,83 @@ html,body,#root {
     overflow-y:auto;
     z-index:120 !important;
   }
+  /* A permanently attached rail takes a fixed slice of the available
+     chart workspace. Only an opened details pane overlaps the plot. */
   #tradingview-right-dock {
+    position:relative;
+    inset:auto;
+    width:28px;
+    min-width:28px;
+    max-width:28px;
+    height:100%;
+    flex:0 0 28px;
+    z-index:42;
+    pointer-events:auto;
+    overflow:visible;
+  }
+  #right-sidebar-content-pane {
     position:absolute;
     top:0;
-    right:0;
-    bottom:0;
-    width:auto;
-    height:100%;
-    z-index:42;
-    pointer-events:none;
-  }
-  #tradingview-right-dock > * {pointer-events:auto;}
-  #right-sidebar-content-pane {
+    right:100%;
     width:min(82vw,320px);
-    max-width:calc(100vw - 42px);
+    max-width:calc(100vw - 58px);
+    height:100%;
     z-index:50;
+    box-shadow:-8px 0 30px #0008;
   }
   #tradingview-right-icon-bar {
-    position:fixed;
-    top:75px;
-    right:4px;
-    bottom:auto;
-    width:32px;
-    height:min(65dvh,390px);
-    max-height:calc(100dvh - 145px);
+    position:relative;
+    inset:auto;
+    display:flex;
+    width:28px;
+    min-width:28px;
+    height:100%;
+    min-height:0;
     overflow-y:auto;
+    overflow-x:hidden;
     scrollbar-width:none;
-    border:1px solid #3c4657;
-    border-radius:7px;
-    box-shadow:0 8px 30px #0009;
+    border:0;
+    border-left:1px solid #303747;
+    border-radius:0;
+    box-shadow:none;
     z-index:54;
   }
+  #tradingview-right-icon-bar > div {gap:2px;}
+  #tradingview-right-icon-bar button {
+    width:22px;
+    min-width:22px;
+    height:22px;
+    min-height:22px;
+  }
   #tradingview-right-icon-bar::-webkit-scrollbar {display:none;}
-  #plutrade-mobile-trade-controls button {white-space:nowrap;}
+  #plutrade-mobile-trade-controls {
+    height:24px;
+    min-height:24px;
+    max-height:24px;
+    padding:1px 3px 1px;
+    flex:0 0 24px;
+  }
+  #plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] {
+    height:21px;
+    align-items:center;
+    gap:3px;
+  }
+  #plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] > button {
+    height:21px;
+    min-height:21px;
+    padding:0 1px;
+    font-size:10px;
+    line-height:19px;
+    border-radius:4px;
+    white-space:nowrap;
+  }
   /* Opening the optional large paper workspace must not shrink the plotting
      canvas to a sliver or push the five trading buttons out of the viewport. */
   #paper-trading-open-panel {
     position:absolute;
     left:0;
     right:0;
-    bottom:calc(46px + env(safe-area-inset-bottom));
+    bottom:24px;
     height:min(55dvh,340px);
     max-height:calc(100dvh - 140px);
     min-height:0;
