@@ -43,7 +43,7 @@ import { SavedChartsModal } from './components/SavedChartsModal';
 import type { SavedChartIdea } from './services/savedCharts';
 import {combineHistoryWithLive,mergeLiveCandle} from './services/chartCandles';
 import {chartStarterMarket,type ChartLoadState} from './services/chartRecovery';
-import { cancelPaperOrder,evaluatePaperOrders,expirePaperOrders,submitPaperOrder,estimatePaperQty,withOrderReservations,type PaperOrderRequest } from './services/paperOrders';
+import { cancelPaperOrder,amendPendingPaperOrder,evaluatePaperOrders,expirePaperOrders,submitPaperOrder,estimatePaperQty,withOrderReservations,type PaperOrderRequest,type PaperAmendRequest } from './services/paperOrders';
 import { SymbolSearchModal } from './components/SymbolSearchModal';
 import { IndicatorsModal } from './components/IndicatorsModal';
 import { AlertsModal } from './components/AlertsModal';
@@ -60,6 +60,7 @@ import {ruleCanActivate,ruleMatchesMarket} from './services/conditionalSafety';
 import {ruleConditionsMet,ruleEligibleOnTick} from './services/conditionalEvaluation';
 import {closedMinuteRun,appendClosedMinute,completedIndicatorSignal,type IndicatorSignal} from './services/indicatorSignals';
 import {marketIdentity,alertMarketIdentity,matchesExactMarket} from './services/marketIdentity';
+import {evaluatePriceAlerts,ALERT_CONDITIONS,ALERT_FREQUENCIES,alertIsExpired,type AlertObservation} from './services/priceAlertEngine';
 import {paperLedgerCriticalChanged} from './services/paperPersistence';
 import {loadRiskPolicy,saveRiskPolicy,evaluateRiskPolicy} from './services/riskCenter';
 import {updateFeedHealth,type MarketEvent,type FeedHealth} from './services/marketEvents';
@@ -365,7 +366,7 @@ export default function App() {
     // whichever exchange happens to be selected.
     return Array.isArray(saved) ? saved.filter(a=>a && typeof a.id==='string' &&
       typeof a.symbol==='string' && Number.isFinite(a.targetPrice) &&
-      (a.condition==='cross_above'||a.condition==='cross_below'))
+      ALERT_CONDITIONS.includes(a.condition) && (!a.frequency || ALERT_FREQUENCIES.includes(a.frequency)))
       .map(a=>a.exchange && (!a.symbol.includes('@')||(a.pairAddress&&a.chainId))?
         a:{...a,paused:true}) : [];
   });
@@ -387,34 +388,37 @@ export default function App() {
     catch (error) { console.warn('Alert log storage unavailable', error); }
   }, [alertLog]);
   const [activeNotification, setActiveNotification] = useState<{ id: string; message: string; type: 'alert' | 'info' } | null>(null);
-  const processPriceAlertTick = useCallback((market:Asset, price:number, now=Date.now()) => {
-    const key = alertMarketIdentity(market);
-    const previous = previousAlertPricesRef.current[key];
-    previousAlertPricesRef.current[key] = price;
-    if (!Number.isFinite(previous) || !Number.isFinite(price) || price <= 0) return [];
-    const venue = market.source || market.exchange;
-    const hits = alertsRef.current.filter(a => a.symbol === market.symbol &&
-      a.exchange === venue && (!a.marketType || a.marketType === market.marketType) &&
-      (market.pairAddress ?
-        a.pairAddress?.toLowerCase()===market.pairAddress.toLowerCase()&&
-        a.chainId?.toLowerCase()===market.chainId?.toLowerCase() :
-        !a.pairAddress) &&
-      !a.triggered && !a.paused && Number.isFinite(a.targetPrice) && a.targetPrice > 0 &&
-      (a.condition === 'cross_above'
-        ? previous < a.targetPrice && price >= a.targetPrice
-        : previous > a.targetPrice && price <= a.targetPrice));
-    if (!hits.length) return [];
-    const matched = new Set(hits.map(a => a.id));
-    const updated = alertsRef.current.map(a => matched.has(a.id) ? {...a, triggered:true} : a);
-    alertsRef.current = updated;
-    setAlerts(updated);
-    const entries:AlertLogEntry[] = hits.map(a => ({
-      id:a.id + '-' + now, symbol:a.symbol, price, at:now,
-      message:`${a.symbol} (${venue}) crossed ${a.condition === 'cross_above' ? 'above' : 'below'} ${a.targetPrice} at ${price}`,
+  const processPriceAlertTick = useCallback((
+    market:Asset,price:number,now=Date.now(),observation:AlertObservation={kind:'tick'}
+  ):string[] => {
+    // Use separate price histories for realtime ticks and confirmed candle closes;
+    // an intrabar print cannot provide the previous bar-close value.
+    const key=alertMarketIdentity(market)+(observation.kind==='closed-bar'?
+      '|close|'+(observation.timeframe||''):'|tick');
+    const previous=previousAlertPricesRef.current[key];
+    if(!Number.isFinite(price)||price<=0||!Number.isFinite(now))return [];
+    previousAlertPricesRef.current[key]=price;
+    const result=evaluatePriceAlerts(alertsRef.current,market,previous,price,now,observation);
+    if(!result.hits.length)return [];
+    alertsRef.current=result.updated;
+    setAlerts(result.updated);
+    const venue=market.source||market.exchange;
+    const entries:AlertLogEntry[]=result.hits.map((alert,index)=>({
+      id:alert.id+'-'+now+'-'+index,symbol:market.symbol,price,at:now,
+      message:alert.notes?
+        `${market.symbol} (${venue}): ${alert.notes} · ${price} ${market.currency}`:
+        `${market.symbol} (${venue}) ${alert.condition.replaceAll('_',' ')} ${alert.targetPrice} at ${price} ${market.currency}`,
     }));
-    setAlertLog(prev => [...entries, ...prev].slice(0,100));
+    setAlertLog(prev=>[...entries,...prev].slice(0,1000));
     setActiveNotification({id:String(now),message:entries[0].message,type:'alert'});
-    return hits.map(a=>a.id);
+    if(typeof Notification!=='undefined'&&Notification.permission==='granted'){
+      try{
+        // Permission is only requested from the user's explicit Alerts dialog button.
+        new Notification('PluTrade alert · '+market.symbol,{body:entries[0].message,
+          tag:'plutrade-price-alert-'+result.hits[0].id});
+      }catch(error){console.debug('Browser notification unavailable',error);}
+    }
+    return result.hits.map(a=>a.id);
   }, []);
   // Poll dormant/inactive-chart alerts at their exact venue. These snapshots
   // are not tick streams; users must keep the browser open for notifications.
@@ -1342,6 +1346,8 @@ export default function App() {
     // A new stream must establish its own first observed price before a
     // crossing can be computed; a stale prior subscription must not trigger.
     delete previousAlertPricesRef.current[alertMarketIdentity(activeAsset)];
+    delete previousAlertPricesRef.current[alertMarketIdentity(activeAsset)+'|tick'];
+    delete previousAlertPricesRef.current[alertMarketIdentity(activeAsset)+'|close|'+activeTimeframe];
 
     // 4. Subscribe to Real Market Data (Binance WebSocket for crypto, high-precision feed for others)
     const unsubscribe = subscribeRealMarketData(activeAsset, activeTimeframe, {
@@ -1418,6 +1424,9 @@ export default function App() {
       onCandleTick: (candle, isClosed) => {
         if (isCancelled) return;
         setCandles(previous=>mergeLiveCandle(previous,candle));
+        if(isClosed&&Number.isFinite(candle.close)&&candle.close>0)
+          processPriceAlertTick(activeAsset,candle.close,Date.now(),
+            {kind:'closed-bar',barTime:candle.time,timeframe:activeTimeframe});
       },
 
       onOrderBook: (book) => {
@@ -1507,6 +1516,19 @@ export default function App() {
     }catch(e){setPaperError(e instanceof Error?e.message:'Invalid stops');}
   };
   const handleCancelPendingOrder=(id:string)=>{setPaperPortfolio(p=>cancelPaperOrder(p,id));setPaperError('');};
+  const handleAmendPendingOrder=(id:string,request:PaperAmendRequest):string|null=>{
+    try{
+      // Validate against current account/quote first, then revalidate within
+      // the state update in case another fill consumed available margin.
+      amendPendingPaperOrder(paperPortfolio,activeAsset,id,request);
+      setPaperPortfolio(previous=>amendPendingPaperOrder(previous,activeAsset,id,request));
+      setPaperError('');
+      return null;
+    }catch(error){
+      const message=error instanceof Error?error.message:'Order amendment rejected';
+      setPaperError(message);return message;
+    }
+  };
   const handleResetPaper = () => {
     setPaperPortfolio(emptyPaperPortfolio(paperPortfolio.settings,paperPortfolio.account.name));
     setConditionalOrders([]);
@@ -1839,6 +1861,7 @@ export default function App() {
             pendingOrders={paperPortfolio.pendingOrders||[]}
             orderEvents={paperPortfolio.orderEvents||[]}
             onCancelPendingOrder={handleCancelPendingOrder}
+            onAmendPendingOrder={handleAmendPendingOrder}
             activeAsset={activeAsset}
             activeTimeframe={activeTimeframe}
             onEditPosition={handleEditPaperStops}
@@ -1909,7 +1932,7 @@ export default function App() {
             id:a.id, symbol:a.symbol,
             title:`${a.symbol} crosses ${a.condition === 'cross_above' ? 'above' : 'below'} ${a.targetPrice}`,
             message:a.notes || `Trigger at ${a.targetPrice}`, timeframe:'Live',
-            status:(a.paused?'Paused':a.triggered?'Triggered':'Active') as DetailedAlert['status'],
+            status:(a.paused?'Paused':a.triggered?'Triggered':alertIsExpired(a,Date.now())?'Paused':'Active') as DetailedAlert['status'],
             dateStr:new Date(a.createdAt).toLocaleString(), type:'price' as const,
           })),...detailedAlerts]}
           alertLog={alertLog}
@@ -2023,6 +2046,7 @@ export default function App() {
         activeAsset={activeAsset}
         alerts={alerts}
         setAlerts={setAlerts}
+        activeTimeframe={activeTimeframe}
       />
 
       <SavedChartsModal open={isSavedChartsOpen} onClose={()=>setIsSavedChartsOpen(false)}

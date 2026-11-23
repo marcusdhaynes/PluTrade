@@ -170,7 +170,13 @@ export interface PriceAlert {
   pairAddress?: string;
   chainId?: string;
   targetPrice: number;
-  condition: 'cross_above' | 'cross_below';
+  condition: 'cross_above' | 'cross_below' | 'crossing' | 'greater_than' | 'less_than';
+  /** 'Once per bar close' is evaluated only with a confirmed completed venue candle. */
+  frequency?:'once'|'every'|'once_per_minute'|'once_per_bar'|'once_per_bar_close';
+  timeframe?:Timeframe;
+  expiresAt?:number;
+  lastTriggeredAt?:number;
+  lastTriggeredBar?:number;
   createdAt: number;
   triggered: boolean;
   paused?: boolean;

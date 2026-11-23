@@ -24,7 +24,7 @@ export interface PaperEntryOrder {
 export interface PaperOrderEvent {
   id:string; orderId:string; symbol:string;exchange:string;
   side:PaperOrderSide;kind:PaperOrderKind;qty:number;price:number;
-  at:number;action:'submitted'|'activated'|'filled'|'canceled'|'expired';
+  at:number;action:'submitted'|'activated'|'filled'|'canceled'|'expired'|'amended';
 }
 export interface PaperPartialTarget {price:number;sharePercent:number}
 export interface PaperOrderRequest {
@@ -131,6 +131,43 @@ export function submitPaperOrder(p:PaperPortfolio,a:Asset,request:PaperOrderRequ
   };
   return recordEvent(withOrderReservations({...p,pendingOrders:[...pendingFor(p),order]}),order,'submitted',now);
 }
+export interface PaperAmendRequest{qty:number;price:number;limitPrice?:number}
+/** Amend a resting simulated entry without changing its original venue identity
+ * or silently submitting a marketable order. The account's other reservations
+ * remain intact and are checked again against the new instruction. */
+export function amendPendingPaperOrder(
+  input:PaperPortfolio,asset:Asset,id:string,change:PaperAmendRequest,at=Date.now()
+):PaperPortfolio{
+  const existing=pendingFor(input).find(o=>o.id===id);
+  if(!existing)throw new Error('Pending order unavailable.');
+  if(existing.expiresAt!==undefined&&existing.expiresAt<=at)
+    throw new Error('Order has expired and cannot be amended.');
+  if(existing.status!=='pending')
+    throw new Error('Triggered stop-limit orders must be canceled and replaced after review.');
+  if(!matchesExactMarket(existing,asset))
+    throw new Error('Select the original exchange and market to edit this order.');
+  const replacement:PaperOrderRequest={
+    side:existing.side,kind:existing.kind,qty:change.qty,price:change.price,
+    limitPrice:existing.kind==='stop-limit'?change.limitPrice:undefined,
+    tp:existing.tp,sl:existing.sl,timeInForce:'GTC',
+    trailingStopPercent:existing.trailingStopPercent,
+    takeProfitLevels:existing.takeProfitLevels,
+  };
+  // Reject implicit immediately-executable limit replacements. A new marketable
+  // entry must use the reviewed order ticket, not a side-effect of the edit form.
+  if(existing.kind==='limit'){
+    const executable=paperExecutionPrice(input.settings,asset.price,existing.side,'entry');
+    if(existing.side==='Long'?change.price>=executable:change.price<=executable)
+      throw new Error('Marketable replacement: cancel and submit through the reviewed order ticket.');
+  }
+  const freed=withOrderReservations({...input,pendingOrders:pendingFor(input).filter(o=>o.id!==id)});
+  withOrderValidation(freed,asset,replacement,at);
+  const amended:PaperEntryOrder={...existing,qty:change.qty,price:change.price,
+    limitPrice:existing.kind==='stop-limit'?change.limitPrice:undefined};
+  const next=withOrderReservations({...input,pendingOrders:pendingFor(input).map(o=>o.id===id?amended:o)});
+  return recordEvent(next,amended,'amended',at,amended.price);
+}
+
 export function cancelPaperOrder(p:PaperPortfolio,id:string):PaperPortfolio{
   const order=pendingFor(p).find(o=>o.id===id);
   if(!order)return p;

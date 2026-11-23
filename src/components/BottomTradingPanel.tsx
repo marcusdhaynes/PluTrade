@@ -5,7 +5,7 @@ import type {Asset, PaperAccount, PaperPosition} from '../types';
 import type {ConditionalOrder,DependencyContext} from '../types/conditionalOrders';
 import type {PaperFill} from '../services/paperTrading';
 import {accountLeverage,isFreshPaperQuote,marketPaperCategory,type PaperSettings} from '../services/paperTrading';
-import type {PaperEntryOrder,PaperOrderEvent} from '../services/paperOrders';
+import type {PaperEntryOrder,PaperOrderEvent,PaperAmendRequest} from '../services/paperOrders';
 import type {PaperAccountRecord} from '../services/paperAccounts';
 import {isPaperStorageBlocked} from '../services/paperAccounts';
 import {PaperAccountModal} from './PaperAccountModal';
@@ -43,6 +43,7 @@ export interface BottomTradingPanelProps {
   pendingOrders:PaperEntryOrder[];
   orderEvents:PaperOrderEvent[];
   onCancelPendingOrder:(id:string)=>void;
+  onAmendPendingOrder:(id:string,request:PaperAmendRequest)=>string|null;
   onEditPosition:(id:string,tp?:number,sl?:number,trailing?:number|null)=>void;
   onResetPaper:()=>void; onResolvePaperRecovery:()=>void; paperError:string;paperTradingBlocked:boolean; fills:PaperFill[];
   conditionalOrders:ConditionalOrder[];
@@ -67,7 +68,7 @@ const amount=(n:number)=>Number.isFinite(n)?n.toLocaleString('en-US',{maximumFra
 export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
   account,positions,activeAsset,activeTimeframe,onClosePosition,onEditPosition,onResetPaper,onResolvePaperRecovery,paperError,paperTradingBlocked,fills,
   portfolio,riskPolicy,onRiskPolicyChange,allMarkets,onSelectScreenedMarket,onAddScreenedMarket,feedHealth,marketStatus,
-  onOpenTicket,pendingOrders,orderEvents,onCancelPendingOrder,
+  onOpenTicket,pendingOrders,orderEvents,onCancelPendingOrder,onAmendPendingOrder,
   paperAccounts,activePaperAccountId,paperSettings,onSelectPaperAccount,onSavePaperAccount,onDeletePaperAccount,
   conditionalOrders,onOpenCreateConditionalOrder,onEditConditionalOrder,onToggleConditionalOrderStatus,
   onDeleteConditionalOrder,onTestTriggerConditionalOrder,requestedTab,isOpen,setIsOpen,isExpanded,setIsExpanded,
@@ -91,6 +92,11 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
   const [tp,setTp]=useState('');
   const [sl,setSl]=useState('');
   const [editId,setEditId]=useState<string|null>(null);
+  const [editPendingId,setEditPendingId]=useState<string|null>(null);
+  const [editPendingQty,setEditPendingQty]=useState('');
+  const [editPendingPrice,setEditPendingPrice]=useState('');
+  const [editPendingLimit,setEditPendingLimit]=useState('');
+  const [editPendingError,setEditPendingError]=useState('');
   const [editTp,setEditTp]=useState('');
   const [editSl,setEditSl]=useState('');
   const [editTrailingEnabled,setEditTrailingEnabled]=useState(false);
@@ -103,8 +109,9 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
     runningBalance+=fill.realizedPnL;
     return {fill,balance:runningBalance};
   }).reverse();
-  const orderHistory=orderEvents.filter((event,index)=>
-    orderEvents.findIndex(other=>other.orderId===event.orderId)===index);
+  // Order History is an event ledger, not one row per order: every submit,
+  // activation, amendment, fill, cancellation and expiry must stay visible.
+  const orderHistory=[...orderEvents].sort((a,b)=>b.at-a.at||b.id.localeCompare(a.id));
   const closedTrades=fills.filter(f=>f.note.toLowerCase().includes('close'));
   const openingFill=(id:string)=>fills.find(f=>f.positionId===id&&f.note.toLowerCase().startsWith('open'));
   const timeline=[...orderEvents.map(event=>({id:event.id,at:event.at,
@@ -258,7 +265,47 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
           <strong>{o.symbol}</strong><span className={o.side==='Long'?'text-[#2cbd99]':'text-[#f06a7b]'}>{o.side}</span>
           <span>{o.kind.toUpperCase()} @ {amount(o.price)}{o.kind==='stop-limit'?' → limit '+amount(o.limitPrice||0):''}</span><span>{amount(o.qty)} units · {o.exchange}</span><span className="text-[#a8bcf8]">{o.status==='triggered'?'Activated · waiting for limit':'Pending'}</span>
           <span className="text-[#adb4c3]">Expires: {o.expiresAt?new Date(o.expiresAt).toLocaleString():'GTC'}</span>
-          <button className="ml-auto text-[#f58b95] hover:underline" onClick={()=>onCancelPendingOrder(o.id)}>Cancel</button>
+          <button type="button" disabled={paperTradingBlocked||o.status!=='pending'}
+            className="ml-auto text-[#88b6fc] hover:underline disabled:opacity-40"
+            title={o.status==='triggered'?'Triggered stop-limit: cancel and replace via ticket':'Amend resting order'}
+            onClick={()=>{
+              setEditPendingId(editPendingId===o.id?null:o.id);
+              setEditPendingQty(String(o.qty));setEditPendingPrice(String(o.price));
+              setEditPendingLimit(o.limitPrice===undefined?'':String(o.limitPrice));
+              setEditPendingError('');
+            }}>Edit</button>
+          <button type="button" disabled={paperTradingBlocked}
+            className="text-[#f58b95] hover:underline disabled:opacity-40" onClick={()=>onCancelPendingOrder(o.id)}>Cancel</button>
+          {editPendingId===o.id&&<form className="basis-full flex gap-2 items-end flex-wrap border-t border-[#3d4658] pt-2 mt-1"
+            onSubmit={event=>{
+              event.preventDefault();
+              const request:PaperAmendRequest={qty:Number(editPendingQty),price:Number(editPendingPrice),
+                limitPrice:o.kind==='stop-limit'?Number(editPendingLimit):undefined};
+              if(!editPendingQty.trim()||!editPendingPrice.trim()||
+                (o.kind==='stop-limit'&&!editPendingLimit.trim())){
+                setEditPendingError('Enter size and required price levels.');return;
+              }
+              const error=onAmendPendingOrder(o.id,request);
+              if(error){setEditPendingError(error);return;}
+              setEditPendingError('');setEditPendingId(null);
+            }}>
+              <label>Units<input aria-label="Amend order units" type="number" min="0" step="any" required
+                value={editPendingQty} onChange={e=>setEditPendingQty(e.target.value)}
+                className="block w-24 bg-[#111827] border border-[#566074] rounded px-2 py-1"/></label>
+              <label>{o.kind==='limit'?'Limit price':'Stop trigger'}
+                <input aria-label="Amend order price" type="number" min="0" step="any" required
+                  value={editPendingPrice} onChange={e=>setEditPendingPrice(e.target.value)}
+                  className="block w-28 bg-[#111827] border border-[#566074] rounded px-2 py-1"/></label>
+              {o.kind==='stop-limit'&&<label>Execution limit
+                <input aria-label="Amend stop limit price" type="number" min="0" step="any" required
+                  value={editPendingLimit} onChange={e=>setEditPendingLimit(e.target.value)}
+                  className="block w-28 bg-[#111827] border border-[#566074] rounded px-2 py-1"/></label>}
+              <button type="submit" disabled={paperTradingBlocked} className="rounded bg-[#2d61c8] px-3 py-1.5 disabled:opacity-40">Save changes</button>
+              <button type="button" onClick={()=>{setEditPendingId(null);setEditPendingError('');}}
+                className="rounded border border-[#566074] px-3 py-1.5">Cancel edit</button>
+              {editPendingError&&<p role="alert" className="basis-full text-[#ffb4c3]">{editPendingError}</p>}
+              <p className="basis-full text-[10px] text-[#9dabca]">Resting orders only. A marketable edit is rejected; submit a reviewed new order instead. Margin and exact venue are rechecked.</p>
+            </form>}
         </div>)}
         {!pendingOrders.length&&<p className="text-[#838b9d] px-3 py-2">No pending entries.</p>}
         <div className="border-t border-[#313641]"><ConditionalOrdersTable orders={conditionalOrders} onOpenCreateModal={()=>onOpenCreateConditionalOrder(null)}
@@ -272,7 +319,7 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
           <span className="uppercase">{o.side} · {o.kind}</span>
           <span>{amount(o.qty)} units</span>
           <span>{amount(o.price)} {paperSettings.currency}</span>
-          <strong className="capitalize">{o.action==='submitted'?'Pending':o.action}</strong>
+          <strong className="capitalize">{o.action}</strong>
         </div>):<p className="p-5 text-[#8792a6]">No recorded orders yet.</p>}
       </div>}
       {tab==='balanceHistory'&&<div>
