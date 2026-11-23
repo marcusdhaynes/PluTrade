@@ -81,7 +81,9 @@ test('toolbar Edit applies hidden controls; Default requires two taps to restore
   await expect(reset).toBeVisible();
   await reset.click();
   await expect(reset).toHaveAttribute('aria-label','Confirm reset toolbar to default');
-  await expect(zoom).toHaveCount(0);
+  // In Edit mode, a hidden slot remains as a dimmed placeholder so the user
+  // can re-enable it; it disappears only after Apply is clicked.
+  await expect(page.locator('[data-toolbar-slot="zoom"]')).toHaveAttribute('data-toolbar-visible','false');
   await reset.click();
   await expect(reset).toHaveCount(0);
   await expect(zoom).toBeVisible();
