@@ -855,7 +855,13 @@ export default function App() {
       else if(key==='d'){event.preventDefault();requestBottomPanel('dataHealth');}
     };
     window.addEventListener('keydown',onKey);
-    return ()=>window.removeEventListener('keydown',onKey);
+    // Readiness is set only after keyboard shortcuts have been subscribed.
+    // Also helps UI automation avoid dispatching keystrokes before hydration.
+    document.documentElement.dataset.plutradeShortcutsReady='true';
+    return ()=>{
+      window.removeEventListener('keydown',onKey);
+      delete document.documentElement.dataset.plutradeShortcutsReady;
+    };
   },[shortcutHelpOpen]);
 
 
@@ -1918,6 +1924,7 @@ export default function App() {
           activeTab={rightSidebarTab}
           setActiveTab={setRightSidebarTab}
           onOpenTradeJournal={() => setIsTradeJournalOpen(true)}
+          onOpenHelp={()=>setShortcutHelpOpen(true)}
           onTakeSnapshot={() => chartRef.current?.takeSnapshot()}
           onOpenConditionalOrder={handleOpenCreateConditionalOrder}
         />

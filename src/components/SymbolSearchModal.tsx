@@ -61,6 +61,11 @@ export const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({
       if (cancelled) return;
       setDiscovered(results.flatMap(r => r.assets));
       setDiscoveryErrors(results.filter(r => r.error).map(r => `${r.source}: ${r.error}`));
+    }).catch(error => {
+      if(cancelled)return;
+      setDiscovered([]);
+      setDiscoveryErrors(['Public market discovery unavailable: '+
+        (error instanceof Error ? error.message : 'Network error')]);
     }).finally(() => { if (!cancelled) setIsDiscovering(false); });
     return () => { cancelled = true; };
   }, [isOpen]);

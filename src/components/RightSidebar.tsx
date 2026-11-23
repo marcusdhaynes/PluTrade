@@ -71,6 +71,7 @@ interface RightSidebarProps {
   activeTab: RightSidebarTab;
   setActiveTab: (tab: RightSidebarTab) => void;
   onOpenTradeJournal?: () => void;
+  onOpenHelp?:()=>void;
   onTakeSnapshot?: () => void;
   onOpenConditionalOrder?: (dep: DependencyContext) => void;
 }
@@ -104,6 +105,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
   activeTab,
   setActiveTab,
   onOpenTradeJournal,
+  onOpenHelp,
   onTakeSnapshot,
   onOpenConditionalOrder,
 }) => {
@@ -190,6 +192,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
                 </div>
               ))}
             </div>
+          )}
+
+          {activeTab === 'calendar' && (
+            <section id="plutrade-calendar-availability" role="status" className="h-full p-4 bg-[#131722] text-[#d1d4dc] space-y-3">
+              <h3 className="font-semibold text-sm">Economic Calendar</h3>
+              <p className="text-xs text-[#9facbd]">A verified economic-event feed is not connected. PluTrade does not invent event dates, impact ratings, or actual/forecast values.</p>
+              <p className="text-[11px] text-[#9facbd]">Use an authoritative market calendar until licensed event data is connected here.</p>
+            </section>
           )}
 
           {activeTab === 'notifications' && (
@@ -318,24 +328,26 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
 
           {/* Calendar */}
           <button
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition"
-            title="Economic Calendar"
+            type="button" id="right-tab-calendar"
+            onClick={()=>{if(isOpen&&activeTab==='calendar')setIsOpen(false);else{setActiveTab('calendar');setIsOpen(true);}}}
+            className={`w-[24px] h-[24px] rounded-md flex items-center justify-center transition ${isOpen&&activeTab==='calendar'?'bg-[#2962ff] text-white':'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'}`}
+            title="Economic Calendar (feed not connected)"
           >
             <Calendar className="w-3.5 h-3.5" />
           </button>
 
           {/* Community Ideas */}
-          <button
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition"
-            title="Community Ideas"
+          <button type="button" disabled aria-label="Community Ideas unavailable"
+            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#586071] cursor-not-allowed opacity-60"
+            title="Community Ideas requires a moderated backend and is not connected"
           >
             <Lightbulb className="w-3.5 h-3.5" />
           </button>
 
           {/* Chats */}
-          <button
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition"
-            title="Public and Private Chats"
+          <button type="button" disabled aria-label="Public and Private Chats unavailable"
+            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#586071] cursor-not-allowed opacity-60"
+            title="Chats require authenticated messaging and moderation and are not connected"
           >
             <MessageSquare className="w-3.5 h-3.5" />
           </button>
@@ -381,9 +393,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
             <Camera className="w-3.5 h-3.5" />
           </button>
 
-          <button
+          <button type="button" onClick={onOpenHelp} disabled={!onOpenHelp}
             className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition"
-            title="Help Center"
+            title="Keyboard Shortcuts & Help"
           >
             <HelpCircle className="w-3.5 h-3.5" />
           </button>

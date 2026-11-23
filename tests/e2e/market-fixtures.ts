@@ -9,4 +9,11 @@ export async function isolateExternalFeeds(page:Page):Promise<void>{
     route.fulfill({status:200,headers,body:JSON.stringify({candles:[]})}));
   await page.route('https://futures.kraken.com/**',route=>
     route.fulfill({status:200,headers,body:JSON.stringify({tickers:[]})}));
+  // Symbol search may scan several public venue directories. Keep UI tests
+  // independent from provider uptime, rate limits and WebKit's CORS policy:
+  // empty catalogs mean unavailable, never manufactured market prices.
+  await page.route('https://api.bybit.com/**',route=>
+    route.fulfill({status:200,headers,body:JSON.stringify({retCode:0,result:{list:[],nextPageCursor:''}})}));
+  await page.route('https://data-api.binance.vision/**',route=>
+    route.fulfill({status:200,headers,body:JSON.stringify({symbols:[]})}));
 }

@@ -18,6 +18,7 @@ test('installable manifest and offline shell are served',async({page})=>{
 });
 test('shortcuts navigate screener, replay and help without changing URL',async({page})=>{
  await page.goto('./');
+ await expect(page.locator('html')).toHaveAttribute('data-plutrade-shortcuts-ready','true');
  await page.keyboard.press('Shift+S');
  await expect(page.locator('#plutrade-screener')).toBeVisible();
  await page.keyboard.press('Shift+R');

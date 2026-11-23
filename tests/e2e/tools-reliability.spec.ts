@@ -119,3 +119,20 @@ test('bottom-bar date navigation rejects unloaded dates and time scale inputs ad
   await expect(settings).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+
+test('sidebar calendar discloses unavailable data, help opens shortcuts, and unsupported social actions are disabled',async({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('./');
+  await page.locator('#right-tab-calendar').click();
+  await expect(page.locator('#plutrade-calendar-availability')).toBeVisible();
+  await expect(page.locator('#plutrade-calendar-availability')).toContainText('feed is not connected');
+  await expect(page.getByRole('button',{name:'Community Ideas unavailable'})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Public and Private Chats unavailable'})).toBeDisabled();
+  await page.getByTitle('Keyboard Shortcuts & Help').click();
+  await expect(page.getByRole('dialog',{name:'PluTrade Keyboard Shortcuts'})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog',{name:'PluTrade Keyboard Shortcuts'})).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
