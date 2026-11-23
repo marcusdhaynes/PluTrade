@@ -347,6 +347,16 @@ export default function App() {
     }
   },[drawingsByMarket]);
 
+  // Keep the mobile chart legend hidden by default; desktop still shows it.
+  const [showMobileChartLegend,setShowMobileChartLegend]=useState(()=>{
+    try{return localStorage.getItem('plutrade_mobile_chart_legend_v1')==='true';}
+    catch{return false;}
+  });
+  useEffect(()=>{
+    try{localStorage.setItem('plutrade_mobile_chart_legend_v1',String(showMobileChartLegend));}
+    catch{}
+  },[showMobileChartLegend]);
+
   // State: Indicators
   const [indicators, setIndicators] = useState<IndicatorSettings>(() => {
     const saved = localStorage.getItem('tv_indicators');
@@ -1956,6 +1966,8 @@ export default function App() {
             onCustomTimeframe={selectCustomChartTimeframe}
             onFitContent={() => chartRef.current?.fitContent()}
             onGoToDate={date=>chartRef.current?.goToUtcDate(date)??false}
+            showMobileChartLegend={showMobileChartLegend}
+            onShowMobileChartLegend={setShowMobileChartLegend}
             onApplyTimeScaleSettings={({barSpacing,rightOffset})=>{
               const chart=chartRef.current?.getChart();
               if(!chart)return false;
@@ -1977,6 +1989,7 @@ export default function App() {
             primaryHistoryState={chartHistoryState}
             onReloadPrimary={()=>setChartRetry(n=>n+1)}
             sessionVwapEnabled={sessionVwapEnabled}
+            showMobileChartLegend={showMobileChartLegend}
             areDrawingsLocked={areDrawingsLocked}
             stayInDrawingMode={stayInDrawingMode}
             onOpenSymbolSearch={()=>{setAddingWatchlistSymbol(false);setIsSymbolSearchOpen(true);}}
