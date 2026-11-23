@@ -109,3 +109,91 @@ test('right price scale remains clear until mobile chart tools menu is requested
   await icons.locator('#right-tab-watchlist').click();
   await expect(page.locator('#right-sidebar-content-pane')).toHaveCount(0);
 });
+
+
+test('chart range controls are above the plot; on-chart axes stay in the chart',async ({page})=>{
+  await page.goto('./');
+  const toolbar=page.locator('#tradingview-bottom-bar');
+  const plot=page.locator('#chart-workspace-viewport');
+  const chart=page.locator('[data-testid="chart-pinch-surface"]').first();
+  await expect(toolbar).toBeVisible();
+  await expect(toolbar).toHaveAttribute('data-layout','above-chart');
+  await expect(plot).toBeVisible();
+  await expect(chart).toBeVisible();
+  const headerBox=await page.locator('#tradingview-top-navbar').boundingBox();
+  const toolbarBox=await toolbar.boundingBox();
+  const plotBox=await plot.boundingBox();
+  const chartBox=await chart.boundingBox();
+  expect(headerBox).not.toBeNull();
+  expect(toolbarBox).not.toBeNull();
+  expect(plotBox).not.toBeNull();
+  expect(chartBox).not.toBeNull();
+  expect(toolbarBox!.y).toBeGreaterThanOrEqual(headerBox!.y+headerBox!.height-1);
+  expect(toolbarBox!.y+toolbarBox!.height).toBeLessThanOrEqual(plotBox!.y+1);
+  expect(chartBox!.height).toBeGreaterThan(110);
+  const rangeLabels=['1D','5D','1M','3M','6M','YTD','1Y','ALL'];
+  for(const label of rangeLabels){
+    const button=page.locator('#range-btn-'+label);
+    await expect(button).toBeVisible();
+    const rect=await button.boundingBox();
+    expect(rect!.x).toBeGreaterThanOrEqual(0);
+    expect(rect!.x+rect!.width).toBeLessThanOrEqual(await page.evaluate(()=>innerWidth+1));
+  }
+  await expect(page.getByLabel('Chart range and scale controls')).toBeVisible();
+  await expect(chart.getByLabel('Trading chart with time axis at bottom and price axis at right')).toBeAttached();
+  // Native Lightweight Charts renders separate axis cells inside its table,
+  // not a fake date or price row outside the chart element.
+  await expect(chart.locator('table').first()).toBeVisible();
+});
+
+test('portrait and landscape touch layouts fit without scrolling the application',async ({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(size);
+    await page.goto('./');
+    const mobileNav=page.locator('#plutrade-mobile-navbar');
+    const chartRange=page.locator('#tradingview-bottom-bar');
+    const trading=page.locator('#plutrade-mobile-trade-controls');
+    await expect(mobileNav).toBeVisible();
+    await expect(chartRange).toBeVisible();
+    await expect(trading).toBeVisible();
+    const geometry=await page.evaluate(()=>{
+      const element=(id:string)=>document.getElementById(id)!.getBoundingClientRect();
+      const nav=element('plutrade-mobile-navbar');
+      const range=element('tradingview-bottom-bar');
+      const chart=element('chart-workspace-viewport');
+      const trade=element('plutrade-mobile-trade-controls');
+      return {
+        width:innerWidth,height:innerHeight,
+        docWidth:document.documentElement.scrollWidth,
+        docHeight:document.documentElement.scrollHeight,
+        navRight:nav.right,rangeRight:range.right,tradeRight:trade.right,
+        tradeBottom:trade.bottom,chartHeight:chart.height,
+      };
+    });
+    expect(geometry.docWidth).toBeLessThanOrEqual(size.width+1);
+    expect(geometry.docHeight).toBeLessThanOrEqual(size.height+1);
+    expect(geometry.navRight).toBeLessThanOrEqual(size.width+1);
+    expect(geometry.rangeRight).toBeLessThanOrEqual(size.width+1);
+    expect(geometry.tradeRight).toBeLessThanOrEqual(size.width+1);
+    expect(geometry.tradeBottom).toBeLessThanOrEqual(size.height+1);
+    expect(geometry.chartHeight).toBeGreaterThan(80);
+    await expect(page.getByRole('button',{name:'More mobile chart actions'})).toBeVisible();
+  }
+});
+
+test('mobile chart settings are available from compact menus rather than a scrolling navbar',async ({page})=>{
+  await page.setViewportSize({width:320,height:568});
+  await page.goto('./');
+  const menu=page.getByRole('button',{name:'More mobile chart actions'});
+  await expect(page.locator('#mobile-symbol-search-trigger')).toBeVisible();
+  await expect(page.locator('#mobile-timeframe-selector')).toBeVisible();
+  await expect(page.locator('#mobile-chart-style-selector')).toBeVisible();
+  await menu.click();
+  const actions=page.getByRole('menu',{name:'Additional chart actions'});
+  await expect(actions).toBeVisible();
+  await expect(actions.getByRole('menuitem',{name:'Alert'})).toBeVisible();
+  await expect(actions.getByLabel('Mobile chart layout')).toBeVisible();
+  await actions.getByRole('menuitem',{name:'Alert'}).click();
+  await expect(actions).toHaveCount(0);
+  await expect(page.getByRole('dialog',{name:/alert/i}).first()).toBeVisible();
+});
