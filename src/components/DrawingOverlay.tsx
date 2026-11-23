@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { Drawing, DrawingPoint, DrawingToolType, OHLCV, DependencyContext } from '../types';
-import { Trash2, Check, Sparkles, Magnet, Zap } from 'lucide-react';
+import { Trash2, Check, Pencil, Magnet, Zap } from 'lucide-react';
 import {rulerMetrics} from '../services/rulerMetrics';
 
 interface DrawingOverlayProps {
@@ -49,6 +49,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   const rulerEndpointDragRef=useRef<{drawingId:string;index:number;pointerId:number}|null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
+  const [styleEditorOpen,setStyleEditorOpen]=useState(false);
   const [drawingContextMenu, setDrawingContextMenu] = useState<{
     x: number;
     y: number;
@@ -76,6 +77,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   } | null>(null);
 
   useEffect(()=>{setInProgressPoints([]);setActiveSnap(null);},[activeTool]);
+  useEffect(()=>{setStyleEditorOpen(false);},[selectedDrawingId]);
   useEffect(()=>{if(areDrawingsLocked){setSelectedDrawingId(null);setDrawingContextMenu(null);setHoveredBendInfo(null);bendDragRef.current=null;setIsBending(false);}},[areDrawingsLocked]);
 
   // Close drawing context menu on global click
@@ -1329,18 +1331,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
             const y = Math.min(p1.y, p2.y);
             const w = Math.abs(p2.x-p1.x);
             const h = Math.abs(p2.y-p1.y);
-            const data=rulerMetrics(drawing.points[0],drawing.points[1],candles,priceDigits);
-            const isUp=data.priceDelta>=0;
-            const color=isUp?'#21be91':'#e86b7c';
-            // Keep the label within chart bounds, even for narrow vertical
-            // or horizontal measurements and for reversed drag directions.
-            const canvasWidth=containerRef.current?.clientWidth||320;
-            const canvasHeight=containerRef.current?.clientHeight||240;
-            const badgeWidth=170,badgeHeight=50;
-            const labelX=Math.max(2,Math.min(canvasWidth-badgeWidth-2,(p1.x+p2.x)/2-badgeWidth/2));
-            const labelY=Math.max(2,Math.min(canvasHeight-badgeHeight-2,
-              Math.min(p1.y,p2.y)-badgeHeight-5>2?Math.min(p1.y,p2.y)-badgeHeight-5:
-              Math.max(p1.y,p2.y)+5));
+            const color=drawing.points[1].price>=drawing.points[0].price?'#21be91':'#e86b7c';
             return (
               <g key={drawing.id} className="pointer-events-auto cursor-pointer"
                 onClick={e=>{e.stopPropagation();handleDrawingClick(e,drawing);}}
@@ -1364,18 +1355,6 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
                       try{e.currentTarget.setPointerCapture(e.pointerId);}catch{}
                     }}/>
                 )}
-                <rect x={labelX} y={labelY} width={badgeWidth} height={badgeHeight}
-                  rx={5} fill="#151e2d" fillOpacity={0.97} stroke={color} strokeWidth={1}/>
-                <text x={labelX+7} y={labelY+13} fontSize="11" fontFamily="monospace"
-                  fontWeight="bold" fill={color}>
-                  {data.priceLabel} ({data.percentLabel})
-                </text>
-                <text x={labelX+7} y={labelY+27} fontSize="10" fontFamily="monospace" fill="#c3d2e6">
-                  {data.tickLabel}
-                </text>
-                <text x={labelX+7} y={labelY+41} fontSize="10" fontFamily="monospace" fill="#c3d2e6">
-                  {data.timeLabel}
-                </text>
               </g>
             );
           }
@@ -1560,59 +1539,63 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         )}
       </svg>
 
-      {/* Floating Action Bar when a Drawing is Selected */}
-      {selectedDrawingId && !areDrawingsLocked && !editingTextId && (
-        <div
-          id="drawing-selected-bar"
-          className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#1e222d] border border-[#2a2e39] text-[#d1d4dc] px-3 py-1.5 rounded-lg shadow-2xl flex items-center gap-3 z-30 pointer-events-auto"
-        >
-          {(() => {
-            const sel = drawings.find((d) => d.id === selectedDrawingId);
-            const label = sel ? sel.type.replace('_', ' ').toUpperCase() : 'DRAWING';
-            return (
-              <span className="text-xs font-semibold text-[#00ffa3] flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                {label} SELECTED
-              </span>
-            );
-          })()}
-
-          <div className="h-4 w-px bg-[#2a2e39]" />
-
-          {/* Line Style toggle */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => {
-                setDrawings((prev) =>
-                  prev.map((d) =>
-                    d.id === selectedDrawingId
-                      ? { ...d, lineStyle: d.lineStyle === 'dashed' ? 'solid' : 'dashed' }
-                      : d
-                  )
-                );
-              }}
-              className="px-2 py-1 text-[11px] bg-[#131722] hover:bg-[#2a2e39] border border-[#2a2e39] rounded text-[#d1d4dc] transition cursor-pointer"
-            >
-              Style
-            </button>
-          </div>
-
-          <div className="h-4 w-px bg-[#2a2e39]" />
-
-          {/* Delete selected drawing button */}
-          <button
-            id="delete-selected-drawing-btn"
-            onClick={() => {
-              setDrawings((prev) => prev.filter((d) => d.id !== selectedDrawingId));
-              setSelectedDrawingId(null);
-            }}
-            className="flex items-center gap-1 text-xs text-[#f23645] hover:bg-[#f23645]/15 px-2.5 py-1 rounded transition cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Delete
+      {/* Selected drawing tools follow its top-right geometry, not the chart header. */}
+      {selectedDrawingId && !areDrawingsLocked && !editingTextId && (() => {
+        const selected=drawings.find(d=>d.id===selectedDrawingId);
+        if(!selected)return null;
+        const points=selected.points.map(getCoordinates).filter((p):p is {x:number;y:number}=>p!==null);
+        if(points.length===0)return null;
+        const canvasW=containerRef.current?.clientWidth||320;
+        const canvasH=containerRef.current?.clientHeight||240;
+        const farRight=Math.max(...points.map(p=>p.x));
+        const topMost=Math.min(...points.map(p=>p.y));
+        // A 52px toolbar stays entirely in the plotting area at every zoom.
+        const left=Math.max(3,Math.min(canvasW-55,farRight+5));
+        const top=Math.max(3,Math.min(canvasH-27,topMost>=30?topMost-29:topMost+9));
+        const applyStyle=(patch:Partial<Drawing>)=>
+          setDrawings(prev=>prev.map(d=>d.id===selectedDrawingId?{...d,...patch}:d));
+        return <div id="drawing-selected-bar" role="toolbar" aria-label="Selected drawing actions"
+          onPointerDown={e=>e.stopPropagation()}
+          onClick={e=>e.stopPropagation()}
+          style={{left,top}}
+          className="absolute z-[80] flex items-center gap-0.5 rounded-md border border-[#445267]/80 bg-[#192231]/95 p-0.5 shadow-lg text-[#d1d4dc] pointer-events-auto">
+          <button id="edit-selected-drawing-btn" type="button" aria-label="Edit selected drawing"
+            aria-expanded={styleEditorOpen} title="Edit drawing style"
+            onClick={()=>setStyleEditorOpen(v=>!v)}
+            className="flex h-[21px] w-[21px] items-center justify-center rounded text-[#b5c7df] hover:bg-[#30415b] hover:text-white">
+            <Pencil size={13}/>
           </button>
-        </div>
-      )}
+          <button id="delete-selected-drawing-btn" type="button" aria-label="Delete selected drawing"
+            title="Delete drawing"
+            onClick={()=>{setDrawings(prev=>prev.filter(d=>d.id!==selectedDrawingId));setSelectedDrawingId(null);setStyleEditorOpen(false);}}
+            className="flex h-[21px] w-[21px] items-center justify-center rounded text-[#ef7787] hover:bg-[#51303b]">
+            <Trash2 size={13}/>
+          </button>
+          {styleEditorOpen&&<div role="dialog" aria-label="Drawing style"
+            style={top>canvasH-170?{bottom:'calc(100% + 4px)'}:{top:'calc(100% + 4px)'}}
+            className="absolute right-0 z-[90] w-[156px] rounded-md border border-[#445267] bg-[#192231] p-2 text-[11px] shadow-xl">
+            <label className="flex items-center justify-between gap-2">
+              Color
+              <input type="color" aria-label="Drawing color" value={selected.color||'#2962ff'}
+                onChange={e=>applyStyle({color:e.target.value})}
+                className="h-6 w-8 cursor-pointer bg-transparent"/>
+            </label>
+            <label className="mt-2 flex items-center justify-between gap-2">
+              Width
+              <input type="number" min={1} max={6} step={1} aria-label="Drawing line width"
+                value={selected.lineWidth||1}
+                onChange={e=>{const width=Number(e.target.value);if(Number.isInteger(width)&&width>=1&&width<=6)applyStyle({lineWidth:width});}}
+                className="w-12 rounded border border-[#47546a] bg-[#111a27] px-1 py-0.5 text-right"/>
+            </label>
+            <label className="mt-2 flex items-center justify-between gap-2">
+              Dashed
+              <input type="checkbox" aria-label="Dashed drawing line"
+                checked={selected.lineStyle==='dashed'}
+                onChange={e=>applyStyle({lineStyle:e.target.checked?'dashed':'solid'})}/>
+            </label>
+          </div>}
+        </div>;
+      })()}
 
       {/* Text Note Edit Modal Input */}
       {editingTextId && (
