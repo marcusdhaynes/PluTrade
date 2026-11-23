@@ -1,83 +1,119 @@
 @import "tailwindcss";
 
+/* App shell is viewport-bound. Only explicitly opened dialogs/lists may scroll.
+   Native chart axes stay inside their Lightweight Charts canvas. */
+html,body,#root {
+  width:100%;
+  max-width:100%;
+  height:100%;
+  margin:0;
+  overflow:hidden;
+  overscroll-behavior:none;
+}
+#tradingview-app-root {
+  width:100%;
+  max-width:100%;
+  min-height:0;
+  height:100dvh;
+  overflow:hidden;
+}
+#chart-workspace-viewport {
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+}
+#tradingview-bottom-bar {
+  min-width:0;
+  max-width:100%;
+}
+#chart-range-choices {
+  scrollbar-width:none;
+}
 
-/* Phone-sized chart: honor dynamic viewport and safe areas without scaling the
-   canvas or trade controls into illegible, horizontally overflowing elements. */
-html,body,#root { width:100%; height:100%; margin:0; overflow:hidden; }
-@media (max-width:767px) {
-  #tradingview-app-root {
-    width:100%;
+/* Both portrait phones and landscape touch phones get the mobile layout,
+   even when the rotated viewport exceeds Tailwind's 768px breakpoint. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #tradingview-top-navbar {
     max-width:100%;
-    height:100dvh;
-    min-height:0;
-  }
-  #tradingview-top-navbar { width:100%; max-width:100%; overflow:hidden; }
-  #tradingview-top-navbar > div { min-width:0; }
-  #tradingview-top-navbar > div:first-child {
-    flex:1 1 auto;
-    overflow-x:auto;
-    overflow-y:hidden;
-    scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
-  }
-  #tradingview-top-navbar > div:first-child::-webkit-scrollbar { display:none; }
-  #tradingview-top-navbar > div:last-child {
-    flex:0 1 32%;
     min-width:0;
-    overflow-x:auto;
-    scrollbar-width:none;
+    overflow:visible;
+  }
+  #plutrade-mobile-navbar {
+    display:flex !important;
+    min-width:0;
+  }
+  #tradingview-top-navbar > div:not(#plutrade-mobile-navbar) {
+    display:none !important;
+  }
+  #plutrade-mobile-trade-controls {
+    display:block !important;
+    max-width:100%;
+  }
+  #tradingview-bottom-bar {
+    width:100%;
+    padding-left:3px;
+    padding-right:3px;
+    overflow:visible;
+  }
+  #chart-range-choices {
+    min-width:0;
+    overflow:visible;
+  }
+  #chart-range-choices > button {
+    min-width:0;
   }
   #tradingview-left-toolbar {
     width:27px;
     min-width:27px;
-    overflow-y:auto;
-    overflow-x:visible;
-    scrollbar-width:none;
+    overflow:visible;
+    flex-shrink:0;
   }
-  /* Sidebar is a slide-over tool on phones; it must not steal chart width. */
+  #tradingview-left-toolbar > div:first-child {
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    overflow-x:hidden;
+    scrollbar-width:none;
+    overscroll-behavior:contain;
+  }
+  #tradingview-left-toolbar > div:first-child::-webkit-scrollbar {display:none;}
+  #tradingview-left-toolbar #left-toolbar-layout-controls {
+    margin-top:auto;
+    flex-shrink:0;
+  }
+  #tradingview-lines-flyout-menu {
+    position:fixed !important;
+    left:30px !important;
+    top:45px !important;
+    width:min(280px,calc(100vw - 36px)) !important;
+    max-height:calc(100dvh - 105px) !important;
+    overflow-y:auto;
+    z-index:120 !important;
+  }
   #tradingview-right-dock {
     position:absolute;
-    top:0;right:0;bottom:0;
+    top:0;
+    right:0;
+    bottom:0;
+    width:0;
     height:100%;
     z-index:42;
     pointer-events:none;
   }
   #tradingview-right-dock > * {pointer-events:auto;}
-  #right-sidebar-content-pane {width:min(82vw,320px);max-width:calc(100vw - 42px);}
-  #tradingview-bottom-bar {padding-left:3px;padding-right:3px;gap:3px;}
-  #tradingview-bottom-bar > div:first-child {min-width:0;flex:1 1 auto;}
-  #tradingview-bottom-bar > div:last-child {flex:0 0 auto;gap:2px;}
-  #tradingview-bottom-bar > div:last-child > span:first-child {display:none;}
-  #plutrade-mobile-trade-controls button {white-space:nowrap;}
-}
-
-@media (max-width:767px) {
-  #tradingview-left-toolbar {overflow:visible;}
-  #tradingview-left-toolbar > div:first-child {
-    flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
-    scrollbar-width:none; -webkit-overflow-scrolling:touch;
+  #right-sidebar-content-pane {
+    width:min(82vw,320px);
+    max-width:calc(100vw - 42px);
+    z-index:50;
   }
-  #tradingview-left-toolbar > div:first-child::-webkit-scrollbar{display:none;}
-  #tradingview-lines-flyout-menu {
-    position:fixed!important;
-    left:30px!important;
-    top:40px!important;
-    width:min(280px,calc(100vw - 36px))!important;
-    max-height:calc(100dvh - 105px)!important;
-    z-index:120!important;
-  }
-  #left-toolbar-layout-controls {margin-top:auto;}
-}
-
-@media (max-width:767px) {
   #tradingview-right-icon-bar {
     position:fixed;
-    top:71px;
+    top:75px;
     right:4px;
     bottom:auto;
+    width:32px;
     height:min(65dvh,390px);
     max-height:calc(100dvh - 145px);
-    width:32px;
     overflow-y:auto;
     scrollbar-width:none;
     border:1px solid #3c4657;
@@ -85,6 +121,54 @@ html,body,#root { width:100%; height:100%; margin:0; overflow:hidden; }
     box-shadow:0 8px 30px #0009;
     z-index:54;
   }
-  #tradingview-right-icon-bar::-webkit-scrollbar{display:none;}
-  #right-sidebar-content-pane {z-index:50;}
+  #tradingview-right-icon-bar::-webkit-scrollbar {display:none;}
+  #plutrade-mobile-trade-controls button {white-space:nowrap;}
+  /* Opening the optional large paper workspace must not shrink the plotting
+     canvas to a sliver or push the five trading buttons out of the viewport. */
+  #paper-trading-open-panel {
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:calc(46px + env(safe-area-inset-bottom));
+    height:min(55dvh,340px);
+    max-height:calc(100dvh - 140px);
+    min-height:0;
+    z-index:39;
+    box-shadow:0 -14px 40px #000b;
+  }
+}
+@media (max-width:767px) {
+  #tradingview-bottom-bar {
+    height:44px;
+    display:grid;
+    grid-template-rows:21px 21px;
+    align-items:center;
+  }
+  #chart-range-choices {
+    display:grid;
+    grid-template-columns:repeat(8,minmax(0,1fr)) 20px;
+    width:100%;
+  }
+  #tradingview-bottom-bar > div:nth-child(2) {
+    justify-content:flex-end;
+    width:100%;
+  }
+}
+@media (min-width:768px) and (hover:none) and (pointer:coarse) {
+  #tradingview-bottom-bar {
+    height:24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  #chart-range-choices {
+    display:flex;
+    width:auto;
+  }
+  #chart-range-choices > button {padding-left:4px;padding-right:4px;}
+  #tradingview-bottom-bar > div:nth-child(2) {
+    width:auto;
+    display:flex;
+    border-top:0;
+  }
 }
