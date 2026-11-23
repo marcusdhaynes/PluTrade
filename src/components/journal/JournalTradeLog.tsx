@@ -1323,6 +1323,52 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
                   </tbody>
                 </table>
               </div>
+              <div id="journal-mobile-trade-cards" className="hidden min-w-0 flex-col gap-1.5 p-1.5">
+                {sortedTrades.length===0&&<div className="rounded border border-[#343e51] bg-[#111927] p-3 text-[10px] text-[#aebbd0]">
+                  No matching trades. Change filters, or use Add Trade to record a completed trade.
+                </div>}
+                {sortedTrades.map(trade=>{
+                  const expanded=expandedId===trade.id;
+                  return <article key={trade.id} className="min-w-0 rounded border border-[#2c3c51] bg-[#121c2a] p-2 text-[10px]">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <button type="button" aria-label={'Details for '+trade.symbol+' '+trade.id}
+                        aria-expanded={expanded} onClick={()=>setExpandedId(expanded?null:trade.id)}
+                        className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+                        <ChevronDown className={'h-3 w-3 shrink-0 text-[#8498b4] transition-transform '+(expanded?'rotate-180':'')}/>
+                        <span className="min-w-0 truncate font-bold text-[#ebf2ff]">{trade.symbol}</span>
+                        <span className="shrink-0 text-[#9eadc4]">{trade.side}</span>
+                        <span className={'shrink-0 font-semibold '+(trade.status==='WIN'?'text-[#49dbaa]':trade.status==='LOSS'?'text-[#ff8797]':'text-[#aab9d0]')}>{trade.status}</span>
+                      </button>
+                      <span className={'shrink-0 font-mono font-bold tabular-nums '+(trade.netReturn>=0?'text-[#49dbaa]':'text-[#ff8797]')}>
+                        {trade.netReturn>=0?'+':''}{trade.netReturn.toFixed(2)} ({trade.netReturnPercent.toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div className="mt-1.5 grid min-w-0 grid-cols-3 gap-1 text-[9px] text-[#98a8c1]">
+                      <span className="min-w-0 truncate" title={trade.openDate}>Open: {trade.openDate.split(' ')[0]}</span>
+                      <span className="min-w-0 truncate">Entry: {trade.entryPrice}</span>
+                      <span className="min-w-0 truncate">Exit: {trade.exitPrice??'—'}</span>
+                    </div>
+                    {expanded&&<div className="mt-2 min-w-0 space-y-1.5 border-t border-[#364559] pt-2 text-[#b5c4dc]">
+                      <div className="grid grid-cols-2 gap-1 text-[10px]">
+                        <span>Quantity: {trade.size}</span><span>Fees: {trade.fees??'—'}</span>
+                        <span>Stop: {trade.stopLoss??'—'}</span><span>Take Profit: {trade.takeProfit??'—'}</span>
+                        <span className="truncate">Portfolio: {trade.portfolio||'Main Account'}</span>
+                        <span className="truncate">Closed: {trade.closeDate||'Open'}</span>
+                      </div>
+                      {trade.note&&<p className="break-words text-[10px]">{trade.note}</p>}
+                      {(trade.setups?.length>0||trade.mistakes?.length>0)&&<p className="break-words text-[9px]">
+                        {[...(trade.setups||[]),...(trade.mistakes||[])].join(' · ')}
+                      </p>}
+                      <div className="flex gap-2">
+                        {onEditTrade&&<button type="button" onClick={()=>onEditTrade(trade)}
+                          className="rounded border border-[#49648a] px-2 py-1 text-[#b3d0ff]">Edit</button>}
+                        <button type="button" onClick={()=>onDeleteTrade(trade.id)}
+                          className="rounded border border-[#724354] px-2 py-1 text-[#ff9bad]">Delete</button>
+                      </div>
+                    </div>}
+                  </article>;
+                })}
+              </div>
             </div>
           )}
 
