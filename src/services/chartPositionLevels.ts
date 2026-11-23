@@ -19,7 +19,8 @@ export function chartPositionExitLevels(position?:PaperPosition|null):ChartExitL
   const stop=positive(position.sl)?position.sl:trailing;
   if(positive(stop)){
     levels.push({id:position.id+'-sl',kind:'sl',
-      label:position.trailingPercent?'SL · Trail '+position.trailingPercent+'%':'Stop Loss',
+      label:position.dynamicTrailing?'SL · ATR '+position.dynamicTrailing.period+'×'+position.dynamicTrailing.multiplier:
+        position.trailingPercent?'SL · Trail '+position.trailingPercent+'%':'Stop Loss',
       price:stop});
   }
   if(position.tpLevels?.length){
