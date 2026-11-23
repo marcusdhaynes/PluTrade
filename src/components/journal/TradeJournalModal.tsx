@@ -501,6 +501,11 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
               }
         }
       >
+        {isMaximized&&<button type="button" id="journal-global-close" onClick={onClose}
+          aria-label="Close Trading Journal" title="Close Trading Journal"
+          className="absolute right-[3px] top-[3px] z-[100] hidden h-[27px] w-[27px] shrink-0 items-center justify-center rounded bg-[#302332] text-[#ffbcc9] hover:bg-[#70323f] hover:text-white">
+          <X size={17}/>
+        </button>}
         {/* TOP WINDOW DRAG BAR (Visible in Windowed Mode for smooth repositioning) */}
         {!isMaximized && (
           <div
@@ -916,16 +921,16 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
               <button type="button" className="underline font-semibold" onClick={startJournalFresh}>Start fresh (keep backup)</button>
             </div>}
             {journalStorageError&&<div role="alert" className="px-3 py-1 text-xs text-[#ffc7c7] bg-[#4d252b]">{journalStorageError}</div>}
-            <div className="flex items-center justify-end gap-2 px-3 py-1 bg-[#111823] border-b border-[#242d3c] text-[10px] text-[#a4b0c2]">
+            <div id="journal-account-import-strip" className="flex w-full min-w-0 flex-nowrap items-center justify-end gap-2 px-3 py-1 bg-[#111823] border-b border-[#242d3c] text-[10px] text-[#a4b0c2]">
               <button type="button" disabled={journalRecoveryBlocked} onClick={()=>setIsCsvImportOpen(true)}
-                className="rounded border border-[#364e7b] px-2 py-1 text-[#abc7ff] hover:bg-[#1b2945] disabled:opacity-40">
+                className="shrink-0 rounded border border-[#364e7b] px-2 py-1 text-[#abc7ff] hover:bg-[#1b2945] disabled:opacity-40">
                 Import Broker CSV
               </button>
-              <label htmlFor="journal-opening-balance">Independent Journal Opening Balance</label>
+              <label htmlFor="journal-opening-balance" className="min-w-0 truncate">Independent Journal Opening Balance</label>
               <input id="journal-opening-balance" type="number" min="0" step="0.01"
                 value={journalOpeningBalance}
                 onChange={e=>changeJournalOpeningBalance(Number(e.target.value))}
-                className="w-28 px-2 py-1 rounded bg-[#1b2534] border border-[#3b4658] text-[#eff2ff] font-mono"
+                className="w-28 min-w-0 shrink-0 px-2 py-1 rounded bg-[#1b2534] border border-[#3b4658] text-[#eff2ff] font-mono"
                 title="Manual journal starting balance; separate from paper trading accounts"/>
             </div>
             {/* Tab Views */}
