@@ -94,20 +94,25 @@ test('mobile chart reserves time/price axes and disables page-touch zoom only on
 });
 
 
-test('right price scale remains clear until mobile chart tools menu is requested',async ({page})=>{
+test('right tool rail is attached, visible and usable without a hamburger',async ({page})=>{
   await page.goto('./');
-  const menu=page.getByRole('button',{name:'Mobile chart tools menu'});
-  const icons=page.locator('#tradingview-right-icon-bar');
-  await expect(menu).toBeVisible();
-  await expect(icons).toBeHidden();
-  await menu.click();
-  await expect(icons).toBeVisible();
-  await icons.locator('#right-tab-watchlist').click();
+  const rail=page.locator('#tradingview-right-icon-bar');
+  const dock=page.locator('#tradingview-right-dock');
+  await expect(rail).toBeVisible();
+  await expect(page.locator('#mobile-right-sidebar-menu')).toHaveCount(0);
+  const rect=await dock.boundingBox();
+  const width=await page.evaluate(()=>innerWidth);
+  expect(rect).not.toBeNull();
+  expect(rect!.width).toBeGreaterThanOrEqual(25);
+  expect(rect!.width).toBeLessThanOrEqual(34);
+  expect(rect!.x+rect!.width).toBeGreaterThanOrEqual(width-1);
+  expect(rect!.x+rect!.width).toBeLessThanOrEqual(width+1);
+  await rail.locator('#right-tab-watchlist').click();
   await expect(page.locator('#right-sidebar-content-pane')).toBeVisible();
-  await expect(icons).toBeHidden();
-  await menu.click();
-  await icons.locator('#right-tab-watchlist').click();
+  await expect(rail).toBeVisible();
+  await rail.locator('#right-tab-watchlist').click();
   await expect(page.locator('#right-sidebar-content-pane')).toHaveCount(0);
+  await expect(rail).toBeVisible();
 });
 
 
@@ -196,4 +201,73 @@ test('mobile chart settings are available from compact menus rather than a scrol
   await actions.getByRole('menuitem',{name:'Alert'}).click();
   await expect(actions).toHaveCount(0);
   await expect(page.locator('#alerts-modal-window')).toBeVisible();
+});
+
+test('mobile has matched 24px execution/range bars and chart-corner settings',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const execution=page.locator('#plutrade-mobile-trade-controls');
+  const range=page.locator('#tradingview-bottom-bar');
+  const corner=page.locator('#chart-corner-controls');
+  await expect(execution).toBeVisible();
+  await expect(range).toBeVisible();
+  await expect(corner).toBeVisible();
+  const executionRect=await execution.boundingBox();
+  const rangeRect=await range.boundingBox();
+  expect(executionRect).not.toBeNull();
+  expect(rangeRect).not.toBeNull();
+  expect(executionRect!.height).toBeGreaterThanOrEqual(23);
+  expect(executionRect!.height).toBeLessThanOrEqual(25);
+  expect(rangeRect!.height).toBeGreaterThanOrEqual(23);
+  expect(rangeRect!.height).toBeLessThanOrEqual(25);
+  await expect(page.locator('#paper-trading-collapsed-strip')).toBeHidden();
+  await expect(page.locator('#percent-scale-toggle')).toHaveCount(0);
+  await expect(page.locator('#log-scale-toggle')).toHaveCount(0);
+  await expect(page.getByText('auto',{exact:true})).toHaveCount(0);
+  const cornerRect=await corner.boundingBox();
+  const chartRect=await page.locator('#chart-workspace-viewport').boundingBox();
+  expect(cornerRect).not.toBeNull();
+  expect(chartRect).not.toBeNull();
+  expect(cornerRect!.x+cornerRect!.width).toBeLessThanOrEqual(chartRect!.x+chartRect!.width+1);
+  expect(cornerRect!.y+cornerRect!.height).toBeLessThanOrEqual(chartRect!.y+chartRect!.height+1);
+  await page.locator('#time-scale-settings-btn').click();
+  await expect(page.getByRole('dialog',{name:'Time scale settings'})).toBeVisible();
+  await page.getByRole('dialog',{name:'Time scale settings'}).getByRole('button',{name:'Close'}).click();
+  await page.locator('#fit-chart-content-btn').click();
+  await expect(execution).toBeVisible();
+});
+
+test('mobile paper workspace remains accessible through actions after removing collapsed strip',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  await page.getByRole('button',{name:'More mobile chart actions'}).click();
+  await page.getByRole('menuitem',{name:'Paper Trading workspace'}).click();
+  await expect(page.locator('#paper-trading-open-panel')).toBeVisible();
+  await expect(page.locator('#plutrade-mobile-trade-controls')).toBeVisible();
+  await expect(page.locator('#tradingview-right-icon-bar')).toBeVisible();
+});
+
+test('attached right rail, trading strip and chart fit 320px portrait and touch landscape',async ({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(size);
+    await page.goto('./');
+    const layout=await page.evaluate(()=>{
+      const rect=(id:string)=>document.getElementById(id)!.getBoundingClientRect();
+      return {
+        documentW:document.documentElement.scrollWidth,
+        documentH:document.documentElement.scrollHeight,
+        right:rect('tradingview-right-dock').right,
+        tradeBottom:rect('plutrade-mobile-trade-controls').bottom,
+        tradeHeight:rect('plutrade-mobile-trade-controls').height,
+        chartHeight:rect('chart-workspace-viewport').height,
+      };
+    });
+    expect(layout.documentW).toBeLessThanOrEqual(size.width+1);
+    expect(layout.documentH).toBeLessThanOrEqual(size.height+1);
+    expect(layout.right).toBeGreaterThanOrEqual(size.width-1);
+    expect(layout.right).toBeLessThanOrEqual(size.width+1);
+    expect(layout.tradeBottom).toBeLessThanOrEqual(size.height+1);
+    expect(layout.tradeHeight).toBeGreaterThanOrEqual(23);
+    expect(layout.chartHeight).toBeGreaterThan(75);
+  }
 });
