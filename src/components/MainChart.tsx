@@ -1494,12 +1494,18 @@ export const MainChart = React.memo(
           </React.Fragment>;
         })}
 
-        {/* Active Price Scale Badge on Right (Purple tag as in screenshot!) */}
-        {currentPriceY !== null && (
-          <div
-            className="absolute right-0 -translate-y-1/2 bg-[#b388ff] text-[#131722] font-mono text-[10px] font-bold px-1 py-0.5 rounded-l shadow-md z-30 pointer-events-none"
-            style={{ top: `${currentPriceY}px` }}
-          >
+        {/* Current price tag lives entirely inside the plotting area, never on
+            the fixed mobile price rail or the time axis. Its blue is identical
+            to the chart's blue line/price-line stroke. */}
+        {currentPriceY !== null && Number.isFinite(currentPriceY) && (
+          <div id="chart-current-price-label"
+            role="status" aria-label={`Current price ${asset.price.toFixed(asset.digits)}`}
+            className="absolute z-[90] pointer-events-none -translate-y-1/2 max-w-[calc(100%-36px)] truncate whitespace-nowrap rounded-[2px] bg-[#2962ff] px-1 py-[1px] font-mono text-[9px] font-bold leading-[12px] text-white shadow-sm"
+            style={{
+              right: compactMobileAxes ? MOBILE_ORDER_RAIL_PX + 2 : 2,
+              top: Math.max(9,Math.min(currentPriceY,
+                Math.max(9,(chartContainerRef.current?.clientHeight||240)-(compactMobileAxes?MOBILE_ORDER_RAIL_PX:24)-9))),
+            }}>
             {asset.price.toFixed(asset.digits)}
           </div>
         )}
