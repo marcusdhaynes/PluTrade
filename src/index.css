@@ -527,3 +527,48 @@ html,body,#root {
     min-width:0;max-width:100%;overflow-x:hidden;
   }
 }
+
+/* Insights and auxiliary journal tools use a responsive card view, not a
+   desktop-sized data table overflowing the mobile viewport. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #plutrade-journal-insights {
+    min-width:0;
+    max-width:100%;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding:6px;
+  }
+  #plutrade-journal-insights > div:first-child {
+    display:flex;flex-wrap:nowrap;gap:4px;align-items:center;
+    min-width:0;max-width:100%;
+  }
+  #plutrade-journal-insights > div:first-child > div {flex:1 1 auto;min-width:0;}
+  #plutrade-journal-insights > div:first-child select {width:100%;max-width:150px;min-width:0;}
+  #journal-insights-data-panel {
+    min-width:0;max-width:100%;overflow-x:hidden;max-height:none;
+  }
+  #journal-insights-data-panel > table {display:none;}
+  #journal-insights-mobile-cards {display:flex !important;}
+  #journal-evaluator-tab {min-width:0;max-width:100%;overflow-x:hidden;padding:6px;}
+  #journal-evaluator-tab > div {min-width:0;max-width:100%;}
+  #journal-evaluator-tab .overflow-x-auto {overflow-x:hidden;}
+  #journal-evaluator-tab table {width:100%;max-width:100%;table-layout:fixed;font-size:9px;}
+  #journal-evaluator-tab table :is(th,td) {
+    min-width:0;max-width:25%;padding:2px;
+    overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere;
+    white-space:normal;
+  }
+  #journal-ai-assistant-tab {width:100%;max-width:100%;min-width:0;padding:6px;}
+  #journal-ai-assistant-tab > div {min-width:0;max-width:100%;}
+  /* Dialog shells are full responsive overlays, never fixed 700px-wide
+     widgets whose controls disappear behind the edge of the phone. */
+  #trade-journal-root-modal [role="dialog"],
+  #trade-journal-root-modal [aria-modal="true"] {
+    max-width:calc(100vw - 12px);
+    min-width:0;
+  }
+  #trade-journal-root-modal input,#trade-journal-root-modal select {
+    min-width:0;
+    max-width:100%;
+  }
+}
