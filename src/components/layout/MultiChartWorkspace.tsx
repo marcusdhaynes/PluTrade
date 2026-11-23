@@ -36,6 +36,10 @@ interface MultiChartWorkspaceProps {
   primaryHistoryState:ChartLoadState;
   onReloadPrimary:()=>void;
   sessionVwapEnabled:boolean;
+  areDrawingsLocked:boolean;
+  stayInDrawingMode:boolean;
+  onOpenSymbolSearch:()=>void;
+  onOpenIndicators:()=>void;
   indicators: IndicatorSettings;
   activeTool: DrawingToolType;
   setActiveTool: (tool: DrawingToolType) => void;
@@ -174,6 +178,10 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
       primaryHistoryState,
       onReloadPrimary,
       sessionVwapEnabled,
+      areDrawingsLocked,
+      stayInDrawingMode,
+      onOpenSymbolSearch,
+      onOpenIndicators,
       indicators,
       activeTool,
       setActiveTool,
@@ -281,6 +289,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
         const activeRef = chartRefs.current.get(activeWindowIndex);
         activeRef?.fitContent();
       },
+      goToUtcDate:(date:string)=>chartRefs.current.get(activeWindowIndex)?.goToUtcDate(date)??false,
       selectRange: (days: number) => {
         const activeRef = chartRefs.current.get(activeWindowIndex);
         activeRef?.selectRange(days);
@@ -636,7 +645,10 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
       return (
         <div
           key={winIndex}
-          onClick={() => {
+          onClick={(event) => {
+            // Embedded chart controls must not re-select the old pane market after their own action.
+            const target=event.target as HTMLElement;
+            if(target.closest('button,input,textarea,select,[role="menu"],[role="dialog"],#chart-data-recovery,#chart-top-legend-header'))return;
             setActiveWindowIndex(winIndex);
             if(!win.source)onUpdateWindowStates(windowStates.map((v,i)=>i===winIndex?
               {...v,source:winAsset.source||winAsset.exchange,marketType:winAsset.marketType,
@@ -706,6 +718,10 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
                 if(template.count===1||syncSettings.interval)setActiveTimeframe('1m');
               }}
               sessionVwapEnabled={sessionVwapEnabled}
+              areDrawingsLocked={areDrawingsLocked}
+              stayInDrawingMode={stayInDrawingMode}
+              onOpenSymbolSearch={onOpenSymbolSearch}
+              onOpenIndicators={onOpenIndicators}
               indicators={indicators}
               activeTool={activeTool}
               setActiveTool={setActiveTool}

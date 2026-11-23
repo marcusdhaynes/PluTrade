@@ -209,6 +209,12 @@ export default function App() {
   },[]);
   // State: Drawing Tools & Drawings
   const [activeTool, setActiveTool] = useState<DrawingToolType>('crosshair');
+  const [areDrawingsLocked,setAreDrawingsLocked]=useState<boolean>(()=>
+    readLocalJson<boolean>('tv_drawing_locked',false)===true);
+  const [stayInDrawingMode,setStayInDrawingMode]=useState<boolean>(()=>
+    readLocalJson<boolean>('tv_drawing_stay_mode',false)===true);
+  useEffect(()=>{try{localStorage.setItem('tv_drawing_locked',JSON.stringify(areDrawingsLocked));}catch{}},[areDrawingsLocked]);
+  useEffect(()=>{try{localStorage.setItem('tv_drawing_stay_mode',JSON.stringify(stayInDrawingMode));}catch{}},[stayInDrawingMode]);
   const [isMagnetMode, setIsMagnetMode] = useState<boolean>(() => {
     return readLocalJson<boolean>('tv_magnet_mode', false) === true;
   });
@@ -1743,6 +1749,18 @@ export default function App() {
           onClearDrawings={handleClearDrawings}
           currentColor={currentColor}
           setCurrentColor={setCurrentColor}
+          isLocked={areDrawingsLocked}
+          setIsLocked={setAreDrawingsLocked}
+          stayInDrawingMode={stayInDrawingMode}
+          setStayInDrawingMode={setStayInDrawingMode}
+          onZoomIn={()=>{
+            const scale=chartRef.current?.getChart()?.timeScale();
+            const range=scale?.getVisibleLogicalRange();
+            if(!range){scale?.fitContent();return;}
+            const center=(Number(range.from)+Number(range.to))/2;
+            const radius=Math.max(2,(Number(range.to)-Number(range.from))*.35);
+            scale?.setVisibleLogicalRange({from:center-radius as any,to:center+radius as any});
+          }}
         />
 
         {/* Center: Multi-Chart Resizable Workspace + Bottom Trading Panel + Bottom Bar */}
@@ -1761,6 +1779,10 @@ export default function App() {
             primaryHistoryState={chartHistoryState}
             onReloadPrimary={()=>setChartRetry(n=>n+1)}
             sessionVwapEnabled={sessionVwapEnabled}
+            areDrawingsLocked={areDrawingsLocked}
+            stayInDrawingMode={stayInDrawingMode}
+            onOpenSymbolSearch={()=>{setAddingWatchlistSymbol(false);setIsSymbolSearchOpen(true);}}
+            onOpenIndicators={()=>setIsIndicatorsOpen(true)}
             indicators={indicators}
             activeTool={activeTool}
             setActiveTool={setActiveTool}
@@ -1837,6 +1859,13 @@ export default function App() {
             chart={chartRef.current?.getChart() || null}
             onSelectRange={(days) => chartRef.current?.selectRange(days)}
             onFitContent={() => chartRef.current?.fitContent()}
+            onGoToDate={date=>chartRef.current?.goToUtcDate(date)??false}
+            onApplyTimeScaleSettings={({barSpacing,rightOffset})=>{
+              const chart=chartRef.current?.getChart();
+              if(!chart)return false;
+              try{chart.timeScale().applyOptions({barSpacing,rightOffset});return true;}
+              catch{return false;}
+            }}
             isLogScale={isLogScale}
             setIsLogScale={setIsLogScale}
             isPercentScale={isPercentScale}

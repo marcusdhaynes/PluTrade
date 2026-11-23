@@ -205,6 +205,11 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   setIsLayoutManagerOpen,
 }) => {
   const [isChartTypeOpen, setIsChartTypeOpen] = useState(false);
+  const [showQuickDrawingTools,setShowQuickDrawingTools]=useState<boolean>(()=>{
+    try{return localStorage.getItem('plutrade_quick_drawing_tools_v1')!=='false';}
+    catch{return true;}
+  });
+  useEffect(()=>{try{localStorage.setItem('plutrade_quick_drawing_tools_v1',String(showQuickDrawingTools));}catch{}},[showQuickDrawingTools]);
   const [isTimeframeDropdownOpen, setIsTimeframeDropdownOpen] = useState(false);
 
   const [favoriteTimeframes, setFavoriteTimeframes] = useState<Timeframe[]>(() => {
@@ -878,6 +883,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
 
       {/* Center Floating Quick Drawing Favorite Pill Toolbar (as shown in screenshot!) */}
       <div className="hidden xl:flex items-center gap-0.5 bg-[#1e222d] border border-[#2a2e39] rounded-md px-1.5 py-0.5 shadow-md">
+        {showQuickDrawingTools&&<>
         <GripVertical className="w-2.5 h-2.5 text-[#787b86] cursor-grab" />
         <button
           onClick={() => onSelectQuickTool?.('trendline')}
@@ -916,9 +922,13 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           <Type className="w-3 h-3" />
         </button>
         <div className="w-px h-2.5 bg-[#2a2e39]" />
+        </>}
         <button
           className="p-0.5 text-[#ffb74d] hover:text-[#ffa726] rounded transition"
-          title="Favorites Toolbar Toggle"
+          title={showQuickDrawingTools?'Hide quick drawing tools':'Show quick drawing tools'}
+          aria-label="Toggle quick drawing tools"
+          aria-pressed={showQuickDrawingTools}
+          onClick={()=>setShowQuickDrawingTools(v=>!v)}
         >
           <Star className="w-2.5 h-2.5 fill-[#ffb74d]" />
         </button>
@@ -974,8 +984,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
 
         {/* Settings Gear */}
         <button
+          type="button"
+          onClick={onOpenIndicators}
           className="p-1 text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition"
-          title="Chart Properties / Settings"
+          title="Indicators and chart studies settings"
         >
           <Settings className="w-3 h-3" />
         </button>

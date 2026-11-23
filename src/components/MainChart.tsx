@@ -48,10 +48,12 @@ import {
   MoreHorizontal,
   ChevronDown,
   TrendingUp,
+  Search,
 } from 'lucide-react';
 
 export interface MainChartRef {
   fitContent: () => void;
+  goToUtcDate:(date:string)=>boolean;
   selectRange: (days: number) => void;
   takeSnapshot: () => void;
   getChart: () => IChartApi | null;
@@ -83,6 +85,10 @@ interface MainChartProps {
   chartRecoveryMarkets?:Asset[];
   onTryOneMinute?:()=>void;
   sessionVwapEnabled?:boolean;
+  areDrawingsLocked?:boolean;
+  stayInDrawingMode?:boolean;
+  onOpenSymbolSearch?:()=>void;
+  onOpenIndicators?:()=>void;
 }
 
 function formatHollowCandles(candles: OHLCV[]) {
@@ -133,10 +139,18 @@ export const MainChart = React.memo(
       chartRecoveryMarkets=[],
       onTryOneMinute,
       sessionVwapEnabled=false,
+      areDrawingsLocked=false,
+      stayInDrawingMode=false,
+      onOpenSymbolSearch,
+      onOpenIndicators,
     },
     ref
   ) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
+    const [priceVisible,setPriceVisible]=useState(true);
+    const [moreOpen,setMoreOpen]=useState(false);
+    const [,refreshSeries]=useState(0);
+    useEffect(()=>{setPriceVisible(true);setMoreOpen(false);},[asset.symbol,asset.source,asset.exchange,asset.marketType,asset.pairAddress,asset.chainId,timeframe]);
     const sourceCandlesRef=useRef(candles);
     sourceCandlesRef.current=candles;
     const chartApiRef = useRef<IChartApi | null>(null);
@@ -167,6 +181,22 @@ export const MainChart = React.memo(
     useImperativeHandle(ref, () => ({
       fitContent: () => {
         chartApiRef.current?.timeScale().fitContent();
+      },
+      goToUtcDate:(date:string)=>{
+        const chart=chartApiRef.current;
+        const start=Date.parse(date+'T00:00:00Z')/1000;
+        if(!chart||!Number.isFinite(start))return false;
+        const bars=sourceCandlesRef.current;
+        // Only scroll to a UTC day with actual, verified bars on THIS chart.
+        const index=bars.findIndex(bar=>bar.time>=start&&bar.time<start+86400);
+        if(index<0)return false;
+        try{
+          const range=chart.timeScale().getVisibleLogicalRange();
+          const span=Math.max(24,Math.min(250,range?Number(range.to)-Number(range.from):90));
+          const from=Math.max(0,index-Math.floor(span/2));
+          chart.timeScale().setVisibleLogicalRange({from:from as any,to:Math.min(bars.length+3,from+span) as any});
+          return true;
+        }catch{return false;}
       },
       selectRange: (days: number) => {
         if (!chartApiRef.current || candles.length === 0) return;
@@ -317,6 +347,9 @@ export const MainChart = React.memo(
       };
     }, []);
 
+    // Visibility is a chart API option, never a CSS overlay that leaves deceptive candles.
+    useEffect(()=>{try{mainSeriesRef.current?.applyOptions({visible:priceVisible});}catch{}},[priceVisible]);
+
     // Update Price Scale Modes
     useEffect(() => {
       if (!chartApiRef.current) return;
@@ -352,6 +385,7 @@ export const MainChart = React.memo(
         activeSeriesRef.current = [];
         mainSeriesRef.current = null;
         seriesBundleRef.current = null;
+        refreshSeries(i=>i+1);
         return;
       }
 
@@ -900,6 +934,7 @@ export const MainChart = React.memo(
         try { chart.timeScale().setVisibleRange(priorViewport); }
         catch { /* Market history changed; retain the chart's safe fitted range. */ }
       }
+      mainSeries.applyOptions({visible:priceVisible});
       seriesBundleRef.current = {
         marketKey,
         timeframe,
@@ -910,6 +945,7 @@ export const MainChart = React.memo(
         candleCount: candles.length,
         renderedCandles:candles.map(bar=>({...bar})),
       };
+      refreshSeries(i=>i+1);
     }, [asset.symbol, asset.source, asset.exchange, asset.marketType, asset.chainId, asset.pairAddress,
       timeframe, chartType, candles, indicatorsKey]);
 
@@ -968,6 +1004,7 @@ export const MainChart = React.memo(
         <div
           id="chart-top-legend-header"
           className="absolute top-1.5 left-2.5 z-20 flex flex-col gap-0.5 pointer-events-auto"
+          onClick={e=>e.stopPropagation()}
         >
           {/* Row 1: Symbol & Exchange with eye, settings, delete, more icons */}
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#d1d4dc] group cursor-pointer">
@@ -998,37 +1035,42 @@ export const MainChart = React.memo(
               </div>
             )}
 
-            <div className="flex items-center gap-0.5 text-[#787b86] ml-1">
-              <button className="p-0.5 hover:text-white rounded transition" title="Hide series">
+            <div className="flex items-center gap-0.5 text-[#a5adbf] ml-1">
+              <button type="button" onClick={()=>setPriceVisible(v=>!v)}
+                aria-pressed={!priceVisible} aria-label={priceVisible?'Hide price series':'Show price series'}
+                className="p-0.5 hover:text-white rounded transition" title={priceVisible?'Hide price series':'Show price series'}>
                 <Eye className="w-3 h-3" />
               </button>
-              <button className="p-0.5 hover:text-white rounded transition" title="Series Settings">
+              <button type="button" onClick={onOpenIndicators} disabled={!onOpenIndicators}
+                className="p-0.5 hover:text-white rounded transition" title="Edit indicators"
+                aria-label="Edit chart indicators">
                 <Settings className="w-3 h-3" />
               </button>
-              <button className="p-0.5 hover:text-[#f23645] rounded transition" title="Remove Symbol">
-                <X className="w-3 h-3" />
-              </button>
-              <button className="p-0.5 hover:text-white rounded transition" title="More options">
-                <MoreHorizontal className="w-3 h-3" />
-              </button>
+              <button type="button" onClick={onOpenSymbolSearch} disabled={!onOpenSymbolSearch}
+                className="p-0.5 hover:text-white rounded transition" title="Change symbol"
+                aria-label="Change chart symbol"><Search className="w-3 h-3"/></button>
+              <div className="relative">
+                <button type="button" onClick={()=>setMoreOpen(v=>!v)}
+                  aria-expanded={moreOpen} aria-label="Chart options"
+                  className="p-0.5 hover:text-white rounded transition" title="Chart options">
+                  <MoreHorizontal className="w-3 h-3" />
+                </button>
+                {moreOpen&&<div role="menu" aria-label="Chart options menu"
+                  className="absolute left-0 top-full z-50 mt-1 min-w-[140px] rounded border border-[#394556] bg-[#1d2634] shadow-xl p-1 space-y-1 text-xs">
+                  <button type="button" role="menuitem" className="w-full text-left p-2 rounded hover:bg-[#31415a]"
+                    onClick={()=>{chartApiRef.current?.timeScale().fitContent();setMoreOpen(false);}}>Fit all candles</button>
+                  <button type="button" role="menuitem" className="w-full text-left p-2 rounded hover:bg-[#31415a]"
+                    onClick={()=>{onRetryChartHistory?.();setMoreOpen(false);}}>Reload chart history</button>
+                </div>}
+              </div>
             </div>
           </div>
 
-          {/* Row 2: Indicator 14 line with controls */}
-          <div className="flex items-center gap-1 text-[10px] text-[#787b86] pl-5">
-            <ChevronDown className="w-2.5 h-2.5 text-[#787b86]" />
-            <span className="font-mono text-[#d1d4dc]">14</span>
-            <div className="flex items-center gap-0.5 text-[#787b86]">
-              <button className="p-0.5 hover:text-white rounded transition" title="Toggle Indicator">
-                <Eye className="w-2.5 h-2.5" />
-              </button>
-              <button className="p-0.5 hover:text-white rounded transition" title="Indicator Settings">
-                <Settings className="w-2.5 h-2.5" />
-              </button>
-              <button className="p-0.5 hover:text-[#f23645] rounded transition" title="Remove Indicator">
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </div>
+          {/* Actual indicator status replaces the inert "14" mock controls. */}
+          <div className="flex items-center gap-1 text-[10px] text-[#98a8bf] pl-5">
+            <span>Indicators: {Object.values(indicators).filter(i=>i.enabled).length} enabled</span>
+            <button type="button" title="Edit indicators" onClick={onOpenIndicators} disabled={!onOpenIndicators}
+              className="text-[#9bbdff] hover:text-white underline">Edit</button>
           </div>
         </div>
 
@@ -1043,6 +1085,7 @@ export const MainChart = React.memo(
           UTC Session VWAP · OHLCV approximation
         </div>}
         {candles.length===0&&<section id="chart-data-recovery" role="status"
+          onClick={e=>e.stopPropagation()}
           className="absolute inset-0 z-30 flex items-center justify-center p-4 pointer-events-none">
           <div className="pointer-events-auto w-full max-w-[440px] rounded-xl border border-[#3b4b65] bg-[#161e2c]/95 p-4 shadow-xl text-[#dbe6f8] space-y-3">
             <div className="flex items-center gap-2">
@@ -1085,18 +1128,15 @@ export const MainChart = React.memo(
 
             {/* Position Controls Marker Pill */}
             <div
+              onClick={e=>e.stopPropagation()}
               className="absolute right-16 -translate-y-1/2 z-30 flex items-center bg-[#131722] border border-[#2962ff] rounded-md text-[11px] font-mono shadow-xl overflow-hidden"
               style={{ top: `${positionY}px` }}
             >
               <div className="px-1.5 py-0.5 bg-[#2962ff] text-white font-bold text-[10px]">
                 {openPosition.side==='Long'?'L':'S'}
               </div>
-              <div className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#787b86] hover:text-white cursor-pointer transition">
-                TP
-              </div>
-              <div className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#787b86] hover:text-white cursor-pointer transition">
-                SL
-              </div>
+              <div className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#aeb6c8]" title="Take-profit controls are available in the paper trade ticket">TP</div>
+              <div className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#aeb6c8]" title="Stop-loss controls are available in the paper trade ticket">SL</div>
               <div className="px-2 py-0.5 border-r border-[#2962ff]/40 text-[#2962ff] font-semibold">
                 {openPosition.qty.toLocaleString()}
               </div>
@@ -1141,6 +1181,8 @@ export const MainChart = React.memo(
           drawings={drawings}
           setDrawings={setDrawings}
           isMagnetMode={isMagnetMode}
+          areDrawingsLocked={areDrawingsLocked}
+          stayInDrawingMode={stayInDrawingMode}
           areDrawingsHidden={areDrawingsHidden}
           currentColor={currentColor}
           candles={candles}

@@ -28,8 +28,11 @@ interface LeftDrawingToolbarProps {
   onClearDrawings: () => void;
   currentColor: string;
   setCurrentColor: (color: string) => void;
-  isLocked?: boolean;
-  setIsLocked?: (locked: boolean | ((prev: boolean) => boolean)) => void;
+  isLocked: boolean;
+  setIsLocked: (locked: boolean | ((prev: boolean) => boolean)) => void;
+  stayInDrawingMode:boolean;
+  setStayInDrawingMode:(enabled:boolean|((prev:boolean)=>boolean))=>void;
+  onZoomIn:()=>void;
 }
 
 export interface LineToolDef {
@@ -298,8 +301,11 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
   onClearDrawings,
   currentColor,
   setCurrentColor,
-  isLocked = false,
+  isLocked,
   setIsLocked,
+  stayInDrawingMode,
+  setStayInDrawingMode,
+  onZoomIn,
 }) => {
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [isLineMenuOpen, setIsLineMenuOpen] = useState(false);
@@ -308,40 +314,31 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
 
   // Remember active tool selected within the line group
   const [selectedLineTool, setSelectedLineTool] = useState<DrawingToolType>(() => {
-    const saved = localStorage.getItem('tv_selected_line_tool');
-    return (saved as DrawingToolType) || 'trendline';
+    try{
+      const saved = localStorage.getItem('tv_selected_line_tool');
+      return LINE_TOOLS_CATALOG.some(t=>t.id===saved) ? saved as DrawingToolType : 'trendline';
+    }catch{return 'trendline';}
   });
 
   // Starred tools in the line dropdown (matches TradingView screenshot favorites like Ray and Parallel Channel)
   const [starredTools, setStarredTools] = useState<string[]>(() => {
-    const saved = localStorage.getItem('tv_starred_drawing_tools');
-    return saved ? JSON.parse(saved) : ['ray', 'parallel_channel'];
+    try{
+      const saved = localStorage.getItem('tv_starred_drawing_tools');
+      if(!saved)return ['ray','parallel_channel'];
+      const parsed:unknown=JSON.parse(saved);
+      if(!Array.isArray(parsed))return ['ray','parallel_channel'];
+      return parsed.filter((t):t is string=>typeof t==='string'&&LINE_TOOLS_CATALOG.some(item=>item.id===t));
+    }catch{return ['ray','parallel_channel'];}
   });
 
-  const [lockedState, setLockedState] = useState<boolean>(() => {
-    const saved = localStorage.getItem('tv_drawing_locked');
-    return saved !== null ? JSON.parse(saved) : false;
-  });
-
-  const [stayInDrawingMode, setStayInDrawingMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('tv_drawing_stay_mode');
-    return saved !== null ? JSON.parse(saved) : false;
-  });
+  const lockedState = isLocked;
 
   useEffect(() => {
-    localStorage.setItem('tv_drawing_locked', JSON.stringify(lockedState));
-  }, [lockedState]);
-
-  useEffect(() => {
-    localStorage.setItem('tv_drawing_stay_mode', JSON.stringify(stayInDrawingMode));
-  }, [stayInDrawingMode]);
-
-  useEffect(() => {
-    localStorage.setItem('tv_starred_drawing_tools', JSON.stringify(starredTools));
+    try{localStorage.setItem('tv_starred_drawing_tools', JSON.stringify(starredTools));}catch{}
   }, [starredTools]);
 
   useEffect(() => {
-    localStorage.setItem('tv_selected_line_tool', selectedLineTool);
+    try{localStorage.setItem('tv_selected_line_tool', selectedLineTool);}catch{}
   }, [selectedLineTool]);
 
   // Click outside to close line tools flyout menu
@@ -662,6 +659,8 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
         <button
           className="w-[26px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition-colors cursor-pointer"
           title="Zoom In"
+          aria-label="Zoom chart in"
+          onClick={onZoomIn}
         >
           <ZoomIn className="w-3.5 h-3.5" />
         </button>
@@ -684,13 +683,14 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
 
         {/* Stay in Drawing Mode */}
         <button
-          onClick={() => setStayInDrawingMode(!stayInDrawingMode)}
+          onClick={() => setStayInDrawingMode(prev=>!prev)}
           className={`w-[26px] h-[24px] rounded-md flex items-center justify-center transition-colors cursor-pointer ${
             stayInDrawingMode
               ? 'bg-[#2962ff] text-white shadow-xs'
               : 'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'
           }`}
           title="Stay in Drawing Mode"
+          aria-pressed={stayInDrawingMode}
         >
           <PenTool className="w-3.5 h-3.5" />
         </button>
@@ -699,8 +699,7 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
         <button
           onClick={() => {
             const next = !lockedState;
-            setLockedState(next);
-            setIsLocked?.(next);
+            setIsLocked(next);
           }}
           className={`w-[26px] h-[24px] rounded-md flex items-center justify-center transition-colors cursor-pointer ${
             lockedState
@@ -708,6 +707,7 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
               : 'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'
           }`}
           title={lockedState ? 'Unlock All Drawings' : 'Lock All Drawings'}
+          aria-pressed={lockedState}
         >
           <Lock className="w-3.5 h-3.5" />
         </button>
@@ -730,8 +730,9 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
         <button
           id="clear-all-drawings-btn"
           onClick={onClearDrawings}
-          className="w-[26px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#f23645] hover:bg-[#1e222d] transition-colors cursor-pointer"
-          title="Remove All Drawings"
+          disabled={lockedState}
+          className="w-[26px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#f23645] hover:bg-[#1e222d] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          title={lockedState?"Unlock drawings to remove them":"Remove All Drawings"}
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>

@@ -11,6 +11,8 @@ interface DrawingOverlayProps {
   drawings: Drawing[];
   setDrawings: React.Dispatch<React.SetStateAction<Drawing[]>>;
   isMagnetMode: boolean;
+  areDrawingsLocked?:boolean;
+  stayInDrawingMode?:boolean;
   areDrawingsHidden: boolean;
   currentColor: string;
   candles?: OHLCV[];
@@ -31,6 +33,8 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   drawings,
   setDrawings,
   isMagnetMode,
+  areDrawingsLocked=false,
+  stayInDrawingMode=false,
   areDrawingsHidden,
   currentColor,
   candles = [],
@@ -66,6 +70,9 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     y: number;
   } | null>(null);
 
+  useEffect(()=>{setInProgressPoints([]);setActiveSnap(null);},[activeTool]);
+  useEffect(()=>{if(areDrawingsLocked){setSelectedDrawingId(null);setDrawingContextMenu(null);setHoveredBendInfo(null);bendDragRef.current=null;setIsBending(false);}},[areDrawingsLocked]);
+
   // Close drawing context menu on global click
   useEffect(() => {
     const handleGlobalClick = () => {
@@ -77,12 +84,13 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
 
   const handleDrawingClick = useCallback((e: React.MouseEvent, drawing: Drawing) => {
     e.stopPropagation();
-    setSelectedDrawingId(drawing.id);
-  }, []);
+    if(!areDrawingsLocked)setSelectedDrawingId(drawing.id);
+  }, [areDrawingsLocked]);
 
   const handleDrawingDoubleClick = useCallback(
     (e: React.MouseEvent, drawing: Drawing) => {
       e.stopPropagation();
+      if(areDrawingsLocked)return;
       onOpenConditionalOrder?.({
         type: 'drawing',
         drawing,
@@ -91,19 +99,20 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         price: drawing.points[0]?.price,
       });
     },
-    [onOpenConditionalOrder]
+    [onOpenConditionalOrder,areDrawingsLocked]
   );
 
   const handleDrawingContextMenu = useCallback((e: React.MouseEvent, drawing: Drawing) => {
     e.preventDefault();
     e.stopPropagation();
+    if(areDrawingsLocked)return;
     setSelectedDrawingId(drawing.id);
     setDrawingContextMenu({
       x: e.clientX,
       y: e.clientY,
       drawing,
     });
-  }, []);
+  }, [areDrawingsLocked]);
 
   // Subscribe to chart zoom / scroll to keep SVG overlay aligned
   useEffect(() => {
@@ -296,6 +305,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   const handlePointerDown = (e: React.PointerEvent) => {
     // Prevent default chart pan when in drawing mode or bending
     if (activeTool === 'cursor' || activeTool === 'crosshair') {
+      if(areDrawingsLocked)return;
       // Check if clicked directly on a bendline to bend it (Adobe Flash/Animate style)
       if (hoveredBendInfo) {
         e.stopPropagation();
@@ -314,7 +324,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     e.stopPropagation();
 
     // Check if user clicked on bendline while bendline tool or drawing tool is active
-    if (hoveredBendInfo && inProgressPoints.length === 0 && activeTool === 'bendline') {
+    if (!areDrawingsLocked && hoveredBendInfo && inProgressPoints.length === 0 && activeTool === 'bendline') {
       bendDragRef.current = {
         drawingId: hoveredBendInfo.drawingId,
         type: 'bend',
@@ -345,7 +355,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         lineWidth: 2,
       };
       setDrawings((prev) => [...prev, newDrawing]);
-      setActiveTool('cursor');
+      if(!stayInDrawingMode)setActiveTool('cursor');
       return;
     }
 
@@ -358,7 +368,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         lineWidth: 2,
       };
       setDrawings((prev) => [...prev, newDrawing]);
-      setActiveTool('cursor');
+      if(!stayInDrawingMode)setActiveTool('cursor');
       return;
     }
 
@@ -371,7 +381,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         lineWidth: 2,
       };
       setDrawings((prev) => [...prev, newDrawing]);
-      setActiveTool('cursor');
+      if(!stayInDrawingMode)setActiveTool('cursor');
       return;
     }
 
@@ -384,7 +394,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         lineWidth: 1.5,
       };
       setDrawings((prev) => [...prev, newDrawing]);
-      setActiveTool('cursor');
+      if(!stayInDrawingMode)setActiveTool('cursor');
       return;
     }
 
@@ -401,7 +411,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       setDrawings((prev) => [...prev, newDrawing]);
       setEditingTextId(newId);
       setTextInputVal('Note');
-      setActiveTool('cursor');
+      if(!stayInDrawingMode)setActiveTool('cursor');
       return;
     }
 
@@ -440,7 +450,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         };
         setDrawings((prev) => [...prev, newDrawing]);
         setInProgressPoints([]);
-        setActiveTool('cursor');
+        if(!stayInDrawingMode)setActiveTool('cursor');
         return;
       }
     }
@@ -470,7 +480,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       setDrawings((prev) => [...prev, newDrawing]);
       setInProgressPoints([]);
       setSelectedDrawingId(newDrawing.id);
-      setActiveTool('cursor');
+      if(!stayInDrawingMode)setActiveTool('cursor');
     }
   };
 
@@ -543,7 +553,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      <svg className="w-full h-full pointer-events-none overflow-visible">
+      <svg className={`w-full h-full pointer-events-none overflow-visible ${areDrawingsLocked?"[&_*]:!pointer-events-none":""}`}>
         {/* SVG Defs for markers & gradients */}
         <defs>
           <filter id="snap-glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -1464,7 +1474,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       </svg>
 
       {/* Floating Action Bar when a Drawing is Selected */}
-      {selectedDrawingId && !editingTextId && (
+      {selectedDrawingId && !areDrawingsLocked && !editingTextId && (
         <div
           id="drawing-selected-bar"
           className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#1e222d] border border-[#2a2e39] text-[#d1d4dc] px-3 py-1.5 rounded-lg shadow-2xl flex items-center gap-3 z-30 pointer-events-auto"
@@ -1565,7 +1575,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       )}
 
       {/* Drawing Context Menu (Right Click on Dependency) */}
-      {drawingContextMenu && (
+      {drawingContextMenu && !areDrawingsLocked && (
         <div
           style={{ left: `${drawingContextMenu.x}px`, top: `${drawingContextMenu.y}px` }}
           className="fixed z-50 bg-[#1e222d] border border-[#2a2e39] rounded-xl shadow-2xl py-1 text-xs text-[#d1d4dc] min-w-[240px] select-none animate-in fade-in zoom-in-95 duration-100"
