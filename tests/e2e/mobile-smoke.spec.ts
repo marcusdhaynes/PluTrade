@@ -28,16 +28,16 @@ test('mobile keeps one account/UPL/order/execution row and preloads equity sizin
   expect(new Set(rects.map(r=>r.top)).size).toBe(1);
   expect(rects.at(-1)!.right).toBeLessThanOrEqual(await page.evaluate(()=>innerWidth+1));
   await expect(actions.nth(0)).toHaveAttribute('id','mobile-active-account-btn');
-  await expect(actions.nth(1)).toHaveAttribute('id','mobile-upl-cash');
-  await expect(actions.nth(2)).toHaveAttribute('id','mobile-upl-percent');
-  await expect(actions.nth(3)).toHaveAttribute('id','mobile-order-ticket-btn');
+  await expect(actions.nth(1)).toHaveAttribute('id','mobile-order-ticket-btn');
+  await expect(actions.nth(2)).toHaveAttribute('id','mobile-upl-cash');
+  await expect(actions.nth(3)).toHaveAttribute('id','mobile-upl-percent');
   await actions.nth(6).click();
   const equity=page.getByRole('dialog',{name:'Equity allocation'});
   await expect(equity).toBeVisible();
   await equity.getByRole('spinbutton',{name:'Percent of equity'}).fill('50');
   await equity.getByRole('button',{name:'Apply to Entry'}).click();
   await expect(actions.nth(6)).toContainText('50%');
-  await expect(actions.nth(3)).toContainText('Order');
+  await expect(actions.nth(1)).toContainText('Order');
   await actions.nth(4).click();
   const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
   await expect(ticket).toBeVisible();
@@ -513,17 +513,17 @@ test('popups render above chart/sidebar and outside tapping dismisses them',asyn
   await expect(date).toHaveCount(0);
 });
 
-test('right Indicators and Alerts are sole launchers; account and UPL precede Order',async ({page})=>{
+test('right Indicators and Alerts are sole launchers; account, Order, UPL amount and percent fit one row',async ({page})=>{
   await page.goto('./');
   await expect(page.locator('#open-alerts-modal-btn')).toHaveCount(0);
   await expect(page.locator('#open-indicators-modal-btn')).toHaveCount(0);
   await expect(page.locator('#mobile-chart-action-rows')).toHaveCount(0);
   const buttons=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button');
   await expect(buttons.first()).toHaveAttribute('id','mobile-active-account-btn');
-  await expect(buttons.nth(1)).toHaveAttribute('id','mobile-upl-cash');
-  await expect(buttons.nth(2)).toHaveAttribute('id','mobile-upl-percent');
-  await expect(buttons.nth(3)).toHaveAttribute('id','mobile-order-ticket-btn');
-  await buttons.nth(3).click();
+  await expect(buttons.nth(1)).toHaveAttribute('id','mobile-order-ticket-btn');
+  await expect(buttons.nth(2)).toHaveAttribute('id','mobile-upl-cash');
+  await expect(buttons.nth(3)).toHaveAttribute('id','mobile-upl-percent');
+  await buttons.nth(1).click();
   await expect(page.getByRole('dialog',{name:'Paper Trading order entry'})).toBeVisible();
   await page.getByTitle('Close order panel').click();
   await page.locator('#right-tab-indicators').click();
