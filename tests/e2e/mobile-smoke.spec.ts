@@ -692,3 +692,41 @@ test('mobile top-left chart icons have no boxes and chart has no TV lower-left l
   await page.locator('#time-scale-settings-btn').click();
   await expect(page.getByRole('dialog',{name:'Time scale settings'}).getByRole('link',{name:/Lightweight Charts/})).toBeVisible();
 });
+
+test('mobile chart chrome remains compact and legend preference persists',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const legend=page.locator('#chart-top-legend-header');
+  const currency=page.locator('#chart-quote-currency-trigger');
+  const corner=page.locator('#chart-corner-controls');
+  const footer=page.locator('#left-toolbar-layout-controls');
+  const execution=page.locator('#plutrade-mobile-trade-controls');
+  await expect(legend).toBeHidden();
+  await expect(currency).toBeVisible();
+  await expect(corner).toBeVisible();
+  const measured=await page.evaluate(()=>{
+    const rect=(id:string)=>document.getElementById(id)!.getBoundingClientRect();
+    const box=(id:string)=>{const r=rect(id);return {x:r.x,y:r.y,width:r.width,height:r.height};};
+    const cornerStyle=getComputedStyle(document.getElementById('chart-corner-controls')!);
+    return {footer:box('left-toolbar-layout-controls'),execution:box('plutrade-mobile-trade-controls'),
+      currency:box('chart-quote-currency-anchor'),cornerBorder:cornerStyle.borderTopWidth,cornerBackground:cornerStyle.backgroundColor};
+  });
+  expect(Math.abs(measured.footer.y-measured.execution.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(measured.footer.height-measured.execution.height)).toBeLessThanOrEqual(1);
+  expect(Number.parseFloat(measured.cornerBorder)).toBe(0);
+  expect(measured.cornerBackground).toBe('rgba(0, 0, 0, 0)');
+  await currency.click();
+  await expect(page.getByRole('menu',{name:'Quote currency'})).toBeVisible();
+  await currency.click();
+
+  await page.locator('#time-scale-settings-btn').click();
+  const preference=page.locator('#mobile-chart-legend-setting');
+  await expect(preference).not.toBeChecked();
+  await preference.check();
+  await expect(legend).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#chart-top-legend-header')).toBeVisible();
+  await page.locator('#time-scale-settings-btn').click();
+  await page.locator('#mobile-chart-legend-setting').uncheck();
+  await expect(page.locator('#chart-top-legend-header')).toBeHidden();
+});
