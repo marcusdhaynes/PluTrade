@@ -36,6 +36,7 @@ interface Props{
   onStandardTimeframe:(tf:Timeframe)=>void;
   customInterval:CustomInterval|null;
   onCustomTimeframe:(interval:CustomInterval)=>string|null;
+  calendarControl?:React.ReactNode;
 }
 
 export const TimeframeBar:React.FC<Props>=({
