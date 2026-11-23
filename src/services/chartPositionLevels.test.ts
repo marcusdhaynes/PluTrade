@@ -17,4 +17,10 @@ assert.deepEqual(multi.map(x=>x.price),[97,112,115]);
 assert.equal(multi[1].quantity,1);
 assert.deepEqual(chartPositionExitLevels({...position,trailingPercent:2,trailingAnchor:110}).map(x=>x.price),[107.8]);
 assert.deepEqual(chartPositionExitLevels({...position,sl:NaN,tp:-4}),[]);
+const dynamic=chartPositionExitLevels({...position,sl:96,dynamicTrailing:{
+  mode:'chandelier',period:22,lookback:22,multiplier:3,timeframe:'1h',
+}});
+assert.equal(dynamic.length,1);
+assert.equal(dynamic[0].price,96);
+assert.match(dynamic[0].label,/ATR 22×3/);
 console.log('Chart position exit overlays: pass');
