@@ -8,6 +8,9 @@ on:
       - 'tests/e2e/mobile-smoke.spec.ts'
       - 'package.json'
       - '.github/workflows/mobile-trade-ci.yml'
+concurrency:
+  group: plutrade-mobile-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
