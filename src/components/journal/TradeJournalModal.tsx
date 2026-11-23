@@ -474,7 +474,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
   return (
     <div
       id="trade-journal-root-modal"
-      className={`fixed inset-0 z-50 transition-colors duration-150 ${
+      className={`fixed inset-0 z-[1800] transition-colors duration-150 ${
         isMaximized
           ? 'w-screen h-screen m-0 p-0 overflow-hidden bg-[#0f131c] flex flex-col'
           : 'pointer-events-none bg-black/15'
