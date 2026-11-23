@@ -186,6 +186,34 @@ export function updatePaperStops(input: PaperPortfolio,id:string,tp?:number,sl?:
     return {...x,tp,sl:safeStop};
   })};
 }
+/** Reallocate remaining open quantity across explicit simulated TP targets.
+ * Existing fills are immutable; targets are validated rather than silently
+ * discarded when someone changes a multi-target configuration on mobile. */
+export function updatePaperTargetLevels(
+  input:PaperPortfolio,id:string,targets:Array<{price:number;sharePercent:number}>,at=Date.now()
+):PaperPortfolio{
+  const position=input.positions.find(p=>p.id===id);
+  if(!position)throw new Error('Position unavailable.');
+  if(targets.length<1||targets.length>6)throw new Error('Specify between one and six take-profit levels.');
+  const sum=targets.reduce((total,target)=>total+target.sharePercent,0);
+  if(!Number.isFinite(sum)||Math.abs(sum-100)>0.001)
+    throw new Error('Take-profit levels must allocate exactly 100% of remaining quantity.');
+  for(const target of targets){
+    if(!Number.isFinite(target.price)||target.price<=0||
+      !Number.isFinite(target.sharePercent)||target.sharePercent<=0||
+      (position.side==='Long'?
+        target.price<=Math.max(position.entryPrice,position.currentPrice):
+        target.price>=Math.min(position.entryPrice,position.currentPrice)))
+      throw new Error('Every take-profit target needs positive allocation and a price beyond entry and current observed price.');
+  }
+  return {...input,positions:input.positions.map(p=>p.id!==id?p:{
+    ...p,tp:undefined,tpLevels:targets.map((target,index)=>({
+      id:p.id+'-tp-revision-'+at+'-'+index,
+      price:target.price,quantity:p.qty*target.sharePercent/100,
+    })),
+  })};
+}
+
 export function markPaperPositions(input:PaperPortfolio,asset:Asset,at=Date.now()):PaperPortfolio{
   if(!isFreshPaperQuote(asset,at))return input;
   const venue=asset.source||asset.exchange;
