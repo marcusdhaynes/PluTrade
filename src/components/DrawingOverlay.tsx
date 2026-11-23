@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { Drawing, DrawingPoint, DrawingToolType, OHLCV, DependencyContext } from '../types';
 import { Trash2, Check, Sparkles, Magnet, Zap } from 'lucide-react';
+import {rulerMetrics} from '../services/rulerMetrics';
 
 interface DrawingOverlayProps {
   chart: IChartApi | null;
@@ -16,6 +17,7 @@ interface DrawingOverlayProps {
   areDrawingsHidden: boolean;
   currentColor: string;
   candles?: OHLCV[];
+  priceDigits?:number;
   onOpenConditionalOrder?: (dep: DependencyContext) => void;
 }
 
@@ -38,10 +40,12 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   areDrawingsHidden,
   currentColor,
   candles = [],
+  priceDigits=2,
   onOpenConditionalOrder,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [inProgressPoints, setInProgressPoints] = useState<DrawingPoint[]>([]);
+  const rulerDragRef=useRef<{id:number;x:number;y:number;start:DrawingPoint}|null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [drawingContextMenu, setDrawingContextMenu] = useState<{
@@ -123,8 +127,13 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     };
 
     timeScale.subscribeVisibleLogicalRangeChange(handleRangeChange);
+    const onVerticalZoom=(event:Event)=>{
+      if((event as CustomEvent).detail?.chart===chart)handleRangeChange();
+    };
+    window.addEventListener('plutrade-chart-price-zoom',onVerticalZoom);
     return () => {
       timeScale.unsubscribeVisibleLogicalRangeChange(handleRangeChange);
+      window.removeEventListener('plutrade-chart-price-zoom',onVerticalZoom);
     };
   }, [chart]);
 
@@ -292,7 +301,25 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     }
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e?:React.PointerEvent) => {
+    const ruler=rulerDragRef.current;
+    if(ruler){
+      rulerDragRef.current=null;
+      if(e&&e.pointerId===ruler.id){
+        const end=getPointFromClientXY(e.clientX,e.clientY);
+        const travel=Math.hypot(e.clientX-ruler.x,e.clientY-ruler.y);
+        if(end&&travel>=6){
+          const newDrawing:Drawing={
+            id:'measure-'+Date.now(),type:'measure',points:[ruler.start,end],
+            color:currentColor,lineWidth:1.5,
+          };
+          setDrawings(prev=>[...prev,newDrawing]);
+          setInProgressPoints([]);
+          setSelectedDrawingId(newDrawing.id);
+          if(!stayInDrawingMode)setActiveTool('cursor');
+        }
+      }
+    }
     if (bendDragRef.current) {
       bendDragRef.current = null;
       setIsBending(false);
@@ -321,6 +348,27 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       return;
     }
 
+    if(activeTool==='measure'){
+      // Drag to measure immediately, or tap once then tap again to complete.
+      // Keep both modes functional on touchscreens and with a mouse.
+      e.stopPropagation();
+      const point=getPointFromClientXY(e.clientX,e.clientY);
+      if(!point)return;
+      if(inProgressPoints.length){
+        const drawing:Drawing={id:'measure-'+Date.now(),type:'measure',
+          points:[inProgressPoints[0],point],color:currentColor,lineWidth:1.5};
+        setDrawings(prev=>[...prev,drawing]);
+        setInProgressPoints([]);
+        setSelectedDrawingId(drawing.id);
+        rulerDragRef.current=null;
+        if(!stayInDrawingMode)setActiveTool('cursor');
+      }else{
+        setInProgressPoints([point]);
+        rulerDragRef.current={id:e.pointerId,x:e.clientX,y:e.clientY,start:point};
+        try{e.currentTarget.setPointerCapture(e.pointerId);}catch{}
+      }
+      return;
+    }
     e.stopPropagation();
 
     // Check if user clicked on bendline while bendline tool or drawing tool is active
@@ -557,7 +605,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
+      onPointerLeave={e=>{if(rulerDragRef.current)return;handlePointerUp(e);}}
     >
       <svg className={`w-full h-full pointer-events-none overflow-visible ${areDrawingsLocked?"[&_*]:!pointer-events-none":""}`}>
         {/* SVG Defs for markers & gradients */}
@@ -1265,42 +1313,43 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
 
             const x = Math.min(p1.x, p2.x);
             const y = Math.min(p1.y, p2.y);
-            const w = Math.abs(p2.x - p1.x);
-            const h = Math.abs(p2.y - p1.y);
-            const deltaPrice = drawing.points[1].price - drawing.points[0].price;
-            const pct = ((deltaPrice / drawing.points[0].price) * 100).toFixed(2);
-            const isUp = deltaPrice >= 0;
-
+            const w = Math.abs(p2.x-p1.x);
+            const h = Math.abs(p2.y-p1.y);
+            const data=rulerMetrics(drawing.points[0],drawing.points[1],candles,priceDigits);
+            const isUp=data.priceDelta>=0;
+            const color=isUp?'#21be91':'#e86b7c';
+            // Keep the label within chart bounds, even for narrow vertical
+            // or horizontal measurements and for reversed drag directions.
+            const canvasWidth=containerRef.current?.clientWidth||320;
+            const canvasHeight=containerRef.current?.clientHeight||240;
+            const badgeWidth=170,badgeHeight=50;
+            const labelX=Math.max(2,Math.min(canvasWidth-badgeWidth-2,(p1.x+p2.x)/2-badgeWidth/2));
+            const labelY=Math.max(2,Math.min(canvasHeight-badgeHeight-2,
+              Math.min(p1.y,p2.y)-badgeHeight-5>2?Math.min(p1.y,p2.y)-badgeHeight-5:
+              Math.max(p1.y,p2.y)+5));
             return (
-              <g
-                key={drawing.id}
-                className="pointer-events-auto cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedDrawingId(drawing.id);
-                }}
-              >
-                <rect
-                  x={x}
-                  y={y}
-                  width={w}
-                  height={h}
-                  fill={isUp ? '#089981' : '#f23645'}
-                  fillOpacity={0.16}
-                  stroke={isUp ? '#089981' : '#f23645'}
-                  strokeWidth={1.5}
-                />
-                <text
-                  x={x + w / 2}
-                  y={y + h / 2}
-                  fill="#ffffff"
-                  fontSize="12"
-                  fontWeight="600"
-                  fontFamily="monospace"
-                  textAnchor="middle"
-                >
-                  {isUp ? '+' : ''}
-                  {deltaPrice.toFixed(2)} ({pct}%)
+              <g key={drawing.id} className="pointer-events-auto cursor-pointer"
+                onClick={e=>{e.stopPropagation();handleDrawingClick(e,drawing);}}
+                onDoubleClick={e=>handleDrawingDoubleClick(e,drawing)}
+                onContextMenu={e=>handleDrawingContextMenu(e,drawing)}>
+                <rect x={x} y={y} width={Math.max(1,w)} height={Math.max(1,h)}
+                  fill={color} fillOpacity={0.14} stroke={color}
+                  strokeWidth={1} strokeDasharray="4 3"/>
+                <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
+                  stroke={color} strokeWidth={1.5}/>
+                <circle cx={p1.x} cy={p1.y} r={4} fill={color} stroke="#e4edfc" strokeWidth={1}/>
+                <circle cx={p2.x} cy={p2.y} r={4} fill={color} stroke="#e4edfc" strokeWidth={1}/>
+                <rect x={labelX} y={labelY} width={badgeWidth} height={badgeHeight}
+                  rx={5} fill="#151e2d" fillOpacity={0.97} stroke={color} strokeWidth={1}/>
+                <text x={labelX+7} y={labelY+13} fontSize="11" fontFamily="monospace"
+                  fontWeight="bold" fill={color}>
+                  {data.priceLabel} ({data.percentLabel})
+                </text>
+                <text x={labelX+7} y={labelY+27} fontSize="10" fontFamily="monospace" fill="#c3d2e6">
+                  {data.tickLabel}
+                </text>
+                <text x={labelX+7} y={labelY+41} fontSize="10" fontFamily="monospace" fill="#c3d2e6">
+                  {data.timeLabel}
                 </text>
               </g>
             );
@@ -1431,17 +1480,24 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
                 const w = Math.abs(cursorPos.x - p0.x);
                 const h = Math.abs(cursorPos.y - p0.y);
                 return (
-                  <rect
-                    x={x}
-                    y={y}
-                    width={w}
-                    height={h}
-                    fill={currentColor}
-                    fillOpacity={0.15}
-                    stroke={currentColor}
-                    strokeWidth={1.5}
-                    strokeDasharray="4 2"
-                  />
+                  <g>
+                    <rect x={x} y={y} width={Math.max(1,w)} height={Math.max(1,h)}
+                      fill={currentColor} fillOpacity={0.15} stroke={currentColor}
+                      strokeWidth={1.5} strokeDasharray="4 2"/>
+                    {activeTool==='measure'&&(()=>{
+                      const current=getPointFromCoords(cursorPos.x,cursorPos.y);
+                      if(!current)return null;
+                      const metrics=rulerMetrics(inProgressPoints[0],current,candles,priceDigits);
+                      return <g>
+                        <circle cx={p0.x} cy={p0.y} r={3} fill={currentColor}/>
+                        <circle cx={cursorPos.x} cy={cursorPos.y} r={3} fill={currentColor}/>
+                        <text x={Math.max(4,Math.min((containerRef.current?.clientWidth||320)-168,x))}
+                          y={Math.max(14,y-7)} fontSize="10" fill="#edf3fe" fontFamily="monospace">
+                          {metrics.priceLabel} · {metrics.percentLabel} · {metrics.timeLabel}
+                        </text>
+                      </g>;
+                    })()}
+                  </g>
                 );
               }
 
