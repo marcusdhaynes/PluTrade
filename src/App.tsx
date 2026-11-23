@@ -2058,6 +2058,15 @@ export default function App() {
           <MobileTradingControls
             asset={activeAsset} position={activePosition}
             accountEquity={paperAccount.equity} accountBalance={paperAccount.balance}
+            accountUnrealizedPnl={paperAccount.unrealizedPnL}
+            accountCurrency={paperPortfolio.settings.currency}
+            activeAccountName={activePaperRecord?.portfolio.account.name??null}
+            activeAccountId={paperAccounts.activeId}
+            availableAccounts={paperAccounts.accounts.map(record=>({
+              id:record.id,name:record.portfolio.account.name,currency:record.portfolio.settings.currency
+            }))}
+            onSelectAccount={selectPaperAccount}
+            onManageAccounts={()=>setIsBottomTradingOpen(true)}
             equityPercent={mobileEquityPercent} onEquityPercent={setMobileEquityPercent}
             onEnter={openMobileEntry}
             onOpenOrder={()=>setIsTradeTicketOpen(true)}
