@@ -160,6 +160,9 @@ html,body,#root {
     border-radius:4px;
     white-space:nowrap;
   }
+  #paper-trading-collapsed-strip {
+    display:none !important;
+  }
   /* Opening the optional large paper workspace must not shrink the plotting
      canvas to a sliver or push the five trading buttons out of the viewport. */
   #paper-trading-open-panel {
@@ -176,19 +179,18 @@ html,body,#root {
 }
 @media (max-width:767px) {
   #tradingview-bottom-bar {
-    height:44px;
-    display:grid;
-    grid-template-rows:21px 21px;
+    height:24px;
+    min-height:24px;
+    max-height:24px;
+    display:flex;
+    flex:0 0 24px;
     align-items:center;
   }
   #chart-range-choices {
     display:grid;
     grid-template-columns:repeat(8,minmax(0,1fr)) 20px;
     width:100%;
-  }
-  #tradingview-bottom-bar > div:nth-child(2) {
-    justify-content:flex-end;
-    width:100%;
+    min-width:0;
   }
 }
 @media (min-width:768px) and (hover:none) and (pointer:coarse) {
