@@ -271,3 +271,56 @@ test('attached right rail, trading strip and chart fit 320px portrait and touch 
     expect(layout.chartHeight).toBeGreaterThan(75);
   }
 });
+
+
+test('mobile trade journal content shrinks independently of its untouched left rail',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  await page.locator('#right-tab-trade-journal').click();
+  const journal=page.locator('#trade-journal-window-card');
+  const rail=journal.locator('aside').first();
+  const viewport=page.locator('#journal-main-content-viewport');
+  const scaled=page.locator('#journal-mobile-scaled-content');
+  await expect(journal).toBeVisible();
+  await expect(rail).toBeVisible();
+  await expect(viewport).toBeVisible();
+  await expect(scaled).toBeVisible();
+  const railRect=await rail.boundingBox();
+  const bodyRect=await viewport.boundingBox();
+  const scaledRect=await scaled.boundingBox();
+  expect(railRect).not.toBeNull();
+  expect(bodyRect).not.toBeNull();
+  expect(scaledRect).not.toBeNull();
+  expect(railRect!.width).toBeGreaterThanOrEqual(27);
+  expect(railRect!.width).toBeLessThanOrEqual(29);
+  expect(scaledRect!.width).toBeLessThanOrEqual(bodyRect!.width+2);
+  await expect(scaled).toHaveCSS('transform',/matrix\(0\.68/);
+  // Scaling doesn't disable the journal's own interactive content.
+  await expect(page.locator('#journal-opening-balance')).toBeVisible();
+  await page.locator('#journal-opening-balance').fill('12500');
+  await expect(page.locator('#journal-opening-balance')).toHaveValue('12500');
+});
+
+test('paper account imports starting capital and percent fees without silently creating trades',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  await page.getByRole('button',{name:'More mobile chart actions'}).click();
+  await page.getByRole('menuitem',{name:'Paper Trading workspace'}).click();
+  await page.getByRole('button',{name:'Select Paper Trading account'}).click();
+  await page.getByText('Create account…').click();
+  const dialog=page.getByRole('dialog',{name:'Create Paper Trading account'});
+  await expect(dialog).toBeVisible();
+  const file=dialog.getByLabel('Import paper account settings file');
+  await file.setInputFiles({
+    name:'account.csv',mimeType:'text/csv',
+    buffer:Buffer.from('setting,value\nstartingBalance,35000\ncurrency,USD\nfeePercent,0.125\nspreadBps,2\nslippageBps,1'),
+  });
+  await expect(dialog.getByRole('status')).toContainText('Settings imported for review');
+  await expect(dialog.getByLabel('Starting balance')).toHaveValue('35000');
+  await expect(dialog.getByLabel('Commission percent')).toHaveValue('0.125');
+  await expect(dialog.getByLabel('Commission type')).toHaveValue('percent');
+  await dialog.getByRole('button',{name:'Create',exact:true}).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Select Paper Trading account'})).toContainText('Primary');
+  await expect(page.locator('#paper-trading-open-panel')).toContainText('35,000');
+});
