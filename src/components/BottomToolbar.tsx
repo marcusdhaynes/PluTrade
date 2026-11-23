@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { IChartApi } from 'lightweight-charts';
-import { Calendar, RotateCcw, Settings, Maximize2 } from 'lucide-react';
+import {createPortal} from 'react-dom';
+import type { IChartApi } from 'lightweight-charts';
+import { Calendar, RotateCcw, Settings } from 'lucide-react';
 
 interface BottomToolbarProps {
   chart: IChartApi | null;
@@ -8,10 +9,6 @@ interface BottomToolbarProps {
   onFitContent: () => void;
   onGoToDate:(utcDate:string)=>boolean;
   onApplyTimeScaleSettings:(settings:{barSpacing:number;rightOffset:number})=>boolean;
-  isLogScale: boolean;
-  setIsLogScale: (val: boolean | ((prev: boolean) => boolean)) => void;
-  isPercentScale: boolean;
-  setIsPercentScale: (val: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 export const BottomToolbar: React.FC<BottomToolbarProps> = ({
@@ -20,13 +17,10 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onFitContent,
   onGoToDate,
   onApplyTimeScaleSettings,
-  isLogScale,
-  setIsLogScale,
-  isPercentScale,
-  setIsPercentScale,
 }) => {
   const [currentTimeStr, setCurrentTimeStr] = useState('');
-  const [timeZoneStr,setTimeZoneStr]=useState('UTC');
+  const [chartCornerHost,setChartCornerHost]=useState<HTMLElement|null>(null);
+  useEffect(()=>{setChartCornerHost(document.getElementById('chart-workspace-viewport'));},[]);
   const [datePanelOpen,setDatePanelOpen]=useState(false);
   const [dateValue,setDateValue]=useState('');
   const [dateError,setDateError]=useState('');
@@ -52,7 +46,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
       const offset = -now.getTimezoneOffset();
       const zone = `UTC${offset >= 0 ? '+' : '-'}${String(Math.floor(Math.abs(offset)/60)).padStart(2,'0')}:${String(Math.abs(offset)%60).padStart(2,'0')}`;
       setCurrentTimeStr(`${String(h).padStart(2, '0')}:${m}:${s} ${ampm} ${zone}`);
-      setTimeZoneStr(zone);
+
     };
 
     updateTime();
@@ -72,93 +66,29 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   ];
 
   return (
-    <div
-      id="tradingview-bottom-bar"
+    <div id="tradingview-bottom-bar"
       data-layout="above-chart"
-      aria-label="Chart range and scale controls"
-      className="relative z-30 grid h-[44px] w-full min-w-0 shrink-0 grid-rows-2 border-b border-[#2a2e39] bg-[#131722] px-1 text-[11px] select-none md:h-[22px] md:flex md:items-center md:justify-between md:px-2"
-    >
-      {/* Time Range Quick Selectors */}
-      <div id="chart-range-choices" className="grid w-full min-w-0 grid-cols-[repeat(8,minmax(0,1fr))_20px] items-center gap-0 md:flex md:w-auto md:gap-0.5">
-        {ranges.map((r) => (
-          <button
-            key={r.label}
-            id={`range-btn-${r.label}`}
-            onClick={() => onSelectRange(r.days)}
-            className="min-w-0 px-0 py-0.5 text-center text-[9px] font-semibold whitespace-nowrap text-[#9aa3b6] hover:text-white hover:bg-[#1e222d] rounded transition md:px-1 md:text-[10px]"
-          >
+      aria-label="Chart range controls"
+      className="relative z-30 flex h-[24px] w-full min-w-0 shrink-0 items-center justify-between border-b border-[#2a2e39] bg-[#131722] px-0.5 text-[10px] select-none md:h-[22px] md:px-2">
+      <div id="chart-range-choices"
+        className="grid h-full w-full min-w-0 grid-cols-[repeat(8,minmax(0,1fr))_20px] items-center gap-0 md:flex md:w-auto md:gap-0.5">
+        {ranges.map(r=>(
+          <button key={r.label} type="button" id={`range-btn-${r.label}`}
+            title={r.label+' visible chart range'} onClick={()=>onSelectRange(r.days)}
+            className="min-w-0 truncate rounded px-0 py-0.5 text-center text-[9px] font-medium text-[#9ba9bc] hover:bg-[#1e222d] hover:text-white md:px-1 md:text-[10px]">
             {r.label}
           </button>
         ))}
-
-        <button type="button"
-          id="go-to-chart-date-btn" aria-expanded={datePanelOpen}
+        <button type="button" id="go-to-chart-date-btn" aria-expanded={datePanelOpen}
+          aria-label="Go to chart date"
+          title="Go to date"
           onClick={()=>{setDatePanelOpen(v=>!v);setScalePanelOpen(false);setDateError('');}}
-          className="p-0.5 text-[#787b86] hover:text-[#d1d4dc] rounded hover:bg-[#1e222d] transition ml-0.5"
-          title="Go to date..."
-        >
-          <Calendar className="w-3 h-3" />
+          className="flex h-[20px] items-center justify-center text-[#9ba9bc] hover:text-white">
+          <Calendar size={12}/>
         </button>
       </div>
-
-      {/* Right side: Time & Timezone, Fit, % / log / auto */}
-      <div className="flex w-full min-w-0 items-center justify-end gap-2 border-t border-[#252c3a] text-[#8d9bad] font-mono text-[10px] md:w-auto md:gap-1.5 md:border-t-0">
-        {/* Live Ticking Time (01:08:13 AM UTC-4) */}
-        <span className="hidden text-[#787b86] text-[9.5px] select-all cursor-pointer hover:text-[#d1d4dc] md:inline" title="Local clock and timezone">
-          {currentTimeStr || '—'}
-        </span>
-        <span className="mr-auto shrink-0 text-[9px] text-[#9baac3] md:hidden" title={currentTimeStr || 'Local timezone'}>
-          {timeZoneStr}
-        </span>
-
-        {/* % Percentage scale toggle */}
-        <button
-          id="percent-scale-toggle"
-          onClick={() => setIsPercentScale((prev) => !prev)}
-          className={`px-0.5 py-0.2 rounded text-[9px] font-bold transition ${
-            isPercentScale ? 'bg-[#2962ff] text-white' : 'hover:text-[#d1d4dc] hover:bg-[#1e222d]'
-          }`}
-          title="Percentage Scale"
-        >
-          %
-        </button>
-
-        {/* Log scale toggle */}
-        <button
-          id="log-scale-toggle"
-          onClick={() => setIsLogScale((prev) => !prev)}
-          className={`px-0.5 py-0.2 rounded text-[9px] font-bold transition ${
-            isLogScale ? 'bg-[#2962ff] text-white' : 'hover:text-[#d1d4dc] hover:bg-[#1e222d]'
-          }`}
-          title="Logarithmic Scale"
-        >
-          log
-        </button>
-
-        {/* Auto scale indicator */}
-        <span className="text-[#089981] text-[9px] font-bold px-0.5 rounded bg-[#089981]/10">
-          auto
-        </span>
-
-        {/* Reset / Fit Content */}
-        <button
-          id="fit-chart-content-btn"
-          onClick={onFitContent}
-          className="p-0.5 hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition"
-          title="Auto Fit Chart to Screen"
-        >
-          <RotateCcw className="w-2.5 h-2.5" />
-        </button>
-
-        {/* Bottom scale settings gear */}
-        <button type="button" id="time-scale-settings-btn" aria-expanded={scalePanelOpen}
-          onClick={()=>{setScalePanelOpen(v=>!v);setDatePanelOpen(false);setScaleError('');}}
-          className="p-0.5 hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition"
-          title="Time Scale Settings"
-        >
-          <Settings className="w-2.5 h-2.5" />
-        </button>
-      </div>
+      <span className="hidden shrink-0 text-[9px] font-mono text-[#8e9db5] lg:inline"
+        title="Current local clock and timezone">{currentTimeStr||'—'}</span>
       {datePanelOpen&&<form role="dialog" aria-label="Go to chart date"
         className="absolute left-1 top-full mt-1 z-50 min-w-[min(240px,calc(100vw-42px))] rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl flex flex-col gap-2 text-[#dce4f0]"
         onSubmit={event=>{
@@ -176,8 +106,23 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           <button type="button" onClick={()=>setDatePanelOpen(false)} className="rounded border border-[#46536c] px-3 py-1">Cancel</button>
         </div>
       </form>}
+      {chartCornerHost&&createPortal(
+        <div id="chart-corner-controls"
+          className="absolute bottom-0 right-0 z-[48] flex items-center gap-0.5 rounded-tl border border-r-0 border-b-0 border-[#384559] bg-[#151d2b]/95 p-0.5 text-[#9eaec4] shadow-lg">
+          <button type="button" id="fit-chart-content-btn" onClick={onFitContent}
+            title="Fit candles and restore automatic price scale"
+            aria-label="Fit chart" className="flex h-[19px] w-[19px] items-center justify-center rounded hover:bg-[#30405c] hover:text-white">
+            <RotateCcw size={13}/>
+          </button>
+          <button type="button" id="time-scale-settings-btn" aria-expanded={scalePanelOpen}
+            aria-label="Chart time scale settings"
+            title="Chart time scale settings"
+            onClick={()=>{setScalePanelOpen(v=>!v);setDatePanelOpen(false);setScaleError('');}}
+            className="flex h-[19px] w-[19px] items-center justify-center rounded hover:bg-[#30405c] hover:text-white">
+            <Settings size={13}/>
+          </button>
       {scalePanelOpen&&<section role="dialog" aria-label="Time scale settings"
-        className="absolute right-1 top-full mt-1 z-50 w-[min(240px,calc(100vw-42px))] rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl text-[#dce4f0] space-y-2">
+        className="absolute bottom-full right-0 mb-1 z-[70] w-[min(240px,calc(100vw-58px))] max-h-[min(66dvh,310px)] overflow-y-auto rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl text-[#dce4f0] space-y-2">
         <strong>Chart time scale</strong>
         <label className="block">Bar spacing
           <input type="number" aria-label="Bar spacing" min={2} max={30} step={1} value={barSpacing}
@@ -198,7 +143,9 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         {scaleError&&<p role="alert" className="text-[#ffacb3]">{scaleError}</p>}
         <button type="button" onClick={()=>setScalePanelOpen(false)}
           className="rounded border border-[#46536c] px-3 py-1">Close</button>
-      </section>}
+      </section>}        </div>,
+        chartCornerHost
+      )}
     </div>
   );
 };
