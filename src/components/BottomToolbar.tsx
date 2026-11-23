@@ -35,12 +35,15 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const [rightOffset,setRightOffset]=useState(4);
   const [scaleError,setScaleError]=useState('');
   const datePopoverRef=useRef<HTMLDivElement>(null);
+  const dateFormRef=useRef<HTMLFormElement>(null);
+  const calendarButtonRef=useRef<HTMLButtonElement>(null);
   const chartCornerRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!datePanelOpen&&!scalePanelOpen)return;
     const dismiss=(event:PointerEvent)=>{
       const target=event.target as Node;
-      if(datePanelOpen&&!datePopoverRef.current?.contains(target))setDatePanelOpen(false);
+      if(datePanelOpen&&!dateFormRef.current?.contains(target)&&
+         !calendarButtonRef.current?.contains(target))setDatePanelOpen(false);
       if(scalePanelOpen&&!chartCornerRef.current?.contains(target))setScalePanelOpen(false);
     };
     const escape=(event:KeyboardEvent)=>{
@@ -64,21 +67,21 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
     <div id="tradingview-bottom-bar" ref={datePopoverRef}
       data-layout="above-chart"
       aria-label="Chart timeframe and calendar controls"
-      className="relative z-30 flex h-[24px] w-full min-w-0 shrink-0 items-center justify-between border-b border-[#2a2e39] bg-[#131722] px-0.5 text-[10px] select-none md:h-[22px] md:px-2">
+      className="relative z-[65] flex h-[24px] w-full min-w-0 shrink-0 items-center justify-between border-b border-[#2a2e39] bg-[#131722] px-0.5 text-[10px] select-none md:h-[22px] md:px-2">
       <TimeframeBar
         activeAsset={activeAsset}
         activeTimeframe={activeTimeframe}
         onStandardTimeframe={onStandardTimeframe}
         customInterval={customInterval}
         onCustomTimeframe={onCustomTimeframe}
-        calendarControl={<button type="button" id="go-to-chart-date-btn"
+        calendarControl={<button ref={calendarButtonRef} type="button" id="go-to-chart-date-btn"
           aria-expanded={datePanelOpen} aria-label="Go to chart date"
           title="Go to date" onClick={()=>{setDatePanelOpen(v=>!v);setScalePanelOpen(false);setDateError('');}}
           className="flex h-[21px] w-6 shrink-0 items-center justify-center text-[#9baac0] hover:text-white">
           <Calendar size={14}/>
         </button>}
       />
-      {datePanelOpen&&<form role="dialog" aria-label="Go to chart date"
+      {datePanelOpen&&<form ref={dateFormRef} role="dialog" aria-label="Go to chart date"
         className="absolute left-1 top-full mt-1 z-50 min-w-[min(240px,calc(100vw-42px))] rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl flex flex-col gap-2 text-[#dce4f0]"
         onSubmit={event=>{
           event.preventDefault();
