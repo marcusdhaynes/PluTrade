@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Asset, ChartType, Timeframe, IndicatorSettings, DrawingToolType } from '../types';
 import {
   Search,
@@ -27,86 +27,13 @@ import {
   Type,
   Maximize,
   Star,
-  Menu,
 } from 'lucide-react';
 import { LAYOUT_TEMPLATES } from '../data/layoutTemplates';
+import {CHART_INTERVALS,marketTimeframeKey,sanitizeTimeframeFavorites,updateMarketTimeframes,
+  visibleTimeframeIntervals,TIMEFRAME_FAVORITES_KEY,type IntervalFavorites} from '../services/timeframeFavorites';
 import { LayoutTemplate, LayoutSyncSettings, SavedChartLayout } from '../types/layout';
 import { LayoutDropdown } from './layout/LayoutDropdown';
 import { LayoutManagerDropdown } from './layout/LayoutManagerDropdown';
-
-interface TimeframeCategory {
-  id: string;
-  title: string;
-  items: { tf: Timeframe; label: string }[];
-}
-
-const CHRONOLOGICAL_CATEGORIES: TimeframeCategory[] = [
-  {
-    id: 'seconds',
-    title: 'Seconds',
-    items: [
-      { tf: '1s', label: '1 second' },
-      { tf: '5s', label: '5 seconds' },
-      { tf: '15s', label: '15 seconds' },
-      { tf: '30s', label: '30 seconds' },
-    ],
-  },
-  {
-    id: 'minutes',
-    title: 'Minutes',
-    items: [
-      { tf: '1m', label: '1 minute' },
-      { tf: '3m', label: '3 minutes' },
-      { tf: '5m', label: '5 minutes' },
-      { tf: '15m', label: '15 minutes' },
-      { tf: '30m', label: '30 minutes' },
-      { tf: '45m', label: '45 minutes' },
-    ],
-  },
-  {
-    id: 'hours',
-    title: 'Hours',
-    items: [
-      { tf: '1h', label: '1 hour' },
-      { tf: '2h', label: '2 hours' },
-      { tf: '3h', label: '3 hours' },
-      { tf: '4h', label: '4 hours' },
-    ],
-  },
-  {
-    id: 'days',
-    title: 'Days & Weeks',
-    items: [
-      { tf: '1D', label: '1 day' },
-      { tf: '1W', label: '1 week' },
-      { tf: '1M', label: '1 month' },
-      { tf: '3M', label: '3 months' },
-      { tf: '12M', label: '12 months' },
-    ],
-  },
-];
-
-const ALL_TIMEFRAMES_CHRONOLOGICAL: Timeframe[] = [
-  '1s',
-  '5s',
-  '15s',
-  '30s',
-  '1m',
-  '3m',
-  '5m',
-  '15m',
-  '30m',
-  '45m',
-  '1h',
-  '2h',
-  '3h',
-  '4h',
-  '1D',
-  '1W',
-  '1M',
-  '3M',
-  '12M',
-];
 
 interface TopNavbarProps {
   activeAsset: Asset;
@@ -209,71 +136,64 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   setIsLayoutManagerOpen,
 }) => {
   const [isChartTypeOpen, setIsChartTypeOpen] = useState(false);
-  const [mobileMoreOpen,setMobileMoreOpen]=useState(false);
+  const [isMobileChartStyleOpen,setIsMobileChartStyleOpen]=useState(false);
+  const [isTimeframeFavoritesOpen,setIsTimeframeFavoritesOpen]=useState(false);
+  const mobileChartStyleRef=useRef<HTMLDivElement>(null);
+  const timeframeFavoritesRef=useRef<HTMLDivElement>(null);
+  const desktopChartStyleRef=useRef<HTMLDivElement>(null);
   const [showQuickDrawingTools,setShowQuickDrawingTools]=useState<boolean>(()=>{
     try{return localStorage.getItem('plutrade_quick_drawing_tools_v1')!=='false';}
     catch{return true;}
   });
   useEffect(()=>{try{localStorage.setItem('plutrade_quick_drawing_tools_v1',String(showQuickDrawingTools));}catch{}},[showQuickDrawingTools]);
-  const [isTimeframeDropdownOpen, setIsTimeframeDropdownOpen] = useState(false);
-
-  const [favoriteTimeframes, setFavoriteTimeframes] = useState<Timeframe[]>(() => {
-    const saved = localStorage.getItem('tv_favorite_timeframes');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return ['1m', '5m', '15m', '30m', '1h', '4h'];
+  const [timeframeFavoritesByTicker,setTimeframeFavoritesByTicker]=useState<IntervalFavorites>(()=>{
+    try{return sanitizeTimeframeFavorites(JSON.parse(localStorage.getItem(TIMEFRAME_FAVORITES_KEY)||'{}'));}
+    catch{return {};}
   });
-
-  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>(() => {
-    const saved = localStorage.getItem('tv_tf_collapsed_categories');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
+  const tickerKey=marketTimeframeKey(activeAsset);
+  const favoriteTimeframes=timeframeFavoritesByTicker[tickerKey]||[];
+  const visibleTimeframes=visibleTimeframeIntervals(timeframeFavoritesByTicker,tickerKey);
+  const [draftTimeframes,setDraftTimeframes]=useState<Timeframe[]>([]);
+  useEffect(()=>{
+    try{localStorage.setItem(TIMEFRAME_FAVORITES_KEY,JSON.stringify(timeframeFavoritesByTicker));}
+    catch(error){console.warn('Could not save ticker interval favorites',error);}
+  },[timeframeFavoritesByTicker]);
+  useEffect(()=>{
+    setIsTimeframeFavoritesOpen(false);
+    setDraftTimeframes([]);
+  },[tickerKey]);
+  const toggleTimeframeFavoriteMenu=()=>{
+    if(!isTimeframeFavoritesOpen)setDraftTimeframes([...favoriteTimeframes]);
+    setIsTimeframeFavoritesOpen(open=>!open);
+  };
+  const saveTickerTimeframeFavorites=()=>{
+    setTimeframeFavoritesByTicker(prev=>updateMarketTimeframes(prev,tickerKey,draftTimeframes));
+    setIsTimeframeFavoritesOpen(false);
+  };
+  useEffect(()=>{
+    const dismiss=(event:PointerEvent)=>{
+      const node=event.target as Node;
+      if(isTimeframeFavoritesOpen&&!timeframeFavoritesRef.current?.contains(node))
+        setIsTimeframeFavoritesOpen(false);
+      if(isMobileChartStyleOpen&&!mobileChartStyleRef.current?.contains(node))
+        setIsMobileChartStyleOpen(false);
+      if(isChartTypeOpen&&!desktopChartStyleRef.current?.contains(node))
+        setIsChartTypeOpen(false);
+    };
+    const escape=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){
+        setIsTimeframeFavoritesOpen(false);
+        setIsMobileChartStyleOpen(false);
+        setIsChartTypeOpen(false);
       }
-    }
-    return {};
-  });
-
-  useEffect(() => {
-    localStorage.setItem('tv_favorite_timeframes', JSON.stringify(favoriteTimeframes));
-  }, [favoriteTimeframes]);
-
-  useEffect(() => {
-    localStorage.setItem('tv_tf_collapsed_categories', JSON.stringify(collapsedCategories));
-  }, [collapsedCategories]);
-
-  const toggleFavoriteTimeframe = (tf: Timeframe, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setFavoriteTimeframes((prev) =>
-      prev.includes(tf) ? prev.filter((item) => item !== tf) : [...prev, tf]
-    );
-  };
-
-  const toggleCategoryCollapse = (catId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCollapsedCategories((prev) => ({
-      ...prev,
-      [catId]: !prev[catId],
-    }));
-  };
-
-  // Favorited intervals displayed as buttons on the left, ordered chronologically
-  const favoritedButtons = ALL_TIMEFRAMES_CHRONOLOGICAL.filter((tf) =>
-    favoriteTimeframes.includes(tf)
-  );
-
-  // If the active timeframe is not among the starred favorites, show it as an additional button so the user knows what's selected
-  const visibleButtons = [...favoritedButtons];
-  if (!favoriteTimeframes.includes(activeTimeframe)) {
-    visibleButtons.push(activeTimeframe);
-  }
+    };
+    window.addEventListener('pointerdown',dismiss,true);
+    window.addEventListener('keydown',escape);
+    return ()=>{
+      window.removeEventListener('pointerdown',dismiss,true);
+      window.removeEventListener('keydown',escape);
+    };
+  },[isTimeframeFavoritesOpen,isMobileChartStyleOpen,isChartTypeOpen]);
 
   const chartTypes: { id: ChartType; label: string; group: string; icon: React.ReactNode }[] = [
     {
@@ -614,132 +534,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
 
         <div className="h-3 w-px bg-[#2a2e39] mx-0.5" />
 
-        {/* Timeframe Selectors: buttons to the left are favorited/starred intervals */}
-        <div className="flex items-center gap-0.5">
-          {visibleButtons.map((tf) => (
-            <button
-              key={tf}
-              id={`tf-btn-${tf}`}
-              onClick={() => setActiveTimeframe(tf)}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition ${
-                activeTimeframe === tf
-                  ? 'bg-[#2962ff] text-white font-semibold shadow-xs'
-                  : 'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'
-              }`}
-              title={`Timeframe ${tf}`}
-            >
-              {tf}
-            </button>
-          ))}
-
-          {/* Timeframe Dropdown with Collapsible Chronological Categories */}
-          <div className="relative z-50">
-            <button
-              id="timeframe-dropdown-trigger"
-              onClick={() => setIsTimeframeDropdownOpen(!isTimeframeDropdownOpen)}
-              className={`p-0.5 rounded text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition ${
-                isTimeframeDropdownOpen ? 'bg-[#1e222d] text-[#2962ff]' : ''
-              }`}
-              title="More intervals"
-            >
-              <ChevronDown className="w-3 h-3" />
-            </button>
-
-            {isTimeframeDropdownOpen && (
-              <>
-                {/* Backdrop to close dropdown on click outside */}
-                <div
-                  className="fixed inset-0 z-[95] cursor-default"
-                  onClick={() => setIsTimeframeDropdownOpen(false)}
-                />
-
-                <div
-                  id="timeframe-collapsible-dropdown"
-                  className="absolute top-full left-0 mt-1 w-56 bg-[#1e222d] border border-[#2a2e39] rounded-lg shadow-2xl py-1 z-[100] max-h-96 overflow-y-auto scrollbar-thin select-none"
-                >
-                  <div className="px-3 py-1 text-[11px] font-semibold text-[#d1d4dc] border-b border-[#2a2e39]/60 mb-0.5 flex items-center justify-between">
-                    <span>Intervals</span>
-                    <span className="text-[10px] text-[#787b86] font-normal">Click ★ to pin</span>
-                  </div>
-
-                  {CHRONOLOGICAL_CATEGORIES.map((category) => {
-                    const isCollapsed = Boolean(collapsedCategories[category.id]);
-                    return (
-                      <div key={category.id} className="border-b border-[#2a2e39]/30 last:border-b-0 py-0.5">
-                        {/* Collapsible Category Header */}
-                        <div
-                          onClick={(e) => toggleCategoryCollapse(category.id, e)}
-                          className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-[#787b86] uppercase tracking-wider cursor-pointer hover:text-[#d1d4dc] hover:bg-[#2a2e39]/40 transition rounded mx-1"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            {isCollapsed ? (
-                              <ChevronRight className="w-3 h-3 text-[#787b86]" />
-                            ) : (
-                              <ChevronDown className="w-3 h-3 text-[#787b86]" />
-                            )}
-                            <span>{category.title}</span>
-                          </div>
-                          <span className="text-[9px] text-[#787b86]/70 font-mono">
-                            {category.items.length}
-                          </span>
-                        </div>
-
-                        {/* Category Items */}
-                        {!isCollapsed && (
-                          <div className="flex flex-col mt-0.5">
-                            {category.items.map((item) => {
-                              const isFav = favoriteTimeframes.includes(item.tf);
-                              const isActive = activeTimeframe === item.tf;
-                              return (
-                                <div
-                                  key={item.tf}
-                                  id={`timeframe-option-${item.tf}`}
-                                  onClick={() => {
-                                    setActiveTimeframe(item.tf);
-                                    setIsTimeframeDropdownOpen(false);
-                                  }}
-                                  className={`flex items-center justify-between px-2.5 py-1 text-xs cursor-pointer group transition mx-1 rounded ${
-                                    isActive
-                                      ? 'bg-[#2962ff]/20 text-[#2962ff] font-semibold'
-                                      : 'text-[#d1d4dc] hover:bg-[#2a2e39] hover:text-white'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="w-7 font-mono text-left font-semibold">{item.tf}</span>
-                                    <span className="text-[11px] text-[#787b86] group-hover:text-[#d1d4dc]">
-                                      {item.label}
-                                    </span>
-                                  </div>
-                                  <button
-                                    id={`star-tf-${item.tf}`}
-                                    onClick={(e) => toggleFavoriteTimeframe(item.tf, e)}
-                                    className={`p-1 rounded transition hover:scale-110 ${
-                                      isFav
-                                        ? 'text-[#ffb74d]'
-                                        : 'text-transparent group-hover:text-[#787b86] hover:!text-[#ffb74d]'
-                                    }`}
-                                    title={isFav ? 'Remove from favorite buttons' : 'Add to favorite buttons'}
-                                  >
-                                    <Star
-                                      className={`w-3.5 h-3.5 ${isFav ? 'fill-[#ffb74d]' : ''}`}
-                                    />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="h-3 w-px bg-[#2a2e39] mx-0.5" />
-
         {/* The blue price line is an optional display mode; keep Candles easy
             to restore without silently overriding the user's saved preference. */}
         {chartType !== 'candlestick' && <button type="button" onClick={()=>setChartType('candlestick')}
@@ -748,7 +542,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           Candles
         </button>}
         {/* Chart Style Section: favorited chart type buttons + dropdown menu */}
-        <div className="relative z-50 flex items-center gap-0.5">
+        <div ref={desktopChartStyleRef} className="relative z-50 flex items-center gap-0.5">
           {visibleChartTypeButtons.map((tId) => {
             const item = chartTypes.find((c) => c.id === tId);
             if (!item) return null;
@@ -784,7 +578,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
             <>
               <div
                 className="fixed inset-0 z-[95] cursor-default"
-                onClick={() => setIsChartTypeOpen(false)}
+                onPointerDown={() => setIsChartTypeOpen(false)}
               />
               <div
                 id="chart-type-dropdown-menu"
