@@ -17,7 +17,8 @@ import { TechnicalSummaryGauge } from './TechnicalSummaryGauge';
 import { AlertsPanel } from './AlertsPanel';
 import {
   List,
-  Clock,
+  BellRing,
+  SlidersHorizontal,
   Newspaper,
   Layers,
   Gauge,
@@ -30,7 +31,6 @@ import {
   ChevronLeft,
   HelpCircle,
   BookOpen,
-  Camera,
 } from 'lucide-react';
 
 export type RightSidebarTab =
@@ -72,7 +72,7 @@ interface RightSidebarProps {
   setActiveTab: (tab: RightSidebarTab) => void;
   onOpenTradeJournal?: () => void;
   onOpenHelp?:()=>void;
-  onTakeSnapshot?: () => void;
+  onOpenIndicators:()=>void;
   onOpenConditionalOrder?: (dep: DependencyContext) => void;
 }
 
@@ -106,7 +106,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
   setActiveTab,
   onOpenTradeJournal,
   onOpenHelp,
-  onTakeSnapshot,
+  onOpenIndicators,
   onOpenConditionalOrder,
 }) => {
   const dockRef=useRef<HTMLDivElement>(null);
@@ -277,7 +277,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
             }`}
             title="Alerts"
           >
-            <Clock className="w-3.5 h-3.5" />
+            <BellRing className="w-3.5 h-3.5" />
+          </button>
+
+          {/* The only Indicators entry is on this permanently attached rail. */}
+          <button type="button" id="right-tab-indicators" aria-label="Indicators"
+            title="Indicators and studies" onClick={onOpenIndicators}
+            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#93abd0] hover:text-white hover:bg-[#2d4264] transition">
+            <SlidersHorizontal className="w-3.5 h-3.5"/>
           </button>
 
           {/* News */}
@@ -395,16 +402,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
           >
             <BookOpen className="w-3.5 h-3.5" />
             <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-[#00ffa3] rounded-full ring-1 ring-[#131722]" />
-          </button>
-
-          {/* Camera / Snapshot button (Moved below Trade Journal) */}
-          <button
-            id="take-chart-snapshot-btn"
-            onClick={onTakeSnapshot}
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition"
-            title="Take a Snapshot"
-          >
-            <Camera className="w-3.5 h-3.5" />
           </button>
 
           <button type="button" onClick={onOpenHelp} disabled={!onOpenHelp}
