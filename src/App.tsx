@@ -168,7 +168,13 @@ export default function App() {
   useEffect(()=>{
     if(!customChartInterval)return;
     const availability=customIntervalBase(customChartInterval,activeAsset);
-    if(!availability.base){setCustomChartInterval(null);return;}
+    if(!availability.base){
+      // Moving from a supported 1-second market to a venue without that feed
+      // should restore a usable default, not strand the chart on empty 1s data.
+      setCustomChartInterval(null);
+      setActiveTimeframe('1m');
+      return;
+    }
     if(activeTimeframe!==availability.base)setActiveTimeframe(availability.base);
   },[activeAsset.symbol,activeAsset.source,activeAsset.exchange,customChartInterval,activeTimeframe]);
   const [chartType, setChartType] = useState<ChartType>(() => {
