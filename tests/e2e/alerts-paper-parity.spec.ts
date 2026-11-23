@@ -100,6 +100,9 @@ test('paper order amendment validates marketability, maintains reserved margin a
   await page.goto('./');
   await page.getByRole('button',{name:/Paper Trading/}).first().click();
   await expect(page.getByText(/Live reference 105/)).toBeVisible();
+  // Writer ownership uses an asynchronous Web Locks lease. Without this
+  // readiness gate, an early click can race read-only startup and flake.
+  await expect(page.getByRole('button',{name:'Create order'})).toBeEnabled();
   const tabs=page.getByRole('navigation',{name:'Paper trading workspace tabs'});
   await tabs.getByRole('button',{name:/Orders/}).first().click();
   await expect(page.getByText('qa-pending-edit')).toHaveCount(0); // IDs must not leak into the UI.
