@@ -35,12 +35,14 @@ function rowsFromCsv(text:string):Record<string,unknown>{
       return [row[0],row[1]];
     }));
   }
+  // A headerless two-column list must be checked BEFORE a two-row
+  // header/value record; otherwise a two-setting preset is misread.
+  if(cells.every(row=>row.length===2&&!!row[0]&&
+    !!aliases[row[0].replace(/[^a-z0-9]/gi,'').toLowerCase()])){
+    return Object.fromEntries(cells.map(row=>[row[0],row[1]]));
+  }
   if(cells.length===2&&cells[0].length===cells[1].length&&cells[0].length>1){
     return Object.fromEntries(cells[0].map((key,i)=>[key,cells[1][i]]));
-  }
-  // Also permit a headerless list of setting,value lines.
-  if(cells.every(row=>row.length===2&&!!row[0])){
-    return Object.fromEntries(cells.map(row=>[row[0],row[1]]));
   }
   throw new Error('Use setting,value rows or one header row followed by one values row.');
 }
