@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect,useRef} from 'react';
 import {
   Asset,
   Watchlist,
@@ -109,8 +109,22 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
   onTakeSnapshot,
   onOpenConditionalOrder,
 }) => {
+  const dockRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!isOpen)return;
+    const dismiss=(event:PointerEvent)=>{
+      if(!dockRef.current?.contains(event.target as Node))setIsOpen(false);
+    };
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setIsOpen(false);};
+    window.addEventListener('pointerdown',dismiss,true);
+    window.addEventListener('keydown',escape);
+    return ()=>{
+      window.removeEventListener('pointerdown',dismiss,true);
+      window.removeEventListener('keydown',escape);
+    };
+  },[isOpen,setIsOpen]);
   return (
-    <div id="tradingview-right-dock" className="flex h-full shrink-0 select-none z-20">
+    <div ref={dockRef} id="tradingview-right-dock" className="flex h-full shrink-0 select-none z-20">
       {/* Expandable Panel Content */}
       {isOpen && (
         <div
