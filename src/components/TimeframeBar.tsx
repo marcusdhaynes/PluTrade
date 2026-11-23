@@ -202,6 +202,7 @@ export const TimeframeBar:React.FC<Props>=({
         className={'h-[21px] shrink-0 rounded px-2 text-[10px] font-semibold '+(currentlyCustom===customIntervalLabel(spec)?
           'bg-[#2962ff] text-white':'text-[#d6b070] hover:bg-[#433b31]')}>{customIntervalLabel(spec)}</button>)}
     </div>
+    {calendarControl}
     <div ref={favoritesRef} className="relative z-[110] shrink-0 border-l border-[#364358] pl-0.5">
       <button type="button" id="timeframe-favorites-button"
         aria-label={'Favorite timeframes for '+activeAsset.symbol}
