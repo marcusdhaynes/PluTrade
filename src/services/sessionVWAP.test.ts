@@ -17,7 +17,7 @@ const anchor=calculateAnchoredVwap(b,day+60);
 assert.equal(anchor.length,3);
 assert.equal(anchor[0].value,14);
 assert.equal(anchor[1].value,(14*2+20*3)/5);
-assert.equal(calculateAnchoredVwap(b,day+86401).length,1);
+assert.equal(calculateAnchoredVwap(b,day+86401).length,0); // Zero volume after the anchor cannot create a VWAP.
 assert.equal(calculateAnchoredVwap(b,Infinity).length,0);
 assert.deepEqual(calculateUtcSessionVwap([b[0],b[0],b[1]]).map(x=>x.time),[day,day+60]);
 console.log('Session/anchored VWAP respects daily resets, strict chronology and no invented volume.');
