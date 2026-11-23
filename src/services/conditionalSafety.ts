@@ -13,8 +13,7 @@ export function conditionSupported(c:SingleCondition):boolean {
   if(c.dependencyType==='account')return [
     'equity_greater_than','equity_less_than','available_greater_than','available_less_than'
   ].includes(c.operator)&&Number.isFinite(c.thresholdValue)&&c.thresholdValue!>=0;
-  if(c.dependencyType==='utc_session')return
-    ['in_utc_hours','outside_utc_hours'].includes(c.operator)&&
+  if(c.dependencyType==='utc_session')return ['in_utc_hours','outside_utc_hours'].includes(c.operator)&&
     Number.isFinite(c.thresholdValue)&&Number.isFinite(c.secondaryValue)&&
     c.thresholdValue!>=0&&c.thresholdValue!<24&&c.secondaryValue!>=0&&c.secondaryValue!<24&&
     c.thresholdValue!==c.secondaryValue;
