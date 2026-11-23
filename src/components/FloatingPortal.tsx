@@ -17,7 +17,7 @@ interface FloatingPortalProps {
  * chart canvases, sidebars, clipped scroll containers and sticky headers
  * cannot cover them. Positioning follows the anchor on scroll and resize. */
 export function FloatingPortal({
-  anchor,children,id,role='dialog',ariaLabel,className='',width=290,placement='bottom-end'
+  anchor,children,id,role='dialog',ariaLabel,className='',width=290,zIndex=1400,placement='bottom-end'
 }:FloatingPortalProps){
   const popup=useRef<HTMLDivElement>(null);
   const [position,setPosition]=useState<{top:number;left:number;maxHeight:number;ready:boolean}>({
