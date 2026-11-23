@@ -730,3 +730,40 @@ test('mobile chart chrome remains compact and legend preference persists',async 
   await page.locator('#mobile-chart-legend-setting').uncheck();
   await expect(page.locator('#chart-top-legend-header')).toBeHidden();
 });
+
+
+test('mobile top header, native time scale, custom price rail and order bar are equally sized',async ({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(size);
+    await page.goto('./');
+    await expect(page.locator('#plutrade-mobile-price-axis')).toBeVisible();
+    const sizes=await page.evaluate(()=>{
+      const box=(id:string)=>document.getElementById(id)!.getBoundingClientRect();
+      const canvas=document.getElementById('plutrade-native-chart-canvas')!;
+      const rows=canvas.querySelectorAll('table tr');
+      const nativeTimeAxis=rows.length?rows[rows.length-1].getBoundingClientRect():null;
+      const {height:order}=box('plutrade-mobile-trade-controls');
+      const {height:header}=box('tradingview-top-navbar');
+      const {height:ticker}=box('plutrade-mobile-navbar');
+      const {height:interval}=box('tradingview-bottom-bar');
+      const rail=box('plutrade-mobile-price-axis');
+      const corner=box('plutrade-mobile-price-axis-corner');
+      return {
+        order,header,ticker,interval,priceWidth:rail.width,
+        timeHeight:nativeTimeAxis?.height??-1,
+        chartToRailGap:rail.left-canvas.getBoundingClientRect().right,
+        cornerWidth:corner.width,cornerHeight:corner.height,
+        nativeCanvasRight:canvas.getBoundingClientRect().right,
+        rightDockLeft:box('tradingview-right-dock').left,
+      };
+    });
+    const target=sizes.order;
+    expect(target).toBeGreaterThanOrEqual(23);
+    expect(target).toBeLessThanOrEqual(25);
+    for(const key of ['header','ticker','interval','priceWidth','timeHeight','cornerWidth','cornerHeight'] as const){
+      expect(Math.abs(sizes[key]-target),`${key} mismatch at ${size.width}x${size.height}`).toBeLessThanOrEqual(1);
+    }
+    expect(Math.abs(sizes.chartToRailGap)).toBeLessThanOrEqual(1);
+    expect(sizes.nativeCanvasRight).toBeLessThanOrEqual(sizes.rightDockLeft+1);
+  }
+});
