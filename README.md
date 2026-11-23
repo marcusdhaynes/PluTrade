@@ -32,3 +32,7 @@ Public market feeds require no API key. Never put broker or AI credentials in th
 See [the architecture assessment](docs/architecture.md). Recommended direction: TypeScript/Vite web client with Canvas charts; Rust/Tokio streaming, execution and risk services; Postgres ledger; broker capability adapters; sandboxed automation; PWA followed by benchmarked native packaging. These are design recommendations, not implemented features or measured performance guarantees.
 
 Charts use [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts). Preserve its license, NOTICE, and creator attribution.
+
+## Round 12 — Strategy Lab (research only)
+
+The Strategy Lab dock tab offers a safe, declarative visual rule builder (SMA/EMA/RSI/close comparisons and AND/OR), long/short historical simulation, modeled fees/spreads/slippage, protective stops and targets, editable validated rule JSON, local browser-only strategy saves, comparisons, trade CSV export, in-sample SMA parameter ranking, and a 70/30 train/holdout walk-forward SMA evaluation. The top-bar Replay button opens the existing independent replay workspace. Tests enforce valid history and next-open fills. These are not Pine Script compatibility, automatic broker execution, verified live fills, multi-market testing, or AI-powered optimization. Statistics are based on close-marked equity; bar Sharpe/Sortino are not annualized and do not establish forward profitability. Holdout outcomes need enough history and trades before interpretation.

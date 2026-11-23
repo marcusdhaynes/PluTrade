@@ -20,6 +20,8 @@ const CloudSyncPanel=React.lazy(()=>import('./CloudSyncPanel')
   .then(m=>({default:m.CloudSyncPanel})));
 const ReplayBacktestPanel=React.lazy(()=>import('./ReplayBacktestPanel')
   .then(m=>({default:m.ReplayBacktestPanel})));
+const StrategyLabPanel=React.lazy(()=>import('./StrategyLabPanel')
+  .then(m=>({default:m.StrategyLabPanel})));
 import type {Timeframe} from '../types';
 import type {FeedHealth} from '../services/marketEvents';
 import type {RiskPolicy} from '../services/riskCenter';
@@ -53,11 +55,11 @@ export interface BottomTradingPanelProps {
   isOpen:boolean;setIsOpen:(open:boolean|((prev:boolean)=>boolean))=>void;
   isExpanded:boolean;setIsExpanded:(open:boolean|((prev:boolean)=>boolean))=>void;
 }
-type Tab='positions'|'orders'|'orderHistory'|'balanceHistory'|'activityLog'|'tradeHistory'|'analytics'|'risk'|'screener'|'dataHealth'|'replay'|'cloud';
+type Tab='positions'|'orders'|'orderHistory'|'balanceHistory'|'activityLog'|'tradeHistory'|'analytics'|'risk'|'screener'|'dataHealth'|'replay'|'strategyLab'|'cloud';
 const tabs:[Tab,string][]=[
   ['positions','Positions'],['orders','Orders'],['orderHistory','Order history'],
   ['balanceHistory','Balance history'],['activityLog','Activity log'],
-  ['tradeHistory','Trade history'],['analytics','Analytics'],['risk','Risk Center'],['screener','Screener'],['dataHealth','Data Health'],['replay','Replay & Backtest'],['cloud','Cloud Sync'],
+  ['tradeHistory','Trade history'],['analytics','Analytics'],['risk','Risk Center'],['screener','Screener'],['dataHealth','Data Health'],['replay','Replay & Backtest'],['strategyLab','Strategy Lab'],['cloud','Cloud Sync'],
 ];
 const cash=(n:number)=>Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
 const amount=(n:number)=>Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:9}):'—';
@@ -302,6 +304,7 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
       </div>}>
         {tab==='cloud'&&<CloudSyncPanel/>}
         {tab==='replay'&&<ReplayBacktestPanel asset={activeAsset} timeframe={activeTimeframe}/>}
+        {tab==='strategyLab'&&<StrategyLabPanel asset={activeAsset} timeframe={activeTimeframe}/>}
         {tab==='screener'&&<MarketScreenerPanel assets={allMarkets} onSelect={onSelectScreenedMarket} onAdd={onAddScreenedMarket}/>}
         {tab==='dataHealth'&&<MarketDataHealthPanel health={feedHealth} status={marketStatus}/>}
       </React.Suspense>

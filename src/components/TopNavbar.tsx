@@ -129,6 +129,7 @@ interface TopNavbarProps {
   activeTool?: DrawingToolType;
   onToggleTradingPanel?: () => void;
   onOpenSavedCharts?: () => void;
+  onOpenReplay?: () => void;
   marketStatus?: { connected: boolean; provider: string; latencyMs: number };
   // Window Layout & Multi-Chart Management
   currentTemplateId: string;
@@ -175,6 +176,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   activeTool,
   onToggleTradingPanel,
   onOpenSavedCharts,
+  onOpenReplay,
   marketStatus,
   currentTemplateId,
   onSelectTemplate,
@@ -818,10 +820,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
         {/* Bar Replay Trigger */}
         <button
           className="flex items-center gap-1 px-1.5 py-0.5 text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition text-[11px]"
-          title="Historical bar replay is not available yet"
-          aria-label="Bar replay unavailable"
-          disabled
-          aria-disabled="true"
+          title="Open historical replay and backtesting"
+          aria-label="Open historical replay"
+          onClick={onOpenReplay}
         >
           <RotateCcw className="w-3 h-3" />
           <span>Replay</span>
