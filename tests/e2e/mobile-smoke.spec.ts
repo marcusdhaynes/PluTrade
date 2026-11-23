@@ -13,34 +13,38 @@ test('narrow-screen application launches without a fatal browser exception',asyn
 });
 
 
-test('mobile keeps a single six-action trading row and preloads equity sizing',async ({page})=>{
+test('mobile keeps one account/UPL/order/execution row and preloads equity sizing',async ({page})=>{
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('./');
   const bar=page.locator('#plutrade-mobile-trade-controls');
   await expect(bar).toBeVisible();
   const actions=bar.locator('div[aria-label="Mobile trading controls"] > button');
-  await expect(actions).toHaveCount(6);
+  await expect(actions).toHaveCount(9);
   const rects=await actions.evaluateAll(buttons=>buttons.map(button=>({
     top:Math.round(button.getBoundingClientRect().top),
     right:button.getBoundingClientRect().right,
   })));
   expect(new Set(rects.map(r=>r.top)).size).toBe(1);
   expect(rects.at(-1)!.right).toBeLessThanOrEqual(await page.evaluate(()=>innerWidth+1));
-  await actions.nth(3).click();
+  await expect(actions.nth(0)).toHaveAttribute('id','mobile-active-account-btn');
+  await expect(actions.nth(1)).toHaveAttribute('id','mobile-upl-cash');
+  await expect(actions.nth(2)).toHaveAttribute('id','mobile-upl-percent');
+  await expect(actions.nth(3)).toHaveAttribute('id','mobile-order-ticket-btn');
+  await actions.nth(6).click();
   const equity=page.getByRole('dialog',{name:'Equity allocation'});
   await expect(equity).toBeVisible();
   await equity.getByRole('spinbutton',{name:'Percent of equity'}).fill('50');
   await equity.getByRole('button',{name:'Apply to Entry'}).click();
-  await expect(actions.nth(3)).toContainText('50%');
-  await expect(actions.first()).toContainText('Order');
-  await actions.nth(1).click();
+  await expect(actions.nth(6)).toContainText('50%');
+  await expect(actions.nth(3)).toContainText('Order');
+  await actions.nth(4).click();
   const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
   await expect(ticket).toBeVisible();
   await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('50');
   await expect(ticket.getByRole('button',{name:'% Equity'})).toBeVisible();
   await ticket.getByTitle('Close order panel').click();
-  await actions.nth(4).click();
+  await actions.nth(7).click();
   await expect(page.getByRole('dialog',{name:'Stop loss options'})).toBeVisible();
   await page.getByRole('button',{name:/Open Entry Ticket/}).click();
   await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','true');
@@ -49,7 +53,7 @@ test('mobile keeps a single six-action trading row and preloads equity sizing',a
 
 test('holding TP reveals the advanced entry path without placing an order',async ({page})=>{
   await page.goto('./');
-  const button=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button').nth(5);
+  const button=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button').nth(8);
   await button.dispatchEvent('pointerdown',{pointerType:'touch'});
   await page.waitForTimeout(510);
   await button.dispatchEvent('pointerup',{pointerType:'touch'});
