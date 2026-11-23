@@ -29,3 +29,12 @@ Scope: hardening of previously inert chart toolbar actions, persisted drawing se
 
 ## Boundaries
 This is not a certification of every TradingView feature, every one of the 20+ drawing geometries, every feed, or real money trading. Browser UI tests use deterministic simulated provider responses only in isolated test runners; production requests real venue data. Additional defects must be diagnosed from the passing/failing checks rather than masked with artificial data.
+
+## Broader sidebar and journal action audit
+- Economic Calendar now opens a truthful, noninteractive availability panel until authoritative licensed event data is connected.
+- Community Ideas and Chats are explicitly disabled, with explanations, rather than misleading no-op buttons. They require authentication, moderation, durable storage and product policies.
+- Sidebar Help opens the existing keyboard shortcut dialog.
+- Trade Journal's previously decorative Replay, Risk/Profit Targets, Filter Parameters and Risk Guardrails buttons now route to existing Historical Replay, Evaluator, Journal Filter and Paper Risk Center features.
+- WebKit browser UI tests isolate public venue metadata API requests so platform CORS policy does not generate false failures; production market requests are unchanged.
+- Shortcut smoke tests wait for the actual registered keyboard handler before dispatching shortcut keys.
+- Stages and deployments must be verified separately before claiming web or every drawing tool is perfect.

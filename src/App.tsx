@@ -2034,6 +2034,8 @@ export default function App() {
         </div>}>
         <TradeJournalModal isOpen={isTradeJournalOpen}
           onClose={()=>setIsTradeJournalOpen(false)}
+          onOpenReplay={()=>{setIsTradeJournalOpen(false);requestBottomPanel('replay');}}
+          onOpenRiskCenter={()=>{setIsTradeJournalOpen(false);requestBottomPanel('risk');}}
           currentSymbol={activeAsset.symbol}/>
       </React.Suspense>}
 

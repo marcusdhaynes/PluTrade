@@ -44,6 +44,7 @@ import {
 } from './JournalGridSettingsModal';
 
 interface JournalTradeLogProps {
+  filterRequest?:number;
   trades: JournalTrade[];
   stats: JournalStats;
   onOpenAddTrade: () => void;
@@ -61,6 +62,7 @@ interface JournalTradeLogProps {
 }
 
 export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
+  filterRequest=0,
   trades,
   stats,
   onOpenAddTrade,
@@ -131,6 +133,7 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
 
   // Open active filter dropdowns
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  useEffect(()=>{if(filterRequest>0)setActiveDropdown('symbol');},[filterRequest]);
 
   // Table selection & expansion state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -935,7 +938,7 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
                       return (
                         <React.Fragment key={trade.id}>
                           <tr
-                            onClick={() => onSelectTrade?.(trade)}
+                            onClick={() => onSelectTrade ? onSelectTrade(trade) : setExpandedId(isExpanded ? null : trade.id)}
                             className={`h-8 hover:bg-[#1a1f2c] transition group cursor-pointer ${
                               isSelected ? 'bg-[#2962ff]/10' : ''
                             }`}

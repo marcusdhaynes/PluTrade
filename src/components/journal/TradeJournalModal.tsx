@@ -50,15 +50,20 @@ interface TradeJournalModalProps {
   onClose: () => void;
   currentSymbol?: string;
   startingBalance?: number;
+  onOpenReplay?:()=>void;
+  onOpenRiskCenter?:()=>void;
 }
 
 export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
   isOpen,
   onClose,
   currentSymbol = '#BTCUSDT',
+  onOpenReplay,
+  onOpenRiskCenter,
 }) => {
   // Default to 'trades' tab to immediately display the grid view requested in image.png
   const [activeTab, setActiveTab] = useState<JournalTab>('trades');
+  const [filterRequest,setFilterRequest]=useState(0);
   // Manual journal entries are independent of the currently selected paper account.
   const [journalOpeningBalance,setJournalOpeningBalance]=useState<number>(()=>{
     try{
@@ -846,28 +851,34 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
 
               <button
                 className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition-colors cursor-pointer"
-                title="Trade Replay / Rewind"
+                title="Open historical replay"
+                onClick={onOpenReplay}
+                disabled={!onOpenReplay}
               >
                 <FastForward className="w-3.5 h-3.5" />
               </button>
 
               <button
                 className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition-colors cursor-pointer"
-                title="Risk & Profit Targets"
+                title="Open risk and profit what-if evaluator"
+                onClick={()=>setActiveTab('evaluator')}
               >
                 <Target className="w-3.5 h-3.5" />
               </button>
 
               <button
                 className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition-colors cursor-pointer"
-                title="Filter Parameters"
+                title="Open trade filters"
+                onClick={()=>{setActiveTab('trades');setFilterRequest(n=>n+1);}}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
               </button>
 
               <button
                 className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition-colors cursor-pointer"
-                title="Risk Rules & Guardrails"
+                title="Open paper trading Risk Center"
+                onClick={onOpenRiskCenter}
+                disabled={!onOpenRiskCenter}
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
               </button>
@@ -920,6 +931,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
             <div className="flex-1 overflow-hidden relative">
               {activeTab === 'trades' && (
                 <JournalTradeLog
+                  filterRequest={filterRequest}
                   trades={trades}
                   stats={stats}
                   layoutSettings={layoutSettings}
@@ -928,7 +940,6 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
                   onOpenAddTrade={() => {if(!journalRecoveryBlocked)setIsAddModalOpen(true);}}
                   onDeleteTrade={handleDeleteTrade}
                   onEditTrade={(trade) => {if(!journalRecoveryBlocked)setEditingTrade(trade);}}
-                  onSelectTrade={(trade) => {}}
                   onOpenSettings={() => setIsSettingsModalOpen(true)}
                   isMaximized={isMaximized}
                   onToggleMaximize={() => setIsMaximized((prev) => !prev)}

@@ -136,3 +136,25 @@ test('sidebar calendar discloses unavailable data, help opens shortcuts, and uns
   await expect(page.getByRole('dialog',{name:'PluTrade Keyboard Shortcuts'})).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+
+test('trade journal tools navigate to filters, evaluator, risk center and historical replay',async({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('./');
+  await page.locator('#right-tab-trade-journal').click();
+  await expect(page.locator('#trade-journal-root-modal')).toBeVisible();
+  await page.getByTitle('Open trade filters').click();
+  await expect(page.getByRole('button',{name:'All Symbols'})).toBeVisible();
+  await page.getByTitle('Open risk and profit what-if evaluator').click();
+  await expect(page.locator('#journal-evaluator-tab')).toBeVisible();
+  await page.getByTitle('Open paper trading Risk Center').click();
+  await expect(page.locator('#trade-journal-root-modal')).toHaveCount(0);
+  await expect(page.locator('#plutrade-risk-center')).toBeVisible();
+  await page.locator('#right-tab-trade-journal').click();
+  await expect(page.locator('#trade-journal-root-modal')).toBeVisible();
+  await page.getByTitle('Open historical replay').click();
+  await expect(page.locator('#trade-journal-root-modal')).toHaveCount(0);
+  await expect(page.locator('#plutrade-historical-lab')).toBeVisible();
+  expect(errors).toEqual([]);
+});
