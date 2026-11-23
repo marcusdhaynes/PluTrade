@@ -45,7 +45,7 @@ test('order ticket tabs, order types, trailing exits, and account settings are i
 
 test('saved chart has functioning local save and restore',async ({page})=>{
   await page.goto('./');
-  await page.locator('#save-chart-action-btn').click();
+  await page.locator('#desktop-save-chart-btn').click();
   const modal=page.getByRole('dialog',{name:'Save and restore charts'});
   await expect(modal).toBeVisible();
   await modal.getByLabel('Chart name').fill('Browser automation saved chart');
@@ -54,7 +54,7 @@ test('saved chart has functioning local save and restore',async ({page})=>{
   await expect(modal.getByTitle('Restore saved chart')).toBeVisible();
   await modal.getByTitle('Restore saved chart').click();
   await expect(modal).toHaveCount(0);
-  await page.locator('#save-chart-action-btn').click();
+  await page.locator('#desktop-save-chart-btn').click();
   await expect(page.getByRole('dialog',{name:'Save and restore charts'})).toContainText('Browser automation saved chart');
 });
 
