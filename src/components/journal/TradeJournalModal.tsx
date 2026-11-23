@@ -491,7 +491,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
         } ${isDragging || isResizing ? 'transition-none shadow-2xl' : 'transition-opacity duration-150'}`}
         style={
           isMaximized
-            ? { width: '100vw', height: '100vh', left: 0, top: 0, opacity: 1 }
+            ? { width: '100vw', height: '100dvh', left: 0, top: 0, opacity: 1 }
             : {
                 width: `${windowPos.width}px`,
                 height: `${windowPos.height}px`,
@@ -908,7 +908,8 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
           </aside>
 
           {/* MAIN BODY AREA */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-[#0f131c] min-w-0">
+          <div id="journal-main-content-viewport" className="flex-1 flex flex-col overflow-hidden bg-[#0f131c] min-w-0 min-h-0">
+            <div id="journal-mobile-scaled-content" className="flex-1 flex flex-col overflow-hidden min-h-0 min-w-0">
             {journalRecoveryBlocked&&<div role="alert" className="flex items-center gap-3 px-3 py-2 bg-[#432d20] text-[#ffdbab] text-xs">
               Journal edits are locked: saved entries need recovery. No records were silently discarded.
               <button type="button" className="underline font-semibold" onClick={exportJournalBackup}>Export original journal</button>
@@ -1019,6 +1020,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
                   onClose={onClose}
                 />
               )}
+            </div>
             </div>
           </div>
         </div>
