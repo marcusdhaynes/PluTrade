@@ -377,6 +377,16 @@ export const MainChart = React.memo(
       };
     }, []);
 
+    // The native axis can grow after fresh candle values/indicators load.
+    // Recenter the quote label against its actual rendered width.
+    useEffect(()=>{
+      const frame=requestAnimationFrame(()=>{
+        const scale=chartApiRef.current?.priceScale('right');
+        if(scale)setPriceAxisWidth(Math.max(28,scale.width()));
+      });
+      return ()=>cancelAnimationFrame(frame);
+    },[candles,asset.digits,asset.symbol,chartType,indicatorsKey]);
+
     // Native browser/page pinch and the library's horizontal-only pinch are
     // disabled for this chart surface. Apply directional pinch to the chart's
     // public logical/time and price ranges, anchored under the two fingers.
