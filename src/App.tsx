@@ -1849,6 +1849,7 @@ export default function App() {
         onSelectQuickTool={(tool) => setActiveTool(tool)}
         activeTool={activeTool}
         onToggleTradingPanel={() => setIsTradeTicketOpen(prev=>!prev)}
+        onTogglePaperWorkspace={()=>setIsBottomTradingOpen(v=>!v)}
         onOpenSavedCharts={()=>setIsSavedChartsOpen(true)}
         onOpenReplay={()=>requestBottomPanel('replay')}
         onOpenStrategyLab={()=>requestBottomPanel('strategyLab')}
@@ -1917,10 +1918,6 @@ export default function App() {
               try{chart.timeScale().applyOptions({barSpacing,rightOffset});return true;}
               catch{return false;}
             }}
-            isLogScale={isLogScale}
-            setIsLogScale={setIsLogScale}
-            isPercentScale={isPercentScale}
-            setIsPercentScale={setIsPercentScale}
           />
           <div className="flex-1 min-h-0 w-full relative" id="chart-workspace-viewport">
           <MultiChartWorkspace
