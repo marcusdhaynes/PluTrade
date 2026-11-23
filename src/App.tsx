@@ -72,7 +72,7 @@ import {loadRiskPolicy,saveRiskPolicy,evaluateRiskPolicy} from './services/riskC
 import {updateFeedHealth,type MarketEvent,type FeedHealth} from './services/marketEvents';
 import {createPaperWriterLease} from './services/paperTabOwnership';
 import {loadWatchlists,persistWatchlists,isWatchlistStorageBlocked,readWatchlistBackupRaw,WATCHLIST_KEY,WATCHLIST_LEGACY_KEY} from './services/watchlistStorage';
-import { emptyPaperPortfolio, closePaperPosition, updatePaperStops, enableTrailingPaperStop, disableTrailingPaperStop, isFreshPaperQuote, accountLeverage, paperCommission, paperExecutionPrice, configurePaperPortfolio, type PaperPortfolio, type PaperSettings } from './services/paperTrading';
+import { emptyPaperPortfolio, closePaperPosition, updatePaperStops, updatePaperTargetLevels, enableTrailingPaperStop, disableTrailingPaperStop, isFreshPaperQuote, accountLeverage, paperCommission, paperExecutionPrice, configurePaperPortfolio, type PaperPortfolio, type PaperSettings } from './services/paperTrading';
 import { loadPaperAccounts, savePaperAccounts, updateActivePaperAccount, createPaperAccountRecord, initialPaperAccounts,isPaperStorageBlocked,PAPER_ACCOUNTS_STORAGE_KEY, type PaperAccountsState } from './services/paperAccounts';
 
 const assetIdentity = marketIdentity;
@@ -1615,6 +1615,13 @@ export default function App() {
       setPaperError('');
     }catch(e){setPaperError(e instanceof Error?e.message:'Invalid stops');}
   };
+  const handleEditPaperTargets=(id:string,targets:Array<{price:number;sharePercent:number}>)=>{
+    try{
+      const next=updatePaperTargetLevels(paperPortfolio,id,targets);
+      setPaperPortfolio(next);
+      setPaperError('');
+    }catch(e){setPaperError(e instanceof Error?e.message:'Invalid take-profit levels');}
+  };
   const handleChartEditPositionStop=(id:string,kind:'sl'|'tp')=>{
     if(typeof window!=='undefined'&&window.matchMedia('(max-width: 767px)').matches)
       setMobileExitRequest(prev=>({id,kind,seq:(prev?.seq||0)+1}));
@@ -2013,6 +2020,7 @@ export default function App() {
             onEnter={openMobileEntry}
             onExit={()=>{if(activePosition)handleClosePosition(activePosition.id);}}
             onEditStops={handleEditPaperStops}
+            onEditTargets={handleEditPaperTargets}
             editRequest={mobileExitRequest}
             onAdvancedConditional={()=>handleOpenCreateConditionalOrder({
               type:'position',label:(activePosition?.symbol||activeAsset.symbol)+' position'})}
