@@ -51,6 +51,8 @@ export const ConditionalOrdersTable: React.FC<ConditionalOrdersTableProps> = ({
         return 'bg-[#ff9800]/20 text-[#ffb74d] border-[#ff9800]/40';
       case 'WHENEVER':
         return 'bg-[#00ffa3]/20 text-[#00ffa3] border-[#00ffa3]/40';
+      case 'WHILE':
+        return 'bg-[#dfb47e]/20 text-[#efc28c] border-[#dfb47e]/40';
       default:
         return 'bg-[#2a2e39] text-[#d1d4dc] border-[#2a2e39]';
     }
@@ -72,6 +74,12 @@ export const ConditionalOrdersTable: React.FC<ConditionalOrdersTableProps> = ({
         </span>
       );
     }
+    if (act === 'sl_dynamic') {
+      const d=order.execution.dynamicTrailing;
+      return <span className="px-1.5 py-0.5 rounded bg-[#d4a35c]/20 text-[#ffce8e] font-bold text-[10px] border border-[#d4a35c]/40">
+        Dynamic ATR {d?.period||22} × {d?.multiplier||3} · {d?.timeframe||'1h'}
+      </span>;
+    }
     if (act === 'sl_trailing') {
       return (
         <span className="px-1.5 py-0.5 rounded bg-[#ff9800]/20 text-[#ff9800] font-bold text-[10px] border border-[#ff9800]/30">
@@ -82,7 +90,7 @@ export const ConditionalOrdersTable: React.FC<ConditionalOrdersTableProps> = ({
     if (act === 'tp') {
       return (
         <span className="px-1.5 py-0.5 rounded bg-[#089981]/20 text-[#089981] font-bold text-[10px] border border-[#089981]/30">
-          TP (+{order.execution.tpPercent}%)
+          Close on Condition (TP)
         </span>
       );
     }
@@ -124,7 +132,7 @@ export const ConditionalOrdersTable: React.FC<ConditionalOrdersTableProps> = ({
   return (
     <div className="flex flex-col h-full bg-[#131722] text-xs">
       <p role="note" className="px-3 py-1 text-[10px] text-[#a4abba] border-b border-[#2a2e39]">
-        Simulated conditional actions only run while this browser page is open. No real broker execution or unattended protection is provided.
+        IF → THEN / WHILE rules are scoped to individual Paper Trading accounts. While/Whenever fire once per false→true activation. ATR stops use verified closed candles; executions require fresh venue trades. Browser must remain open. No real broker orders are placed.
       </p>
       {/* Table Toolbar */}
       <div className="h-8 px-3 border-b border-[#2a2e39] flex items-center justify-between bg-[#131722]">
@@ -225,11 +233,13 @@ export const ConditionalOrdersTable: React.FC<ConditionalOrdersTableProps> = ({
                             {c.dependencyType === 'indicator' && '📊'}
                             {c.dependencyType === 'price' && '💲'}
                             {c.dependencyType === 'position' && '💼'}
+                            {c.dependencyType === 'account' && '🏦'}
+                            {c.dependencyType === 'utc_session' && '🕒'}
                             {c.dependencyType === 'volume' && '🌊'}
                           </span>
                           <span className="text-[#d1d4dc]">{c.dependencyLabel}</span>
                           <span className="text-[#787b86]">
-                            {c.operator.replace('_', ' ')}
+                            {c.operator.replaceAll('_', ' ')}
                             {c.thresholdValue != null && ` $${c.thresholdValue}`}
                           </span>
                         </div>
@@ -265,7 +275,7 @@ export const ConditionalOrdersTable: React.FC<ConditionalOrdersTableProps> = ({
 
                   {/* Triggers */}
                   <td className="py-2 px-3 font-mono text-[10.5px] text-[#787b86]">
-                    {order.conditionLogic === 'WHENEVER'
+                    {order.conditionLogic === 'WHENEVER'||order.conditionLogic==='WHILE'
                       ? `${order.triggerCount} times`
                       : `${order.triggerCount}/${order.maxTriggers}`}
                   </td>

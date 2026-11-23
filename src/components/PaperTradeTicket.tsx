@@ -1,3 +1,4 @@
+import {DEFAULT_DYNAMIC_TRAIL,validDynamicTrail,type DynamicTrailingSettings} from '../services/dynamicTrailing';
 import React,{useEffect,useMemo,useState} from 'react';
 import {X,ChevronDown,ChevronUp,Plus,ArrowLeftRight,Settings2,Info} from 'lucide-react';
 import type {Asset,OrderBookItem} from '../types';
@@ -79,6 +80,8 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   const [slEnabled,setSlEnabled]=useState(false);
   const [trailingEnabled,setTrailingEnabled]=useState(false);
   const [trailingPercent,setTrailingPercent]=useState('0.50');
+  const [dynamicEnabled,setDynamicEnabled]=useState(false);
+  const [dynamicSettings,setDynamicSettings]=useState<DynamicTrailingSettings>({...DEFAULT_DYNAMIC_TRAIL});
   const [tpMode,setTpMode]=useState<PaperExitMode>('percent');
   const [slMode,setSlMode]=useState<PaperExitMode>('percent');
   const [tpValue,setTpValue]=useState('2.10');
@@ -194,12 +197,14 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
     margin+fee<=base.account.availableFunds+1e-7&&
     (!tpEnabled||(!!tp&&(side==='Long'?tp>entry:tp<entry)))&&
     (!slEnabled||(!!sl&&(side==='Long'?sl<entry:sl>entry)))&&
-    validTrailing&&validLevels&&asset.currency===cash;
+    validTrailing&&(!dynamicEnabled||validDynamicTrail(dynamicSettings))&&
+    !(trailingEnabled&&dynamicEnabled)&&validLevels&&asset.currency===cash;
   const execute=()=>{
     setErrorLocal('');
     const reason=onSubmit({side,kind,qty,price:kind==='market'?undefined:triggerPrice,
       limitPrice:kind==='stop-limit'?entry:undefined,tp,sl,timeInForce:tif,
       trailingStopPercent:trailingEnabled?trailingNumber:undefined,
+      dynamicTrailing:dynamicEnabled?dynamicSettings:undefined,
       takeProfitLevels:levels});
     if(reason){setErrorLocal(reason);setReviewOpen(false);}
     else {setReviewOpen(false);onClose();}
@@ -306,7 +311,12 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
                 <button id="paper-trailing-stop-toggle" type="button" role="switch"
                   aria-checked={trailingEnabled} aria-label="Enable trailing stop loss"
                   className={`relative w-9 h-5 rounded-full ${trailingEnabled?'bg-[#efefef]':'bg-[#44464b]'}`}
-                  onClick={()=>setTrailingEnabled(v=>!v)}>
+                  onClick={()=>{
+                    setTrailingEnabled(v=>{
+                      if(!v)setDynamicEnabled(false);
+                      return !v;
+                    });
+                  }}>
                   <span className={`absolute top-0.5 w-4 h-4 rounded-full shadow ${trailingEnabled?'right-0.5 bg-[#1a1c22]':'left-0.5 bg-[#81848b]'}`}/>
                 </button>
               </div>
@@ -330,6 +340,51 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
                   </p>:
                   <p role="alert" className="text-[10px] text-[#ff9ba8]">Enter a distance greater than 0% and less than 100%.</p>}
               </>}
+            </div>
+            <div className="space-y-2 border-t border-[#33363a] pt-3">
+              <div className="flex items-center justify-between">
+                <label htmlFor="paper-dynamic-trail-toggle" className="text-[11px] text-[#ffd096]">
+                  Dynamic Trailing Stop · ATR Chandelier
+                </label>
+                <button type="button" id="paper-dynamic-trail-toggle" role="switch"
+                  aria-label="Enable dynamic ATR trailing stop" aria-checked={dynamicEnabled}
+                  className={`relative w-9 h-5 rounded-full ${dynamicEnabled?'bg-[#efce89]':'bg-[#44464b]'}`}
+                  onClick={()=>{
+                    setDynamicEnabled(value=>{
+                      if(!value)setTrailingEnabled(false);
+                      return !value;
+                    });
+                  }}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full shadow ${dynamicEnabled?'right-0.5 bg-[#332617]':'left-0.5 bg-[#81848b]'}`}/>
+                </button>
+              </div>
+              {dynamicEnabled&&<div className="grid grid-cols-2 gap-2">
+                <label className="text-[10px] text-[#abb6c8]">ATR Period
+                  <input aria-label="Ticket dynamic ATR period" type="number" min="2" max="100" step="1"
+                    value={dynamicSettings.period}
+                    onChange={e=>setDynamicSettings(v=>({...v,period:Number(e.target.value)}))}
+                    className={controls}/></label>
+                <label className="text-[10px] text-[#abb6c8]">Lookback Bars
+                  <input aria-label="Ticket dynamic lookback" type="number" min="2" max="100" step="1"
+                    value={dynamicSettings.lookback}
+                    onChange={e=>setDynamicSettings(v=>({...v,lookback:Number(e.target.value)}))}
+                    className={controls}/></label>
+                <label className="text-[10px] text-[#abb6c8]">ATR Multiplier
+                  <input aria-label="Ticket dynamic multiplier" type="number" min=".25" max="10" step=".25"
+                    value={dynamicSettings.multiplier}
+                    onChange={e=>setDynamicSettings(v=>({...v,multiplier:Number(e.target.value)}))}
+                    className={controls}/></label>
+                <label className="text-[10px] text-[#abb6c8]">Timeframe
+                  <select aria-label="Ticket dynamic timeframe" value={dynamicSettings.timeframe}
+                    onChange={e=>setDynamicSettings(v=>({...v,timeframe:e.target.value as DynamicTrailingSettings['timeframe']}))}
+                    className={controls}>
+                    {['1m','5m','15m','1h','4h','1D'].map(tf=><option key={tf} value={tf}>{tf}</option>)}
+                  </select>
+                </label>
+                <p className="col-span-2 text-[10px] text-[#9badc5]">
+                  Uses verified completed candles only. The dynamic level is unavailable until enough history is collected. Add a fixed SL above if you need immediate simulated protection; it remains the floor/ceiling as ATR tightens. Not a broker-native stop.
+                </p>
+              </div>}
             </div>
             {tpEnabled&&<>
               {extraTps.map((l,i)=><div key={l.id} className="flex gap-1 items-end">
@@ -418,6 +473,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
           <div className="flex justify-between"><span>Commission</span><strong>{pct(fee)} {cash}</strong></div>
           {tp!==undefined&&<div className="flex justify-between"><span>Take profit</span><strong>{pct(tp)}</strong></div>}
           {protectiveStop!==undefined&&<div className="flex justify-between"><span>Stop loss</span><strong>{pct(protectiveStop)}</strong></div>}
+          {dynamicEnabled&&<div className="flex justify-between text-[#ffd096]"><span>Dynamic Chandelier</span><strong>ATR {dynamicSettings.period} × {dynamicSettings.multiplier} · {dynamicSettings.timeframe} (warms on closed bars)</strong></div>}
           {kind!=='market'&&<div className="flex justify-between"><span>Time in force</span><strong>{tif}</strong></div>}
         </div>
         {!canSubmit&&<p role="alert" className="text-[#ffb1b6]">The quote, size, margin or exits are no longer valid. Cancel and review the ticket.</p>}

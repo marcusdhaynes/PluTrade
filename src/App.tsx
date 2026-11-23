@@ -58,9 +58,14 @@ import { Bell } from 'lucide-react';
 import WebBuildBanner from './updates/WebBuildBanner';
 import {KeyboardShortcutsDialog} from './components/KeyboardShortcutsDialog';
 import {ruleCanActivate,ruleMatchesMarket} from './services/conditionalSafety';
+import {routeConditionalRuleToPaperAccounts} from './services/conditionalAccountRouting';
+import {quantityForConditional} from './services/conditionalExecution';
 import {ruleConditionsMet,ruleEligibleOnTick} from './services/conditionalEvaluation';
 import {closedMinuteRun,appendClosedMinute,completedIndicatorSignal,type IndicatorSignal} from './services/indicatorSignals';
 import {marketIdentity,alertMarketIdentity,matchesExactMarket} from './services/marketIdentity';
+import {attachDynamicTrailing,disableDynamicTrailing,applyDynamicTrailingFromBars,
+  completedDynamicBars,validDynamicTrail,type DynamicTrailingSettings,
+  type DynamicTrailTimeframe} from './services/dynamicTrailing';
 import {evaluatePriceAlerts,ALERT_CONDITIONS,ALERT_FREQUENCIES,alertIsExpired,type AlertObservation} from './services/priceAlertEngine';
 import {paperLedgerCriticalChanged} from './services/paperPersistence';
 import {loadRiskPolicy,saveRiskPolicy,evaluateRiskPolicy} from './services/riskCenter';
@@ -506,12 +511,10 @@ export default function App() {
     };
         const side=order.action==='enter_short'?'Short':'Long';
         const spec=order.execution;
-        const qtyFor=(kind:'market'|'limit',price:number)=>{
-          if(spec.sizeUnit==='percent')return estimatePaperQty(next,market,spec.size,price);
-          if(spec.sizeUnit==='usd')return spec.size/price;
-          return spec.size;
-        };
-        const match=next.positions.find(p=>matchesExactMarket(p,market));
+        const qtyFor=(_kind:'market'|'limit',price:number)=>
+          quantityForConditional(spec,next,market,price);
+        const match=next.positions.find(p=>matchesExactMarket(p,market)&&
+          (!spec.positionId||p.id===spec.positionId));
         if(order.action==='enter_long'||order.action==='enter_short'){
           const kind=spec.orderType==='limit'?'limit':'market';
           const price=kind==='limit'?(spec.limitPrice||0):market.price;
@@ -523,8 +526,11 @@ export default function App() {
             price:kind==='limit'?price:undefined,tp,sl,timeInForce:'GTC'});
         }else if(order.action==='increase_position'){
           if(!match)throw new Error('No position to increase.');
+          const percent=Number(spec.increasePercent)||50;
+          if(!Number.isFinite(percent)||percent<=0||percent>100)
+            throw new Error('Scale-in percentage must be 0–100%.');
           next=submitWithRisk({side:match.side,kind:'market',
-            qty:qtyFor('market',market.price)});
+            qty:match.qty*percent/100});
         }else if(order.action==='exit_long'||order.action==='exit_short'){
           const expected=order.action==='exit_long'?'Long':'Short';
           if(!match||match.side!==expected)throw new Error('No matching position to close.');
@@ -548,8 +554,13 @@ export default function App() {
         }else if(order.action==='sl_trailing'){
           if(!match)throw new Error('No position for trailing stop.');
           next=enableTrailingPaperStop(next,match.id,Number(spec.trailingPercent));
+        }else if(order.action==='sl_dynamic'){
+          if(!match)throw new Error('No position for dynamic ATR protection.');
+          if(!validDynamicTrail(spec.dynamicTrailing))throw new Error('Invalid dynamic ATR settings.');
+          next=attachDynamicTrailing(next,match.id,spec.dynamicTrailing);
         }else if(order.action==='cancel_all'){
-          next=withOrderReservations({...next,pendingOrders:[]});
+          for(const pending of [...(next.pendingOrders||[])])
+            next=cancelPaperOrder(next,pending.id);
         }else{
           throw new Error('Unsupported paper order action.');
         }
@@ -570,13 +581,15 @@ export default function App() {
         let orders=record.orders;
         for(let i=0;i<record.orders.length;i++){
           const order=orders[i];
-          if(order.status!=='active'||!ruleCanActivate(order)||!ruleMatchesMarket(order,market))continue;
+          if(order.status!=='active'||(order.accountId&&order.accountId!==record.id)||
+            !ruleCanActivate(order)||!ruleMatchesMarket(order,market))continue;
           const dependsOnIndicator=order.conditions.some(c=>c.dependencyType==='indicator');
           if(dependsOnIndicator!==Boolean(indicator))continue;
           const met=ruleConditionsMet(order,market,previous,portfolio,eventIds,drawingsByMarket[key]||[],previousAt,indicator);
           // Re-arm WHENEVER only after a false observation. Alert dependencies
           // require an actual new event, never a persisted "triggered" flag.
-          if(order.conditionLogic==='WHENEVER' && Boolean(order.lastConditionSatisfied)!==met){
+          if((order.conditionLogic==='WHENEVER'||order.conditionLogic==='WHILE') &&
+             Boolean(order.lastConditionSatisfied)!==met){
             if(orders===record.orders)orders=[...orders];
             orders[i]={...order,lastConditionSatisfied:met};
           }
@@ -585,7 +598,8 @@ export default function App() {
             portfolio=applyRuleToPortfolio(order,portfolio,market);
             if(orders===record.orders)orders=[...orders];
             orders[i]={...order,triggerCount:order.triggerCount+1,lastTriggeredAt:at,
-              lastConditionSatisfied:true,status:order.conditionLogic==='WHENEVER'?'active':'triggered'};
+              lastConditionSatisfied:true,
+              status:order.conditionLogic==='WHENEVER'||order.conditionLogic==='WHILE'?'active':'triggered'};
           }catch(error){
             console.warn('Paper conditional rule could not execute',order.id,error);
           }
@@ -639,6 +653,67 @@ export default function App() {
     }
     return ()=>{cancelled=true;stops.forEach(stop=>stop());};
   },[indicatorMarketKeys,assets.length,executeObservedTick,recordFeedEvent]);
+  // One venue-scoped, timeframe-scoped verified candle pipeline for every
+  // active ATR-Chandelier stop in any paper account. All copies share this
+  // subscription; only the local writer tab may mutate paper ledgers.
+  const dynamicTrailingKeys=[...new Set(paperAccounts.accounts.flatMap(record=>
+    record.portfolio.positions.filter(p=>p.dynamicTrailing).map(p=>
+      marketIdentity(p)+'::'+p.dynamicTrailing!.timeframe)))].sort().join('~');
+  useEffect(()=>{
+    if(!paperWriterOwned)return;
+    const combinations=dynamicTrailingKeys.split('~').filter(Boolean);
+    if(!combinations.length)return;
+    let stopped=false;
+    const unsubs:Array<()=>void>=[];
+    for(const combination of combinations){
+      const split=combination.lastIndexOf('::');
+      if(split<0)continue;
+      const key=combination.slice(0,split);
+      const timeframe=combination.slice(split+2) as DynamicTrailTimeframe;
+      const market=marketCatalogRef.current.find(a=>marketIdentity(a)===key);
+      if(!market)continue;
+      let history:OHLCV[]=[],pending:OHLCV[]=[],historyLoaded=false;
+      const refresh=()=>{
+        if(stopped)return;
+        const closed=completedDynamicBars([...history,...pending],timeframe,Date.now());
+        if(!closed.length)return;
+        setPaperAccounts(state=>{
+          let changed=false;
+          const accounts=state.accounts.map(record=>{
+            const portfolio=applyDynamicTrailingFromBars(record.portfolio,market,timeframe,closed,Date.now());
+            if(portfolio===record.portfolio)return record;
+            changed=true;
+            return {...record,portfolio};
+          });
+          return changed?{...state,accounts}:state;
+        });
+      };
+      // Stream only confirmed closed venue bars. REST history is verified
+      // by the market provider; synthetic example candles are never used.
+      unsubs.push(subscribeRealMarketData(market,timeframe,{
+        onCandleTick:(bar,isClosed)=>{
+          if(stopped||!isClosed)return;
+          pending=[...pending,bar].slice(-250);
+          if(historyLoaded)refresh();
+        },
+        onPriceUpdate:()=>{},onMarketEvent:recordFeedEvent,
+        onOrderBook:()=>{},onTrade:()=>{},onStatusChange:()=>{},
+      }));
+      void fetchHistoricalData(market,timeframe).then(bars=>{
+        if(stopped)return;
+        history=bars;
+        historyLoaded=true;
+        refresh();
+      }).catch(()=>{
+        // Without trustworthy sufficient bars, a dynamic stop shows
+        // warming/unavailable; any existing fixed stop stays in place.
+        historyLoaded=true;
+        refresh();
+      });
+    }
+    return ()=>{stopped=true;unsubs.forEach(fn=>fn());};
+  },[dynamicTrailingKeys,paperWriterOwned,assets.length,recordFeedEvent]);
+
   // Held paper positions and pending orders need real, venue-scoped stream
   // updates; REST snapshots must never fill a pending order or protective stop.
   const heldMarketKeys=[...new Set(paperAccounts.accounts.flatMap(record=>[
@@ -1519,7 +1594,8 @@ export default function App() {
     setCloseReviewQty(String(p.qty));
     setCloseReviewId(id);
   };
-  const handleEditPaperStops = (id:string,tp?:number,sl?:number,trailing?:number|null) => {
+  const handleEditPaperStops = (id:string,tp?:number,sl?:number,trailing?:number|null,
+    dynamic?:DynamicTrailingSettings|null) => {
     try {
       const position=paperPositions.find(item=>item.id===id);
       if(!position)throw new Error('Position unavailable.');
@@ -1533,6 +1609,8 @@ export default function App() {
       let next=updatePaperStops(paperPortfolio,id,tp,sl);
       if(trailing===null)next=disableTrailingPaperStop(next,id);
       else if(trailing!==undefined)next=enableTrailingPaperStop(next,id,trailing);
+      if(dynamic===null)next=disableDynamicTrailing(next,id);
+      else if(dynamic!==undefined)next=attachDynamicTrailing(next,id,dynamic);
       setPaperPortfolio(next);
       setPaperError('');
     }catch(e){setPaperError(e instanceof Error?e.message:'Invalid stops');}
@@ -1575,31 +1653,24 @@ export default function App() {
     setIsConditionalOrderModalOpen(true);
   }, []);
 
-  const handleSaveConditionalOrder = useCallback((order: ConditionalOrder) => {
-    const permitted=ruleCanActivate(order);
-    const safeOrder=permitted?order:{...order,status:'paused' as const};
-    setConditionalOrders((prev) => {
-      const idx = prev.findIndex((o) => o.id === order.id);
-      if (idx >= 0) {
-        const next = [...prev],previous=prev[idx];
-        // Saving an edited rule is an explicit new revision. Preserve earlier
-        // execution totals, but clear the active revision's trigger/edge state.
-        next[idx] = {...safeOrder,
-          priorTriggerCount:(previous.priorTriggerCount||0)+previous.triggerCount,
-          rearmCount:(previous.rearmCount||0)+1,
-          triggerCount:0,lastTriggeredAt:undefined,lastConditionSatisfied:false,
-          status:!permitted?'paused':previous.status==='paused'?'paused':'active',
-        };
-        return next;
-      }
-      return [safeOrder, ...prev];
-    });
-    setActiveNotification({
-      id: String(Date.now()),
-      message: permitted ? `Conditional order "${order.title}" saved or re-armed; prior fills remain in history.` : `Rule "${order.title}" saved paused (unsupported condition or missing market identity).`,
-      type: 'info',
-    });
-  }, []);
+  const handleSaveConditionalOrder=useCallback((order:ConditionalOrder)=>{
+    if(paperTradingBlocked){
+      setPaperError('Unlock the single writer paper ledger before saving conditional rules.');
+      return;
+    }
+    try{
+      // Verify the target synchronously so the user cannot select a deleted
+      // account and receive an inaccurate success notification.
+      routeConditionalRuleToPaperAccounts(paperAccounts,order);
+      setPaperAccounts(state=>routeConditionalRuleToPaperAccounts(state,order));
+      setPaperError('');
+      setActiveNotification({id:String(Date.now()),type:'info',
+        message:`Rule "${order.title}" assigned to ${order.accountScope==='all_paper'?
+          'all paper accounts':'the selected paper account'}. Each account evaluates independently while this browser remains open.`});
+    }catch(error){
+      setPaperError(error instanceof Error?error.message:'Unable to assign conditional rule.');
+    }
+  },[paperTradingBlocked,paperAccounts]);
 
   const handleToggleConditionalOrderStatus = useCallback((id: string) => {
     setConditionalOrders((prev) =>
@@ -1617,17 +1688,24 @@ export default function App() {
 
   // Pure execution permits multiple triggered rules to apply sequentially to
   // one current portfolio without replacing earlier fills in the same tick.
-  const handleTestTriggerConditionalOrder = useCallback((order:ConditionalOrder) => {
-    // Explicit dry-run: never write the projected portfolio, fills or trigger count.
-    try {
-      const projected=applyRuleToPortfolio(order,paperPortfolio,activeAsset);
-      const delta=projected.account.balance-paperPortfolio.account.balance;
-      const fills=projected.fills.length-paperPortfolio.fills.length;
+  const handleTestTriggerConditionalOrder = useCallback((order:ConditionalOrder)=>{
+    // Forced dry-run of THEN action only, not a live trigger nor persisted fills.
+    const targets=paperAccounts.accounts.filter(a=>
+      order.accountScope==='all_paper'||a.id===(order.accountId||paperAccounts.activeId));
+    try{
+      let fills=0;
+      let details:string[]=[];
+      for(const target of targets){
+        const simulated=applyRuleToPortfolio({...order,accountId:target.id},target.portfolio,activeAsset);
+        const count=simulated.fills.length-target.portfolio.fills.length;
+        fills+=count;
+        details.push(`${target.portfolio.account.name}: ${count} hypothetical fill(s)`);
+      }
       setActiveNotification({id:String(Date.now()),type:'info',
-        message:`Simulation only · ${fills} hypothetical fills · balance change ${delta.toFixed(2)} ${paperPortfolio.settings.currency}. No trades were saved.`});
+        message:`Dry run only · ${fills} hypothetical fills. ${details.join('; ')}. No ledger changes.`});
       setPaperError('');
     }catch(e){setPaperError(e instanceof Error?e.message:'Simulation unavailable');}
-  },[applyRuleToPortfolio,paperPortfolio]);
+  },[applyRuleToPortfolio,paperAccounts,activeAsset]);
 
   // Toggle Alert Status
   const handleToggleAlertStatus = (id: string) => {
@@ -2126,8 +2204,21 @@ export default function App() {
         onClose={() => setIsConditionalOrderModalOpen(false)}
         activeAsset={activeAsset}
         drawings={drawings}
-        alerts={detailedAlerts}
+        alerts={alerts.map(a=>({
+          id:a.id,symbol:a.symbol,
+          title:`${a.symbol} ${a.condition.replaceAll('_',' ')} ${a.targetPrice}`,
+          message:a.notes||'Price alert event',timeframe:a.timeframe||'1m',
+          status:(a.paused?'Paused':a.triggered?'Triggered':'Active') as DetailedAlert['status'],
+          dateStr:new Date(a.createdAt).toLocaleString(),type:'price' as const,
+        }))}
         positions={paperPositions}
+        accountOptions={paperAccounts.accounts.map(a=>({
+          id:a.id,name:a.portfolio.account.name,currency:a.portfolio.settings.currency
+        }))}
+        activeAccountId={paperAccounts.activeId}
+        accountPositions={Object.fromEntries(paperAccounts.accounts.map(record=>[
+          record.id,record.portfolio.positions
+        ]))}
         initialDependency={selectedDependencyForOrder}
         orderToEdit={orderToEdit}
         onSaveOrder={handleSaveConditionalOrder}
