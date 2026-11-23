@@ -303,3 +303,9 @@ html,body,#root {
   #mobile-layout-anchor {flex-shrink:0;}
   #mobile-window-actions {margin-left:auto;}
 }
+
+/* Keep open mobile order editors above chart canvases and right tool panels,
+   below real modal windows. Underlying trade/order UI stays in place. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #plutrade-mobile-trade-controls {position:relative;z-index:1500 !important;}
+}
