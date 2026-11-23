@@ -459,7 +459,7 @@ test('mobile top bar is one row: window view, save, camera, data, PiP and fullsc
     expect(boxes.every((rect,i)=>i===0||rect.x>boxes[i-1].x)).toBe(true);
     const ticker=(await page.locator('#mobile-symbol-search-trigger').boundingBox())!;
     expect(ticker.width).toBeLessThanOrEqual(67);
-    expect(boxes.at(-1)!.right).toBeLessThanOrEqual(size.width+1);
+    expect(boxes.at(-1)!.x+boxes.at(-1)!.width).toBeLessThanOrEqual(size.width+1);
     await expect(page.locator('#mobile-chart-action-rows')).toHaveCount(0);
   }
 });
@@ -478,7 +478,7 @@ test('timeframe scroll clips labels and keeps calendar/divider fixed',async ({pa
   const after=[await divider.boundingBox(),await calendar.boundingBox(),await star.boundingBox()];
   for(let i=0;i<before.length;i++)expect(after[i]!.x).toBeCloseTo(before[i]!.x,1);
   const viewport=(await scroll.boundingBox())!;
-  expect(viewport.right).toBeLessThanOrEqual(before[0]!.x+1);
+  expect(viewport.x+viewport.width).toBeLessThanOrEqual(before[0]!.x+1);
   await expect(divider).toHaveCSS('border-left-style','solid');
 });
 
@@ -492,7 +492,7 @@ test('popups render above chart/sidebar and outside tapping dismisses them',asyn
   expect(Number(await dropdown.evaluate(el=>getComputedStyle(el).zIndex))).toBeGreaterThan(1000);
   const rect=(await dropdown.boundingBox())!;
   expect(rect.x).toBeGreaterThanOrEqual(0);
-  expect(rect.right).toBeLessThanOrEqual(321);
+  expect(rect.x+rect.width).toBeLessThanOrEqual(321);
   await page.locator('#chart-timeframe-calendar-divider').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
   await expect(dropdown).toHaveCount(0);
   await page.locator('#timeframe-favorites-button').click();
