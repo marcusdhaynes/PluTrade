@@ -408,7 +408,7 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
           <button type="button" aria-label="Add journal trade" title="Add Trade" onClick={onOpenAddTrade}
             className="grid h-[26px] w-7 shrink-0 place-items-center rounded bg-[#00a889] text-white"><Plus size={15}/></button>
         </div>
-        {mobileFiltersOpen&&<FloatingPortal anchor={mobileFilterAnchor} placement="bottom-start" width={320}
+        {mobileFiltersOpen&&<FloatingPortal anchor={mobileFilterAnchor} placement="bottom-start" width={320} zIndex={2100}
           id="journal-mobile-filters-popover" ariaLabel="Journal filter options"
           className="rounded-lg border border-[#52627d] bg-[#172234] p-3 text-[#e3eaf8] shadow-2xl">
           <strong className="block pb-2 text-xs">Trade filters</strong>
