@@ -1,0 +1,10 @@
+import {strict as assert} from 'node:assert';
+import {pinchGeometry,pinchFactor,scaleAboutAnchor} from './chartPinch';
+assert.equal(pinchGeometry({x:0,y:0},{x:100,y:5}).axis,'horizontal');
+assert.equal(pinchGeometry({x:0,y:0},{x:5,y:100}).axis,'vertical');
+assert.equal(pinchGeometry({x:0,y:0},{x:70,y:70}).axis,'both');
+assert.equal(pinchFactor(100,200),2);
+assert.equal(pinchFactor(100,0),.2);
+assert.deepEqual(scaleAboutAnchor({from:0,to:100},50,2),{from:25,to:75});
+assert.deepEqual(scaleAboutAnchor({from:10,to:30},20,.5),{from:0,to:40});
+console.log('Directional chart pinch geometry: pass');
