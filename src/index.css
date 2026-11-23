@@ -50,3 +50,21 @@ html,body,#root { width:100%; height:100%; margin:0; overflow:hidden; }
   #tradingview-bottom-bar > div:last-child > span:first-child {display:none;}
   #plutrade-mobile-trade-controls button {white-space:nowrap;}
 }
+
+@media (max-width:767px) {
+  #tradingview-left-toolbar {overflow:visible;}
+  #tradingview-left-toolbar > div:first-child {
+    flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
+    scrollbar-width:none; -webkit-overflow-scrolling:touch;
+  }
+  #tradingview-left-toolbar > div:first-child::-webkit-scrollbar{display:none;}
+  #tradingview-lines-flyout-menu {
+    position:fixed!important;
+    left:30px!important;
+    top:40px!important;
+    width:min(280px,calc(100vw - 36px))!important;
+    max-height:calc(100dvh - 105px)!important;
+    z-index:120!important;
+  }
+  #left-toolbar-layout-controls {margin-top:auto;}
+}
