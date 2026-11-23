@@ -309,3 +309,221 @@ html,body,#root {
 @media (max-width:767px), (hover:none) and (pointer:coarse) {
   #plutrade-mobile-trade-controls {position:relative;z-index:1500 !important;}
 }
+
+/* Mobile top bar: icon affordances are bare, not boxed. Keep ticker input
+   distinguished as the only bordered field in the top-left cluster. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #plutrade-mobile-navbar button:not(#mobile-symbol-search-trigger),
+  #plutrade-mobile-navbar #mobile-layout-anchor {
+    border:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+  }
+  #plutrade-mobile-navbar button:not(#mobile-symbol-search-trigger):active {
+    color:#99c4ff;
+  }
+  #plutrade-mobile-trade-controls {
+    padding-left:2px;
+    padding-right:2px;
+  }
+  #plutrade-mobile-trade-controls [aria-label="Mobile trading controls"] > button {
+    min-width:0;
+    padding-left:0;
+    padding-right:0;
+    overflow:hidden;
+    white-space:nowrap;
+  }
+  #mobile-active-account-btn {flex:1.55 1 0%;}
+  #mobile-upl-cash,#mobile-upl-percent {flex:1.36 1 0%;}
+}
+
+/* Every journal screen must fit the actual viewport. The central content is
+   already scaled independently; this styling MUST NOT resize the 28px dock. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #trade-journal-root-modal {overflow:hidden;max-width:100vw;}
+  #trade-journal-window-card {min-width:0;max-width:100vw;}
+  #journal-global-close {display:flex !important;}
+  #journal-account-import-strip {min-width:0;max-width:100%;overflow:hidden;padding-right:48px;gap:5px;}
+  #journal-account-import-strip > label {min-width:0;max-width:42%;flex:0 1 auto;font-size:9px;}
+  #journal-account-import-strip > button {font-size:9px;padding:2px 4px;}
+  #journal-account-import-strip > input {width:66px;flex:0 0 66px;padding:2px 3px;}
+  #journal-main-content-viewport {overflow:hidden;max-width:100%;min-width:0;}
+  #journal-mobile-scaled-content {min-width:0;max-width:none;}
+  #journal-mobile-scaled-content > div {min-width:0;max-width:100%;}
+  #journal-tradelog-view,#journal-calendar-view,#journal-dashboard-tab {
+    min-width:0;max-width:100%;
+  }
+  #journal-tradelog-toolbar {
+    flex-wrap:nowrap;
+    justify-content:stretch;
+    min-width:0;
+    gap:2px;
+    padding:2px 3px;
+    min-height:30px;
+  }
+  #journal-desktop-filter-row,#journal-desktop-log-actions {display:none !important;}
+  #journal-mobile-filter-strip {display:flex !important;max-width:100%;}
+  #journal-mobile-filter-strip > * {min-width:0;}
+  #journal-trades-content {
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    -webkit-overflow-scrolling:touch;
+    min-width:0;
+    min-height:0;
+    flex:1 1 auto;
+  }
+  #journal-trades-content > div:first-child {min-width:0;max-width:100%;}
+  #journal-trades-content > div:first-child > div {min-width:0;max-width:100%;overflow:hidden;}
+  #journal-trades-content svg {max-width:100%;}
+  #journal-trade-main-grid {
+    flex:0 0 auto;
+    width:100%;
+    min-width:0;
+    min-height:0;
+    height:auto;
+    flex-direction:column;
+    align-items:stretch;
+    overflow:visible;
+    gap:6px;
+  }
+  #journal-trade-table-panel,#journal-trade-widgets-column {
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0;
+    height:auto;
+    flex:0 0 auto;
+    overflow:visible;
+    align-self:stretch;
+  }
+  #journal-trade-splitter,#journal-desktop-trades-table {display:none !important;}
+  #journal-mobile-trade-cards {display:flex !important;max-width:100%;overflow:hidden;}
+  #journal-mobile-trade-cards article {width:100%;max-width:100%;overflow:hidden;overflow-wrap:anywhere;}
+  #journal-trade-widgets-column {overflow:visible !important;gap:6px;}
+  #journal-trade-widgets-column > div {width:100%;min-width:0;max-width:100%;overflow:hidden;}
+  #journal-trade-widgets-column svg {max-width:100%;height:auto;}
+  #journal-trade-widgets-column :is(p,span,div) {overflow-wrap:break-word;}
+  #journal-tradelog-view > div:last-of-type {min-width:0;}
+  #journal-tradelog-view > div:last-of-type input[type="range"] {min-width:0;}
+
+  /* Filters AND sorts occupy exactly one horizontal toolbar row. */
+  #journal-calendar-top-toolbar,#journal-overview-top-toolbar {
+    display:flex;
+    flex-wrap:nowrap !important;
+    align-items:center;
+    justify-content:space-between;
+    gap:4px;
+    padding:3px 4px;
+    min-width:0;
+  }
+  #journal-calendar-filters {
+    display:flex;
+    flex-wrap:nowrap !important;
+    gap:3px;
+    min-width:0;
+    flex:1 1 auto;
+    overflow:hidden;
+  }
+  #journal-calendar-filters > div {
+    display:flex;min-width:0;max-width:33%;flex:1 1 0%;
+    padding:2px 3px;gap:1px;overflow:hidden;
+  }
+  #journal-calendar-filters > div:first-child {display:none;}
+  #journal-calendar-filters > div > span {display:none;}
+  #journal-calendar-filters select {
+    min-width:0;max-width:100%;width:100%;
+    font-size:10px;text-overflow:ellipsis;
+  }
+  #journal-calendar-filters > button {flex-shrink:0;font-size:9px;}
+  #journal-calendar-actions {flex-shrink:0;gap:3px;}
+  #journal-calendar-actions > button {padding:3px;}
+  #journal-calendar-actions > button span {display:none;}
+  #journal-overview-top-toolbar > div {min-width:0;max-width:100%;gap:4px;}
+  #journal-overview-top-toolbar button,#journal-overview-top-toolbar select {max-width:100%;}
+  #journal-dashboard-tab > div {min-width:0;max-width:100%;}
+  #journal-dashboard-tab svg {max-width:100%;}
+  /* Full-sized trade calendar: 8 equal square cells, no min-width 700px. */
+  #journal-calendar-body {
+    display:flex;
+    flex-direction:column;
+    width:100%;max-width:100%;min-width:0;
+    overflow-y:auto;
+    overflow-x:hidden;
+  }
+  #journal-calendar-scroll {
+    flex:0 0 auto;
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    overflow:visible;
+    padding:4px;
+  }
+  #journal-calendar-square-grid {
+    display:flex;
+    flex-direction:column;
+    flex:0 0 auto;
+    width:100%;
+    max-width:100%;
+    min-width:0 !important;
+  }
+  #journal-calendar-square-grid .grid,
+  #journal-dashboard-calendar-grid .grid {
+    grid-template-columns:repeat(8,minmax(0,1fr));
+    gap:2px;
+    width:100%;
+    max-width:100%;
+    min-width:0;
+  }
+  #journal-calendar-square-grid > .grid,
+  #journal-dashboard-calendar-grid > .grid {font-size:9px;letter-spacing:0;}
+  #journal-calendar-square-grid .journal-calendar-week {
+    min-height:0 !important;
+    flex:0 0 auto !important;
+  }
+  [data-journal-calendar-square] {
+    box-sizing:border-box;
+    aspect-ratio:1 / 1;
+    width:100%;max-width:100%;
+    height:auto !important;
+    min-height:0 !important;
+    min-width:0 !important;
+    padding:2px !important;
+    overflow:hidden !important;
+  }
+  [data-journal-calendar-square] > div {min-width:0;max-width:100%;overflow:hidden;}
+  [data-journal-calendar-square] :is(span,div) {
+    min-width:0;
+    text-overflow:ellipsis;
+    overflow:hidden;
+    white-space:nowrap;
+    font-size:clamp(7px,1.7vw,11px);
+  }
+  [data-journal-calendar-square] > div:last-child span {display:none;}
+  #calendar-day-drilldown-drawer {
+    flex:0 0 auto;
+    width:100%;max-width:100%;
+    min-width:0;
+    min-height:220px;
+    max-height:none;
+    overflow:visible;
+    border-left:0;
+    border-top:1px solid #384559;
+  }
+  #calendar-day-drilldown-drawer > div:last-child {overflow:visible;}
+  #journal-dashboard-calendar-scroller {overflow-x:hidden !important;width:100%;max-width:100%;}
+  #journal-dashboard-calendar-grid {
+    min-width:0 !important;
+    width:100% !important;
+    max-width:100%;
+  }
+  #journal-dashboard-tab .min-w-\[600px\] {min-width:0 !important;}
+  #journal-dashboard-tab .lg\:col-span-8 {min-width:0;}
+  /* Right-hand overview/analytics widgets stack below the main pane instead
+     of extending beyond the red-marked screen edge. */
+  #journal-dashboard-tab > .grid {grid-template-columns:minmax(0,1fr) !important;}
+  #journal-dashboard-tab .lg\:grid-cols-12 {grid-template-columns:minmax(0,1fr) !important;}
+  #journal-dashboard-tab > div > div {min-width:0;max-width:100%;}
+  #journal-dashboard-tab > div > div > div {min-width:0;max-width:100%;}
+  #journal-ai-assistant-view,#journal-evaluator-view,#journal-insights-view {
+    min-width:0;max-width:100%;overflow-x:hidden;
+  }
+}
