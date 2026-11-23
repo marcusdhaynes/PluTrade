@@ -449,7 +449,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
               </button>)}
           </div>
           {isMobileChartStyleOpen&&<div id="mobile-chart-type-dropdown-menu" role="dialog" aria-label="Chart styles"
-            className="absolute right-0 top-full z-[120] mt-1 max-h-[min(73dvh,450px)] w-[min(258px,calc(100vw-16px))] overflow-y-auto rounded-lg border border-[#47546c] bg-[#1b2534] p-1.5 shadow-2xl">
+            className="fixed right-2 top-[35px] z-[120] max-h-[min(73dvh,450px)] w-[min(258px,calc(100vw-16px))] overflow-y-auto rounded-lg border border-[#47546c] bg-[#1b2534] p-1.5 shadow-2xl">
             <p className="px-2 py-1 text-[10px] text-[#aabbcf]">Select a view · Star favorites for quick access</p>
             {chartTypes.map(item=>{
               const selected=chartType===item.id,starred=favoriteChartTypes.includes(item.id);
