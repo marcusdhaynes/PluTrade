@@ -46,6 +46,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [inProgressPoints, setInProgressPoints] = useState<DrawingPoint[]>([]);
   const rulerDragRef=useRef<{id:number;x:number;y:number;start:DrawingPoint}|null>(null);
+  const rulerEndpointDragRef=useRef<{drawingId:string;index:number;pointerId:number}|null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [drawingContextMenu, setDrawingContextMenu] = useState<{
@@ -241,6 +242,15 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     const rect = containerRef.current.getBoundingClientRect();
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
+    const endpoint=rulerEndpointDragRef.current;
+    if(endpoint&&endpoint.pointerId===e.pointerId){
+      const point=getPointFromClientXY(e.clientX,e.clientY);
+      if(point&&!areDrawingsLocked){
+        setDrawings(prev=>prev.map(d=>d.id===endpoint.drawingId?
+          {...d,points:d.points.map((p,i)=>i===endpoint.index?point:p)}:d));
+      }
+      return;
+    }
 
     // Handle Adobe Flash/Animate Bend Dragging
     if (bendDragRef.current && bendDragRef.current.type === 'bend') {
@@ -302,6 +312,10 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   };
 
   const handlePointerUp = (e?:React.PointerEvent) => {
+    if(rulerEndpointDragRef.current&&(!e||e.pointerId===rulerEndpointDragRef.current.pointerId)){
+      rulerEndpointDragRef.current=null;
+      return;
+    }
     const ruler=rulerDragRef.current;
     if(ruler){
       rulerDragRef.current=null;
@@ -1337,8 +1351,19 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
                   strokeWidth={1} strokeDasharray="4 3"/>
                 <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
                   stroke={color} strokeWidth={1.5}/>
-                <circle cx={p1.x} cy={p1.y} r={4} fill={color} stroke="#e4edfc" strokeWidth={1}/>
-                <circle cx={p2.x} cy={p2.y} r={4} fill={color} stroke="#e4edfc" strokeWidth={1}/>
+                <circle cx={p1.x} cy={p1.y} r={isSelected?6:4} fill={color} stroke="#e4edfc" strokeWidth={1}/>
+                <circle cx={p2.x} cy={p2.y} r={isSelected?6:4} fill={color} stroke="#e4edfc" strokeWidth={1}/>
+                {!areDrawingsLocked&&[p1,p2].map((point,index)=>
+                  <circle key={index} cx={point.x} cy={point.y} r={13}
+                    fill="transparent" className="pointer-events-auto cursor-grab touch-none"
+                    aria-label={'Drag ruler endpoint '+(index+1)}
+                    onPointerDown={e=>{
+                      e.stopPropagation();e.preventDefault();
+                      rulerEndpointDragRef.current={drawingId:drawing.id,index,pointerId:e.pointerId};
+                      setSelectedDrawingId(drawing.id);
+                      try{e.currentTarget.setPointerCapture(e.pointerId);}catch{}
+                    }}/>
+                )}
                 <rect x={labelX} y={labelY} width={badgeWidth} height={badgeHeight}
                   rx={5} fill="#151e2d" fillOpacity={0.97} stroke={color} strokeWidth={1}/>
                 <text x={labelX+7} y={labelY+13} fontSize="11" fontFamily="monospace"
