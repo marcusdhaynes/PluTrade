@@ -131,8 +131,8 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
     const a=document.createElement('a');a.href=url;a.download='plutrade-paper-fills.csv';a.click();
     window.setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
-  if(!isOpen)return <button type="button" onClick={()=>setIsOpen(true)}
-    className="h-6 bg-[#1e222d] border-t border-[#2a2e39] px-3 flex items-center gap-3 text-[11px] text-[#d1d4dc]">
+  if(!isOpen)return <button id="paper-trading-collapsed-strip" type="button" onClick={()=>setIsOpen(true)}
+    className="hidden md:flex h-6 bg-[#1e222d] border-t border-[#2a2e39] px-3 items-center gap-3 text-[11px] text-[#d1d4dc]">
     <strong>Paper Trading</strong><span>Equity {cash(account.equity)} {paperSettings.currency}</span><span>Open {positions.length}</span>
   </button>;
   const corruptBackup=(()=>{try{return localStorage.getItem('plutrade_paper_accounts_corrupt_backup_v1');}catch{return null;}})();
