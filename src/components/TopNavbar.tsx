@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Asset, ChartType, IndicatorSettings, DrawingToolType } from '../types';
+import { Asset, ChartType, Timeframe, IndicatorSettings, DrawingToolType } from '../types';
 import {
   Search,
   CandlestickChart,
@@ -40,6 +40,7 @@ import { LayoutManagerDropdown } from './layout/LayoutManagerDropdown';
 
 interface TopNavbarProps {
   activeAsset: Asset;
+  activeTimeframe: Timeframe;
   chartType: ChartType;
   setChartType: (type: ChartType) => void;
   onOpenSymbolSearch: () => void;
@@ -89,6 +90,7 @@ interface TopNavbarProps {
 
 export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   activeAsset,
+  activeTimeframe,
   chartType,
   setChartType,
   onOpenSymbolSearch,
