@@ -124,7 +124,7 @@ test('right tool rail is attached, visible and usable without a hamburger',async
 });
 
 
-test('chart range controls are above the plot; on-chart axes stay in the chart',async ({page})=>{
+test('the timeframe selector replaces range controls above the plot; native axes stay on chart',async ({page})=>{
   await page.goto('./');
   const toolbar=page.locator('#tradingview-bottom-bar');
   const plot=page.locator('#chart-workspace-viewport');
@@ -144,15 +144,17 @@ test('chart range controls are above the plot; on-chart axes stay in the chart',
   expect(toolbarBox!.y).toBeGreaterThanOrEqual(headerBox!.y+headerBox!.height-1);
   expect(toolbarBox!.y+toolbarBox!.height).toBeLessThanOrEqual(plotBox!.y+1);
   expect(chartBox!.height).toBeGreaterThan(110);
-  const rangeLabels=['1D','5D','1M','3M','6M','YTD','1Y','ALL'];
-  for(const label of rangeLabels){
-    const button=page.locator('#range-btn-'+label);
-    await expect(button).toBeVisible();
-    const rect=await button.boundingBox();
-    expect(rect!.x).toBeGreaterThanOrEqual(0);
-    expect(rect!.x+rect!.width).toBeLessThanOrEqual(await page.evaluate(()=>innerWidth+1));
-  }
-  await expect(page.getByLabel('Chart range and scale controls')).toBeVisible();
+  await expect(page.locator('#tradingview-top-navbar #chart-timeframe-bar')).toHaveCount(0);
+  await expect(toolbar.locator('#chart-timeframe-bar')).toBeVisible();
+  await expect(toolbar.locator('#chart-timeframe-scroll')).toBeVisible();
+  await expect(toolbar.locator('#chart-timeframe-dropdown-trigger')).toBeVisible();
+  await expect(toolbar.locator('#go-to-chart-date-btn')).toBeVisible();
+  await expect(toolbar.locator('#timeframe-favorites-button')).toBeVisible();
+  await expect(toolbar.locator('#range-btn-1D')).toHaveCount(0);
+  const star=await toolbar.locator('#timeframe-favorites-button').boundingBox();
+  const calendar=await toolbar.locator('#go-to-chart-date-btn').boundingBox();
+  expect(star!.x).toBeGreaterThan(calendar!.x);
+  await expect(page.getByLabel('Chart timeframe and calendar controls')).toBeVisible();
   await expect(chart.getByLabel('Trading chart with time axis at bottom and price axis at right')).toBeAttached();
   // Native Lightweight Charts renders separate axis cells inside its table,
   // not a fake date or price row outside the chart element.
@@ -394,4 +396,55 @@ test('right-side toolbox and time-scale popovers close on outside pointerdown',a
   await expect(page.getByRole('dialog',{name:'Time scale settings'})).toBeVisible();
   await page.locator('#chart-timeframe-scroll').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
   await expect(page.getByRole('dialog',{name:'Time scale settings'})).toHaveCount(0);
+});
+
+
+test('custom timeframe dropdown includes strict digits, every unit, actual selection and tick restriction',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const trigger=page.locator('#chart-timeframe-dropdown-trigger');
+  await trigger.click();
+  const dropdown=page.getByRole('dialog',{name:'All chart intervals'});
+  await expect(dropdown).toBeVisible();
+  await expect(dropdown.getByText('Custom interval')).toBeVisible();
+  const input=dropdown.getByRole('textbox',{name:'Custom interval number'});
+  await expect(input).toHaveAttribute('inputmode','numeric');
+  await input.fill('2x3');
+  await expect(input).toHaveValue('23');
+  await input.fill('2');
+  const select=dropdown.getByLabel('Custom interval unit');
+  await expect(select.locator('option')).toHaveCount(8);
+  expect(await select.locator('option').allTextContents()).toEqual([
+    'ticks','seconds','minutes','hours','days','weeks','months','years'
+  ]);
+  await select.selectOption('hours');
+  await dropdown.getByRole('button',{name:'Apply'}).click();
+  await expect(dropdown).toHaveCount(0);
+  await expect(trigger).toContainText('2h');
+  await expect(page.locator('#go-to-chart-date-btn')).toBeVisible();
+  await trigger.click();
+  await select.selectOption('ticks');
+  await dropdown.getByRole('button',{name:'Apply'}).click();
+  await expect(dropdown.getByRole('alert')).toContainText('verified historical individual-trade feed');
+  await expect(trigger).toContainText('2h');
+  await page.locator('#chart-timeframe-scroll').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(dropdown).toHaveCount(0);
+  await page.locator('#tf-btn-1m').click();
+  await expect(trigger).toContainText('1m');
+});
+
+test('ticker selector stays as narrow as the compact icon controls at top',async ({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(size);
+    await page.goto('./');
+    const ticker=page.locator('#mobile-symbol-search-trigger');
+    const icon=page.locator('#mobile-chart-action-rows > button').first();
+    await expect(ticker).toBeVisible();
+    await expect(icon).toBeVisible();
+    const a=await ticker.boundingBox(),b=await icon.boundingBox();
+    expect(a!.width).toBeLessThanOrEqual(b!.width+3);
+    expect(a!.width).toBeGreaterThan(45);
+    await expect(page.locator('#mobile-chart-action-rows').getByRole('button',{name:'Alert'})).toBeVisible();
+    await expect(page.locator('#mobile-chart-action-rows').getByRole('button',{name:'Alert'}).locator('svg')).toBeVisible();
+  }
 });
