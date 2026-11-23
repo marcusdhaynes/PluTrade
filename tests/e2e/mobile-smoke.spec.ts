@@ -13,33 +13,34 @@ test('narrow-screen application launches without a fatal browser exception',asyn
 });
 
 
-test('mobile keeps a single five-action trading row and preloads equity sizing',async ({page})=>{
+test('mobile keeps a single six-action trading row and preloads equity sizing',async ({page})=>{
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('./');
   const bar=page.locator('#plutrade-mobile-trade-controls');
   await expect(bar).toBeVisible();
   const actions=bar.locator('div[aria-label="Mobile trading controls"] > button');
-  await expect(actions).toHaveCount(5);
+  await expect(actions).toHaveCount(6);
   const rects=await actions.evaluateAll(buttons=>buttons.map(button=>({
     top:Math.round(button.getBoundingClientRect().top),
     right:button.getBoundingClientRect().right,
   })));
   expect(new Set(rects.map(r=>r.top)).size).toBe(1);
   expect(rects.at(-1)!.right).toBeLessThanOrEqual(await page.evaluate(()=>innerWidth+1));
-  await actions.nth(2).click();
+  await actions.nth(3).click();
   const equity=page.getByRole('dialog',{name:'Equity allocation'});
   await expect(equity).toBeVisible();
   await equity.getByRole('spinbutton',{name:'Percent of equity'}).fill('50');
   await equity.getByRole('button',{name:'Apply to Entry'}).click();
-  await expect(actions.nth(2)).toContainText('50%');
-  await actions.first().click();
+  await expect(actions.nth(3)).toContainText('50%');
+  await expect(actions.first()).toContainText('Order');
+  await actions.nth(1).click();
   const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
   await expect(ticket).toBeVisible();
   await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('50');
   await expect(ticket.getByRole('button',{name:'% Equity'})).toBeVisible();
   await ticket.getByTitle('Close order panel').click();
-  await actions.nth(3).click();
+  await actions.nth(4).click();
   await expect(page.getByRole('dialog',{name:'Stop loss options'})).toBeVisible();
   await page.getByRole('button',{name:/Open Entry Ticket/}).click();
   await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','true');
@@ -48,7 +49,7 @@ test('mobile keeps a single five-action trading row and preloads equity sizing',
 
 test('holding TP reveals the advanced entry path without placing an order',async ({page})=>{
   await page.goto('./');
-  const button=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button').nth(4);
+  const button=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button').nth(5);
   await button.dispatchEvent('pointerdown',{pointerType:'touch'});
   await page.waitForTimeout(510);
   await button.dispatchEvent('pointerup',{pointerType:'touch'});
@@ -193,7 +194,8 @@ test('portrait and landscape touch layouts fit without scrolling the application
     expect(geometry.tradeBottom).toBeLessThanOrEqual(size.height+1);
     expect(geometry.chartHeight).toBeGreaterThan(80);
     await expect(page.locator('#chart-timeframe-bar')).toBeVisible();
-    await expect(page.locator('#mobile-chart-action-rows')).toBeVisible();
+    await expect(page.locator('#mobile-chart-action-rows')).toHaveCount(0);
+    await expect(page.locator('#mobile-top-chart-actions')).toBeVisible();
     await expect(page.locator('#mobile-top-tools-trigger')).toHaveCount(0);
   }
 });
@@ -204,11 +206,13 @@ test('mobile chart controls are always visible and visual style favorites can be
   await expect(page.locator('#mobile-symbol-search-trigger')).toBeVisible();
   await expect(page.locator('#mobile-timeframe-selector')).toHaveCount(0);
   await expect(page.locator('#mobile-top-tools-trigger')).toHaveCount(0);
-  const rows=page.locator('#mobile-chart-action-rows');
-  await expect(rows).toBeVisible();
-  await expect(rows.getByRole('button',{name:'Alert'})).toBeVisible();
-  await expect(rows.getByRole('button',{name:'Paper Trading'})).toBeVisible();
-  await expect(rows.getByLabel('Mobile chart layout')).toBeVisible();
+  await expect(page.locator('#mobile-chart-action-rows')).toHaveCount(0);
+  const top=page.locator('#mobile-top-chart-actions');
+  await expect(top).toBeVisible();
+  await expect(top.getByLabel('Mobile chart layout')).toBeVisible();
+  for(const name of ['Save Chart','Snapshot','Download Data'])
+    await expect(top.getByRole('button',{name})).toBeVisible();
+  await expect(page.locator('#right-tab-indicators')).toBeVisible();
 
   const style=page.getByRole('button',{name:'Choose visual chart style'});
   await expect(style).toBeVisible();
@@ -216,16 +220,16 @@ test('mobile chart controls are always visible and visual style favorites can be
   const styles=page.getByRole('dialog',{name:'Chart styles'});
   await expect(styles).toBeVisible();
   await styles.getByRole('button',{name:'Favorite Line'}).click();
-  await expect(page.locator('#mobile-chart-type-btn-line')).toBeVisible();
+  await expect(styles.getByRole('button',{name:'Unfavorite Line'})).toHaveAttribute('aria-pressed','true');
   await styles.getByRole('button',{name:'Chart style Line'}).click();
   await expect(styles).toHaveCount(0);
-  await expect(page.locator('#mobile-chart-type-btn-line')).toHaveClass(/bg-\[#295ee8\]/);
+  await expect(style).toHaveAttribute('title','Chart type: Line');
   await style.click();
   await expect(styles).toBeVisible();
-  await page.locator('#chart-timeframe-scroll').click({position:{x:3,y:5}});
+  await page.locator('#chart-workspace-viewport').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
   await expect(styles).toHaveCount(0);
-  await rows.getByRole('button',{name:'Alert'}).click();
-  await expect(page.locator('#alerts-modal-window')).toBeVisible();
+  await page.locator('#right-tab-alerts').click();
+  await expect(page.locator('#tradingview-alerts-panel')).toBeVisible();
 });
 
 test('all intervals scroll horizontally until ticker favorites are explicitly saved',async ({page})=>{
@@ -294,10 +298,13 @@ test('mobile has matched 24px execution/range bars and chart-corner settings',as
   await expect(execution).toBeVisible();
 });
 
-test('mobile paper workspace remains accessible through actions after removing collapsed strip',async ({page})=>{
+test('mobile paper workspace remains accessible by holding Order',async ({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto('./');
-  await page.locator('#mobile-chart-action-rows').getByRole('button',{name:'Paper Trading'}).click();
+  const order=page.locator('#mobile-order-ticket-btn');
+  await order.dispatchEvent('pointerdown',{pointerType:'touch'});
+  await page.waitForTimeout(585);
+  await order.dispatchEvent('pointerup',{pointerType:'touch'});
   await expect(page.locator('#paper-trading-open-panel')).toBeVisible();
   await expect(page.locator('#plutrade-mobile-trade-controls')).toBeVisible();
   await expect(page.locator('#tradingview-right-icon-bar')).toBeVisible();
@@ -360,7 +367,10 @@ test('mobile trade journal content shrinks independently of its untouched left r
 test('paper account imports starting capital and percent fees without silently creating trades',async ({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto('./');
-  await page.locator('#mobile-chart-action-rows').getByRole('button',{name:'Paper Trading'}).click();
+  const order=page.locator('#mobile-order-ticket-btn');
+  await order.dispatchEvent('pointerdown',{pointerType:'touch'});
+  await page.waitForTimeout(585);
+  await order.dispatchEvent('pointerup',{pointerType:'touch'});
   await page.getByRole('button',{name:'Select Paper Trading account'}).click();
   await page.getByText('Create account…').click();
   const dialog=page.getByRole('dialog',{name:'Create Paper Trading account'});
@@ -433,18 +443,104 @@ test('custom timeframe dropdown includes strict digits, every unit, actual selec
   await expect(trigger).toContainText('1m');
 });
 
-test('ticker selector stays as narrow as the compact icon controls at top',async ({page})=>{
+test('mobile top bar is one row: window view, save, camera, data, PiP and fullscreen',async ({page})=>{
   for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
     await page.setViewportSize(size);
     await page.goto('./');
-    const ticker=page.locator('#mobile-symbol-search-trigger');
-    const icon=page.locator('#mobile-chart-action-rows > button').first();
-    await expect(ticker).toBeVisible();
-    await expect(icon).toBeVisible();
-    const a=await ticker.boundingBox(),b=await icon.boundingBox();
-    expect(a!.width).toBeLessThanOrEqual(b!.width+3);
-    expect(a!.width).toBeGreaterThan(45);
-    await expect(page.locator('#mobile-chart-action-rows').getByRole('button',{name:'Alert'})).toBeVisible();
-    await expect(page.locator('#mobile-chart-action-rows').getByRole('button',{name:'Alert'}).locator('svg')).toBeVisible();
+    const ids=['mobile-layout-anchor','mobile-save-chart-btn','mobile-chart-snapshot-btn',
+      'mobile-save-data-btn','mobile-pip-btn','mobile-fullscreen-btn'];
+    const boxes=[];
+    for(const id of ids){
+      const element=page.locator('#'+id);
+      await expect(element).toBeVisible();
+      boxes.push((await element.boundingBox())!);
+    }
+    expect(new Set(boxes.map(rect=>Math.round(rect.y))).size).toBe(1);
+    expect(boxes.every((rect,i)=>i===0||rect.x>boxes[i-1].x)).toBe(true);
+    const ticker=(await page.locator('#mobile-symbol-search-trigger').boundingBox())!;
+    expect(ticker.width).toBeLessThanOrEqual(67);
+    expect(boxes.at(-1)!.x+boxes.at(-1)!.width).toBeLessThanOrEqual(size.width+1);
+    await expect(page.locator('#mobile-chart-action-rows')).toHaveCount(0);
   }
+});
+
+test('timeframe scroll clips labels and keeps calendar/divider fixed',async ({page})=>{
+  await page.setViewportSize({width:320,height:568});
+  await page.goto('./');
+  const scroll=page.locator('#chart-timeframe-scroll');
+  const divider=page.locator('#chart-timeframe-calendar-divider');
+  const calendar=page.locator('#go-to-chart-date-btn');
+  const star=page.locator('#timeframe-favorites-button');
+  const before=[await divider.boundingBox(),await calendar.boundingBox(),await star.boundingBox()];
+  await expect(scroll).toHaveCSS('overflow-x','auto');
+  expect(await scroll.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  await scroll.evaluate(el=>{el.scrollLeft=el.scrollWidth;});
+  const after=[await divider.boundingBox(),await calendar.boundingBox(),await star.boundingBox()];
+  for(let i=0;i<before.length;i++)expect(after[i]!.x).toBeCloseTo(before[i]!.x,1);
+  const viewport=(await scroll.boundingBox())!;
+  expect(viewport.x+viewport.width).toBeLessThanOrEqual(before[0]!.x+1);
+  await expect(divider).toHaveCSS('border-left-style','solid');
+});
+
+test('popups render above chart/sidebar and outside tapping dismisses them',async ({page})=>{
+  await page.setViewportSize({width:320,height:568});
+  await page.goto('./');
+  await page.locator('#chart-timeframe-dropdown-trigger').click();
+  const dropdown=page.getByRole('dialog',{name:'All chart intervals'});
+  await expect(dropdown).toBeVisible();
+  expect(await dropdown.evaluate(el=>el.parentElement===document.body)).toBe(true);
+  expect(Number(await dropdown.evaluate(el=>getComputedStyle(el).zIndex))).toBeGreaterThan(1000);
+  const rect=(await dropdown.boundingBox())!;
+  expect(rect.x).toBeGreaterThanOrEqual(0);
+  expect(rect.x+rect.width).toBeLessThanOrEqual(321);
+  await page.locator('#chart-timeframe-calendar-divider').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(dropdown).toHaveCount(0);
+  await page.locator('#timeframe-favorites-button').click();
+  const favorites=page.getByRole('dialog',{name:/Favorite intervals for/});
+  await expect(favorites).toBeVisible();
+  expect(await favorites.evaluate(el=>el.parentElement===document.body)).toBe(true);
+  await page.locator('#mobile-save-chart-btn').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(favorites).toHaveCount(0);
+  await page.locator('#go-to-chart-date-btn').click();
+  const date=page.getByRole('dialog',{name:'Go to chart date'});
+  await expect(date).toBeVisible();
+  expect(await date.evaluate(el=>el.parentElement===document.body)).toBe(true);
+  await page.locator('#chart-timeframe-scroll').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(date).toHaveCount(0);
+});
+
+test('right Indicators and Alerts are sole launchers and Order is first',async ({page})=>{
+  await page.goto('./');
+  await expect(page.locator('#open-alerts-modal-btn')).toHaveCount(0);
+  await expect(page.locator('#open-indicators-modal-btn')).toHaveCount(0);
+  await expect(page.locator('#mobile-chart-action-rows')).toHaveCount(0);
+  const buttons=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button');
+  await expect(buttons.first()).toHaveAttribute('id','mobile-order-ticket-btn');
+  await buttons.first().click();
+  await expect(page.getByRole('dialog',{name:'Paper Trading order entry'})).toBeVisible();
+  await page.getByTitle('Close order panel').click();
+  await page.locator('#right-tab-indicators').click();
+  await expect(page.locator('#indicators-modal-window')).toBeVisible();
+  await page.locator('#indicators-modal-backdrop').click({position:{x:3,y:3}});
+  await page.locator('#right-tab-alerts').click();
+  await expect(page.locator('#tradingview-alerts-panel')).toBeVisible();
+});
+
+
+test('mobile equity and stop-loss tool windows layer above sidebar and close off-click',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const bar=page.locator('#plutrade-mobile-trade-controls');
+  await bar.getByRole('button',{name:/Eq/}).click();
+  const equity=page.getByRole('dialog',{name:'Equity allocation'});
+  await expect(equity).toBeVisible();
+  const z=await bar.evaluate(el=>Number(getComputedStyle(el).zIndex));
+  expect(z).toBeGreaterThan(1400);
+  await page.locator('#chart-timeframe-bar').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(equity).toHaveCount(0);
+  await bar.getByRole('button',{name:/Stop loss/}).click();
+  const stops=page.getByRole('dialog',{name:'Stop loss options'});
+  await expect(stops).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(stops).toHaveCount(0);
 });

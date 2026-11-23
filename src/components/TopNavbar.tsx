@@ -34,6 +34,7 @@ import {
   Play,
 } from 'lucide-react';
 import { LAYOUT_TEMPLATES } from '../data/layoutTemplates';
+import {FloatingPortal} from './FloatingPortal';
 import { LayoutTemplate, LayoutSyncSettings, SavedChartLayout } from '../types/layout';
 import { LayoutDropdown } from './layout/LayoutDropdown';
 import { LayoutManagerDropdown } from './layout/LayoutManagerDropdown';
@@ -148,7 +149,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   useEffect(()=>{
     const dismiss=(event:PointerEvent)=>{
       const node=event.target as Node;
-      if(isMobileChartStyleOpen&&!mobileChartStyleRef.current?.contains(node))
+      if(isMobileChartStyleOpen&&!mobileChartStyleRef.current?.contains(node)&&
+         !(node instanceof Element&&node.closest('#mobile-chart-type-dropdown-menu')))
         setIsMobileChartStyleOpen(false);
       if(isChartTypeOpen&&!desktopChartStyleRef.current?.contains(node))
         setIsChartTypeOpen(false);
@@ -420,8 +422,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
                 {item.icon}
               </button>)}
           </div>
-          {isMobileChartStyleOpen&&<div id="mobile-chart-type-dropdown-menu" role="dialog" aria-label="Chart styles"
-            className="fixed right-2 top-[35px] z-[120] max-h-[min(73dvh,450px)] w-[min(258px,calc(100vw-16px))] overflow-y-auto rounded-lg border border-[#47546c] bg-[#1b2534] p-1.5 shadow-2xl">
+          {isMobileChartStyleOpen&&<FloatingPortal anchor={mobileChartStyleRef} placement="bottom-start"
+            id="mobile-chart-type-dropdown-menu" ariaLabel="Chart styles" width={258}
+            className="rounded-lg border border-[#47546c] bg-[#1b2534] p-1.5 shadow-2xl">
             <p className="px-2 py-1 text-[10px] text-[#aabbcf]">Select a view · Star favorites for quick access</p>
             {chartTypes.map(item=>{
               const selected=chartType===item.id,starred=favoriteChartTypes.includes(item.id);
@@ -441,12 +444,49 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
                 </button>
               </div>;
             })}
-          </div>}
+          </FloatingPortal>}
         </div>
-        <button type="button" aria-label="Open mobile indicators" onClick={onOpenIndicators}
-          className="grid h-7 w-7 shrink-0 place-items-center rounded border border-[#3a4356] text-[#9eb3d1]">
-          <SlidersHorizontal size={15}/>
-        </button>
+        <div id="mobile-top-chart-actions" className="flex min-w-0 shrink-0 items-center gap-0.5">
+          <label id="mobile-layout-anchor" title="Chart window layout"
+            className="relative flex h-7 w-6 shrink-0 items-center justify-center rounded border border-[#3b475a] bg-[#202b3b] text-[#c8d5e8]">
+            <LayoutGrid size={15}/>
+            <select aria-label="Mobile chart layout" value={currentTemplateId}
+              onChange={event=>{
+                const template=LAYOUT_TEMPLATES.find(item=>item.id===event.target.value);
+                if(template)onSelectTemplate(template);
+              }} className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
+              {LAYOUT_TEMPLATES.map(template=><option key={template.id} value={template.id}>{template.name}</option>)}
+            </select>
+          </label>
+          <button type="button" id="mobile-save-chart-btn" aria-label="Save Chart"
+            title="Save and restore charts" onClick={onOpenSavedCharts}
+            className="flex h-7 w-6 shrink-0 items-center justify-center rounded text-[#b6c6df] hover:bg-[#2b3d57]">
+            <Save size={15}/>
+          </button>
+          <button type="button" id="mobile-chart-snapshot-btn" aria-label="Snapshot"
+            title="Chart snapshot" onClick={onTakeSnapshot}
+            className="flex h-7 w-6 shrink-0 items-center justify-center rounded text-[#b6c6df] hover:bg-[#2b3d57]">
+            <Camera size={15}/>
+          </button>
+          <button type="button" id="mobile-save-data-btn" aria-label="Download Data"
+            title="Save chart data" onClick={onDownloadData}
+            className="flex h-7 w-6 shrink-0 items-center justify-center rounded text-[#b6c6df] hover:bg-[#2b3d57]">
+            <Download size={15}/>
+          </button>
+        </div>
+        <div className="min-w-0 flex-1"/>
+        <div id="mobile-window-actions" className="flex shrink-0 items-center gap-0.5">
+          <button type="button" id="mobile-pip-btn" aria-label={isPipActive?'Close PiP':'PiP'}
+            title="Picture in picture" onClick={onTogglePip}
+            className={'flex h-7 w-6 items-center justify-center rounded '+(isPipActive?'bg-[#2962ff] text-white':'text-[#b6c6df] hover:bg-[#2b3d57]')}>
+            <PictureInPicture2 size={15}/>
+          </button>
+          <button type="button" id="mobile-fullscreen-btn" aria-label={isFullscreen?'Exit Fullscreen':'Fullscreen'}
+            title={isFullscreen?'Exit fullscreen':'Fullscreen'} onClick={onToggleFullscreen}
+            className="flex h-7 w-6 items-center justify-center rounded text-[#b6c6df] hover:bg-[#2b3d57]">
+            {isFullscreen?<Minimize2 size={15}/>:<Maximize2 size={15}/>}
+          </button>
+        </div>
       </div>
 
       <div id="desktop-primary-navbar" className="hidden md:flex w-full min-w-0 items-center justify-between gap-1">
@@ -618,22 +658,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
 
         <div className="h-3 w-px bg-[#2a2e39] mx-0.5" />
 
-        {/* Indicators Dialog Trigger */}
-        <button
-          id="open-indicators-modal-btn"
-          onClick={onOpenIndicators}
-          className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-[#1e222d] text-[#d1d4dc] hover:text-white transition font-medium text-[11px]"
-        >
-          <SlidersHorizontal className="w-3 h-3 text-[#2962ff]" />
-          <span>Indicators</span>
-          {activeIndicatorsCount > 0 && (
-            <span className="ml-0.5 px-1 py-0.2 bg-[#2962ff]/20 text-[#2962ff] rounded-full text-[9px] font-bold">
-              {activeIndicatorsCount}
-            </span>
-          )}
-          <ChevronDown className="w-2.5 h-2.5 text-[#787b86]" />
-        </button>
-
         {/* Multi-Chart Quad Split Grid Icon */}
         <button
           className="p-1 text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition"
@@ -641,17 +665,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           onClick={() => { setIsLayoutDropdownOpen(true); setIsLayoutManagerOpen(false); }}
         >
           <LayoutGrid className="w-3 h-3" />
-        </button>
-
-        {/* Alert Trigger */}
-        <button
-          id="open-alerts-modal-btn"
-          onClick={onOpenAlerts}
-          className="flex items-center gap-1 px-1.5 py-0.5 text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition text-[11px]"
-          title="Create Price Alert"
-        >
-          <Bell className="w-3 h-3" />
-          <span>Alert</span>
         </button>
 
         {/* Bar Replay Trigger */}
@@ -776,6 +789,20 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           }}
         />
 
+        <div id="desktop-chart-file-actions" className="flex items-center gap-0.5">
+          <button type="button" id="desktop-save-chart-btn" aria-label="Save Chart"
+            title="Save chart" onClick={onOpenSavedCharts} className="p-1 text-[#b8c4d5] hover:bg-[#28384f] rounded">
+            <Save size={14}/>
+          </button>
+          <button type="button" id="desktop-chart-snapshot-btn" aria-label="Snapshot"
+            title="Chart snapshot" onClick={onTakeSnapshot} className="p-1 text-[#b8c4d5] hover:bg-[#28384f] rounded">
+            <Camera size={14}/>
+          </button>
+          <button type="button" id="desktop-save-data-btn" aria-label="Download Data"
+            title="Download chart data" onClick={onDownloadData} className="p-1 text-[#b8c4d5] hover:bg-[#28384f] rounded">
+            <Download size={14}/>
+          </button>
+        </div>
         {/* Unnamed / Active Layout Manager Dropdown */}
         <LayoutManagerDropdown
           currentLayout={currentLayout}
@@ -806,40 +833,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           title="Quick Search"
         >
           <Search className="w-3 h-3" />
-        </button>
-
-        {/* Settings Gear */}
-        <button
-          type="button"
-          onClick={onOpenIndicators}
-          className="p-1 text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition"
-          title="Indicators and chart studies settings"
-        >
-          <Settings className="w-3 h-3" />
-        </button>
-
-        {/* Fullscreen Toggle */}
-        <button
-          id="toggle-fullscreen-btn"
-          onClick={onToggleFullscreen}
-          className="p-1 text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition"
-          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-        >
-          {isFullscreen ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
-        </button>
-
-        {/* Picture-in-Picture (PiP) Button */}
-        <button
-          id="popout-mini-chart-btn"
-          onClick={onTogglePip}
-          className={`p-1 rounded transition relative ${
-            isPipActive
-              ? 'text-white bg-[#2962ff] shadow-xs'
-              : 'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'
-          }`}
-          title={isPipActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture (Overlay on other tabs/windows)'}
-        >
-          <PictureInPicture2 className="w-3 h-3" />
         </button>
 
         {/* Live Market Feed Status Pill */}
@@ -876,56 +869,20 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           <span>Trade</span>
         </button>
 
-        {/* Local saved charts: never claim to publish or upload without a real backend. */}
-        <button
-          id="save-chart-action-btn"
-          type="button"
-          onClick={onOpenSavedCharts}
-          title="Save or restore charts privately in this browser"
-          className="px-3 py-1 bg-white hover:bg-white/90 text-[#131722] font-bold rounded-full transition shadow-xs text-xs"
-        >
-          Save chart
+        <button type="button" id="popout-mini-chart-btn" onClick={onTogglePip}
+          aria-label="PiP" title="Picture-in-picture"
+          className="p-1 text-[#b4c2d6] hover:text-white hover:bg-[#26374f] rounded">
+          <PictureInPicture2 size={15}/>
+        </button>
+        <button type="button" id="toggle-fullscreen-btn" onClick={onToggleFullscreen}
+          aria-label={isFullscreen?'Exit Fullscreen':'Fullscreen'}
+          title={isFullscreen?'Exit Fullscreen':'Enter Fullscreen'}
+          className="p-1 text-[#b4c2d6] hover:text-white hover:bg-[#26374f] rounded">
+          {isFullscreen?<Minimize2 size={15}/>:<Maximize2 size={15}/>}
         </button>
       </div>
       </div>
 
-      {/* Replace the mobile three-lines popup with always-visible compact rows.
-          Important actions stay reachable without hiding the actual chart. */}
-      <div id="mobile-chart-action-rows"
-        className="grid md:hidden w-full min-w-0 grid-cols-5 gap-px border-t border-[#30394a] bg-[#121923] p-px">
-        <label title="Chart layout" className="relative flex h-[23px] min-w-0 cursor-pointer items-center justify-center gap-0.5 rounded bg-[#253146] text-[#c2d3e8]">
-          <LayoutGrid size={15}/><ChevronDown size={9}/>
-          <select aria-label="Mobile chart layout" value={currentTemplateId}
-            onChange={event=>{
-              const template=LAYOUT_TEMPLATES.find(item=>item.id===event.target.value);
-              if(template)onSelectTemplate(template);
-            }}
-            className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
-            {LAYOUT_TEMPLATES.map(template=><option key={template.id} value={template.id}>{template.name}</option>)}
-          </select>
-        </label>
-        {([
-          ['Alert',onOpenAlerts,false,<Bell size={15}/>],
-          ['Replay',onOpenReplay,false,<RotateCcw size={15}/>],
-          ['Strategy',onOpenStrategyLab,false,<FlaskConical size={15}/>],
-          ['Undo',onUndoDrawing,!canUndo,<Undo2 size={15}/>],
-          ['Redo',onRedoDrawing,!canRedo,<Redo2 size={15}/>],
-          ['Save Chart',onOpenSavedCharts,false,<Save size={15}/>],
-          ['Save Layout',onSaveLayout,false,<LayoutGrid size={15}/>],
-          ['Snapshot',onTakeSnapshot,false,<Camera size={15}/>],
-          [isFullscreen?'Exit Full':'Fullscreen',onToggleFullscreen,false,
-            isFullscreen?<Minimize2 size={15}/>:<Maximize2 size={15}/>],
-          [isPipActive?'Close PiP':'PiP',onTogglePip,false,<PictureInPicture2 size={15}/>],
-          [sessionVwapEnabled?'VWAP On':'VWAP',onToggleSessionVwap,false,<LineChart size={15}/>],
-          ['Trade Ticket',onToggleTradingPanel,false,<TrendingUp size={15}/>],
-          ['Paper Trading',onTogglePaperWorkspace,false,<Wallet size={15}/>],
-          ['Download Data',onDownloadData,false,<Download size={15}/>],
-        ] as Array<[string,(()=>void)|undefined,boolean,React.ReactNode]>).map(([label,action,disabled,icon])=>
-          <button type="button" key={label} disabled={disabled}
-            title={label} aria-label={label}
-            className="flex h-[23px] min-w-0 items-center justify-center rounded bg-[#202b3d] text-[#c2d3e8] disabled:opacity-30 hover:bg-[#35435a] active:bg-[#4169a0]"
-            onClick={()=>action?.()}>{icon}</button>)}
-      </div>
     </header>
   );
 });

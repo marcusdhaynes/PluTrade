@@ -62,7 +62,7 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
     catch(e){setError(e instanceof Error?e.message:'Unable to save account');}
   };
   const change=(patch:Partial<PaperSettings>)=>setSettings(s=>({...s,...patch}));
-  return <div className="fixed inset-0 z-[300] bg-black/70 flex items-center justify-center p-4" role="presentation"
+  return <div className="fixed inset-0 z-[1900] bg-black/70 flex items-center justify-center p-4" role="presentation"
     onPointerDown={e=>{if(e.currentTarget===e.target)onClose();}}>
     <section role="dialog" aria-modal="true" aria-label={existing?'Paper Trading account settings':'Create Paper Trading account'}
       className="w-full max-w-[390px] max-h-[92vh] overflow-y-auto rounded-xl border border-[#414347] bg-[#1d1f21] text-white shadow-[0_16px_60px_#000c]">

@@ -13,6 +13,8 @@ interface Props {
   equityPercent:number;
   onEquityPercent:(value:number)=>void;
   onEnter:(focus?:ExitKind)=>void;
+  onOpenOrder:()=>void;
+  onOpenPaperWorkspace?:()=>void;
   onExit:()=>void;
   onEditStops:(id:string,tp?:number,sl?:number,trailing?:number|null,dynamic?:DynamicTrailingSettings|null)=>void;
   onEditTargets:(id:string,levels:Array<{price:number;sharePercent:number}>)=>void;
@@ -30,7 +32,7 @@ const numeric=(n:number,digits=6)=>Number.isFinite(n)?n.toLocaleString(undefined
  * supported exit types without making a tap on a small screen execute a trade. */
 export const MobileTradingControls:React.FC<Props>=({
   asset,position,accountEquity,accountBalance,equityPercent,onEquityPercent,
-  onEnter,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
+  onEnter,onOpenOrder,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
 })=>{
   const [panel,setPanel]=useState<'equity'|ExitKind|null>(null);
   const [advanced,setAdvanced]=useState(false);
@@ -46,6 +48,11 @@ export const MobileTradingControls:React.FC<Props>=({
   const [error,setError]=useState('');
   const holdTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const held=useRef(false);
+  const orderHoldTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const orderHeld=useRef(false);
+  const clearOrderHold=()=>{
+    if(orderHoldTimer.current){clearTimeout(orderHoldTimer.current);orderHoldTimer.current=null;}
+  };
   const lastPosition=useRef<string|null>(null);
   const clearHold=()=>{if(holdTimer.current!==null){clearTimeout(holdTimer.current);holdTimer.current=null;}};
 
@@ -141,9 +148,29 @@ export const MobileTradingControls:React.FC<Props>=({
   };
   const baseButton='flex-1 min-w-0 h-[21px] rounded border border-[#3c4658] bg-[#232b39] px-px text-[10px] leading-[19px] font-semibold tracking-tight text-[#d6e2f4] active:bg-[#355172] touch-manipulation';
   const close=()=>{clearHold();setPanel(null);setError('');};
-  return <div id="plutrade-mobile-trade-controls"
+  const orderControlsRef=useRef<HTMLDivElement>(null);
+  const quickPanelRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!panel)return;
+    const outside=(event:PointerEvent)=>{
+      if(!orderControlsRef.current?.contains(event.target as Node)&&
+         !quickPanelRef.current?.contains(event.target as Node)){
+        clearHold();setPanel(null);setError('');
+      }
+    };
+    const escape=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){clearHold();setPanel(null);setError('');}
+    };
+    window.addEventListener('pointerdown',outside,true);
+    window.addEventListener('keydown',escape);
+    return ()=>{
+      window.removeEventListener('pointerdown',outside,true);
+      window.removeEventListener('keydown',escape);
+    };
+  },[panel]);
+  return <div ref={orderControlsRef} id="plutrade-mobile-trade-controls"
     className="relative md:hidden shrink-0 w-full h-[24px] border-t border-[#3f4d62] bg-[#151d2b] px-1 py-px z-40">
-    {panel&&<div role="dialog" aria-label={panel==='equity'?'Equity allocation':panel==='sl'?'Stop loss options':'Take profit options'}
+    {panel&&<div ref={quickPanelRef} role="dialog" aria-label={panel==='equity'?'Equity allocation':panel==='sl'?'Stop loss options':'Take profit options'}
       className="absolute bottom-full left-0 right-0 z-50 max-h-[min(67dvh,440px)] overflow-y-auto rounded-t-xl border border-[#48556a] bg-[#182233] p-3 shadow-[0_-10px_45px_#000a] text-xs">
       <div className="flex items-center justify-between mb-3">
         <strong>{panel==='equity'?'% Equity · new entries':panel==='sl'?'Stop loss':'Take profit'} <span className="font-normal text-[#8da0bd]">· Paper</span></strong>
@@ -279,6 +306,21 @@ export const MobileTradingControls:React.FC<Props>=({
       {error&&<p role="alert" className="mt-2 text-[#ff9eac]">{error}</p>}
     </div>}
     <div className="flex w-full items-center gap-1" aria-label="Mobile trading controls">
+      <button type="button" id="mobile-order-ticket-btn"
+        aria-label="Order" title="Open order ticket; hold for Paper Trading workspace"
+        className={baseButton+' border-[#4d6994] bg-[#253651] text-white'}
+        onPointerDown={()=>{
+          orderHeld.current=false;
+          clearOrderHold();
+          if(onOpenPaperWorkspace)orderHoldTimer.current=setTimeout(()=>{
+            orderHeld.current=true;onOpenPaperWorkspace();
+          },550);
+        }}
+        onPointerUp={clearOrderHold} onPointerCancel={clearOrderHold} onPointerLeave={clearOrderHold}
+        onContextMenu={e=>{e.preventDefault();clearOrderHold();orderHeld.current=true;onOpenPaperWorkspace?.();}}
+        onClick={()=>{if(!orderHeld.current)onOpenOrder();orderHeld.current=false;}}>
+        Order
+      </button>
       <button type="button" className={baseButton+' border-[#255da9] bg-[#1c426f] text-white'}
         onClick={()=>onEnter()}>Enter</button>
       <button type="button" className={baseButton+' '+(position?'border-[#ad4851] bg-[#49272f] text-white':'opacity-40')}

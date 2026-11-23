@@ -216,7 +216,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   };
   if(!open)return null;
   return <aside role="dialog" aria-label="Paper Trading order entry" aria-modal="false"
-    className="fixed right-0 top-0 md:top-8 bottom-0 z-[135] w-full sm:w-[310px] bg-[#151515] border-l border-[#35363a] text-[#e9ecf2] shadow-[-14px_0_50px_#000a] flex flex-col font-sans animate-in slide-in-from-right-4 duration-200">
+    className="fixed right-0 top-0 md:top-8 bottom-0 z-[1800] w-full sm:w-[310px] bg-[#151515] border-l border-[#35363a] text-[#e9ecf2] shadow-[-14px_0_50px_#000a] flex flex-col font-sans animate-in slide-in-from-right-4 duration-200">
     <div className="flex items-center gap-2 px-3 h-12 shrink-0 border-b border-[#27282b]">
       <div className="bg-[#f3f5fa] text-[#151921] rounded w-6 h-6 grid place-items-center font-bold text-xs">C</div>
       <div className="flex-1 min-w-0"><div className="truncate font-semibold text-xs">{asset.symbol}</div>

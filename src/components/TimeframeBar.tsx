@@ -1,5 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ChevronDown,Star} from 'lucide-react';
+import {FloatingPortal} from './FloatingPortal';
 import type {Asset,Timeframe} from '../types';
 import {
   CHART_INTERVALS,TIMEFRAME_FAVORITES_KEY,marketTimeframeKey,
@@ -80,8 +81,10 @@ export const TimeframeBar:React.FC<Props>=({
     if(!intervalOpen&&!favoritesOpen)return;
     const dismiss=(event:PointerEvent)=>{
       const node=event.target as Node;
-      if(intervalOpen&&!chooserRef.current?.contains(node))setIntervalOpen(false);
-      if(favoritesOpen&&!favoritesRef.current?.contains(node))setFavoritesOpen(false);
+      if(intervalOpen&&!chooserRef.current?.contains(node)&&
+        !(node instanceof Element&&node.closest('#all-chart-intervals-dropdown')))setIntervalOpen(false);
+      if(favoritesOpen&&!favoritesRef.current?.contains(node)&&
+        !(node instanceof Element&&node.closest('#ticker-timeframe-favorites-menu')))setFavoritesOpen(false);
     };
     const escape=(event:KeyboardEvent)=>{
       if(event.key==='Escape'){setIntervalOpen(false);setFavoritesOpen(false);}
@@ -129,7 +132,7 @@ export const TimeframeBar:React.FC<Props>=({
     setFavoritesOpen(false);
   };
   const currentlyCustom=customInterval?customIntervalLabel(customInterval):null;
-  return <div id="chart-timeframe-bar" className="flex h-full min-w-0 flex-1 items-center gap-0.5">
+  return <div id="chart-timeframe-bar" className="relative flex h-full w-full max-w-full min-w-0 flex-1 items-center gap-0.5">
     <div ref={chooserRef} className="relative z-[110] shrink-0">
       <button type="button" id="chart-timeframe-dropdown-trigger"
         aria-label="All chart intervals and custom interval"
@@ -142,8 +145,9 @@ export const TimeframeBar:React.FC<Props>=({
         className="flex h-[21px] min-w-[31px] items-center justify-center gap-0.5 rounded border border-[#344257] bg-[#202a39] px-1 text-[10px] font-semibold text-[#c6d4e9] hover:bg-[#31415a]">
         <span>{currentlyCustom||activeTimeframe}</span><ChevronDown size={11}/>
       </button>
-      {intervalOpen&&<div id="all-chart-intervals-dropdown" role="dialog" aria-label="All chart intervals"
-        className="absolute left-0 top-full z-[130] mt-1 w-[min(310px,calc(100vw-54px))] max-h-[min(76dvh,490px)] overflow-y-auto rounded-lg border border-[#455771] bg-[#1c2637] p-2 text-[#dce7f7] shadow-2xl">
+      {intervalOpen&&<FloatingPortal anchor={chooserRef} placement="bottom-start" width={310}
+        id="all-chart-intervals-dropdown" ariaLabel="All chart intervals"
+        className="rounded-lg border border-[#455771] bg-[#1c2637] p-2 text-[#dce7f7] shadow-2xl">
         <p className="mb-1 text-[11px] font-semibold">Custom interval</p>
         <div className="flex gap-1">
           <input id="custom-chart-interval-number" aria-label="Custom interval number"
@@ -181,10 +185,10 @@ export const TimeframeBar:React.FC<Props>=({
         }} className="mt-2 w-full rounded border border-[#544936] px-2 py-1.5 text-left text-[10px] text-[#f5cb7e]">
           Manage favorites for {currentlyCustom}
         </button>}
-      </div>}
+      </FloatingPortal>}
     </div>
     <div id="chart-timeframe-scroll" role="toolbar" aria-label="Chart timeframes"
-      className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain whitespace-nowrap scrollbar-none"
+      className="relative flex h-full max-w-full min-w-0 flex-[1_1_0%] items-center gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain whitespace-nowrap scrollbar-none"
       style={{touchAction:'pan-x'}}>
       {visible.map(tf=><button type="button" id={'tf-btn-'+tf} key={tf}
         aria-label={'Timeframe '+tf} title={'Show '+tf+' chart'}
@@ -202,7 +206,10 @@ export const TimeframeBar:React.FC<Props>=({
         className={'h-[21px] shrink-0 rounded px-2 text-[10px] font-semibold '+(currentlyCustom===customIntervalLabel(spec)?
           'bg-[#2962ff] text-white':'text-[#d6b070] hover:bg-[#433b31]')}>{customIntervalLabel(spec)}</button>)}
     </div>
-    {calendarControl}
+    <div id="chart-timeframe-calendar-divider"
+      className="ml-1 flex h-[21px] shrink-0 items-center border-l border-[#526077] pl-1">
+      {calendarControl}
+    </div>
     <div ref={favoritesRef} className="relative z-[110] shrink-0 border-l border-[#364358] pl-0.5">
       <button type="button" id="timeframe-favorites-button"
         aria-label={'Favorite timeframes for '+activeAsset.symbol}
@@ -212,9 +219,9 @@ export const TimeframeBar:React.FC<Props>=({
           'bg-[#3b3328] text-[#ffbe55]':'text-[#9baac0] hover:bg-[#293649]')}>
         <Star size={15} fill={hasFavorites?'currentColor':'none'}/>
       </button>
-      {favoritesOpen&&<div id="ticker-timeframe-favorites-menu" role="dialog"
-        aria-label={'Favorite intervals for '+activeAsset.symbol}
-        className="absolute right-0 top-full z-[130] mt-1 w-[min(294px,calc(100vw-44px))] max-h-[75dvh] overflow-y-auto rounded-lg border border-[#485770] bg-[#1b2638] p-2 text-[#dae6f8] shadow-2xl">
+      {favoritesOpen&&<FloatingPortal anchor={favoritesRef} width={294}
+        id="ticker-timeframe-favorites-menu" ariaLabel={'Favorite intervals for '+activeAsset.symbol}
+        className="rounded-lg border border-[#485770] bg-[#1b2638] p-2 text-[#dae6f8] shadow-2xl">
         <p className="mb-2 text-[11px] font-semibold">Favorites · {activeAsset.symbol}</p>
         <p className="mb-2 text-[10px] leading-snug text-[#9fb0c9]">Only saved intervals appear. Clear all to show every standard interval.</p>
         <div className="grid grid-cols-4 gap-1">
@@ -252,7 +259,7 @@ export const TimeframeBar:React.FC<Props>=({
               className="rounded bg-[#2962ff] px-3 py-1.5 text-[10px] font-semibold text-white">Save for ticker</button>
           </div>
         </div>
-      </div>}
+      </FloatingPortal>}
     </div>
   </div>;
 };
