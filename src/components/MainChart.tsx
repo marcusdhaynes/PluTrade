@@ -251,9 +251,9 @@ export const MainChart = React.memo(
         height: Math.max(1,chartContainerRef.current.clientHeight),
         layout: {
           background: { type: ColorType.Solid, color: '#131722' },
-          textColor: '#787b86',
+          textColor: '#a5b1c5',
           fontFamily: "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif",
-          fontSize: 9,
+          fontSize: 10,
         },
         grid: {
           vertLines: { color: '#1e222d', style: LineStyle.Solid },
@@ -279,6 +279,7 @@ export const MainChart = React.memo(
           visible:true,
           borderVisible:true,
           ticksVisible:true,
+          minimumWidth:52,
           borderColor: '#363a45',
           mode: isLogScale
             ? PriceScaleMode.Logarithmic
@@ -292,6 +293,7 @@ export const MainChart = React.memo(
           visible:true,
           borderVisible:true,
           ticksVisible:true,
+          minimumHeight:20,
           borderColor: '#2a2e39',
           timeVisible: true,
           secondsVisible: false,
