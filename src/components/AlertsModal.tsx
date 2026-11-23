@@ -246,7 +246,8 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
 
                 <div className="flex items-center gap-2">
                 <button type="button" onClick={()=>setAlerts(prev=>prev.map(a=>a.id===alert.id?
-                  {...a,paused:!a.paused,triggered:a.triggered?false:a.triggered}:a))}
+                  (a.triggered?{...a,paused:false,triggered:false,
+                    lastTriggeredAt:undefined,lastTriggeredBar:undefined}:{...a,paused:!a.paused}):a))}
                   className="text-[10px] text-[#a4bee7] hover:text-white rounded px-1" title={alert.paused?'Resume alert':'Pause alert'}>
                   {alert.paused?'Resume':alert.triggered?'Rearm':'Pause'}
                 </button>

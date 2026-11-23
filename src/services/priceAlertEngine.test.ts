@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import type {Asset,PriceAlert} from '../types';
-import {evaluatePriceAlerts,alertIsExpired,alertMatchesExactMarket} from './priceAlertEngine';
+import {evaluatePriceAlerts,alertIsExpired,alertMatchesExactMarket,alertBarBucket} from './priceAlertEngine';
 
 const at=1_700_000_000_000;
 const market:Asset={
@@ -78,6 +78,17 @@ const checks:[string,()=>void][]=[
    assert.equal(run(make({targetPrice:Infinity}),99,101).hits.length,0);
    assert.equal(run(make(),99,101,NaN).hits.length,0);
  }],
+ ['calendar bar buckets reset on proper UTC month, quarter, ISO week and year',()=>{
+   const x=(date:string,tf:string)=>alertBarBucket(new Date(date).getTime(),tf);
+   assert.equal(x('2026-11-01T00:00:00Z','1M'),x('2026-11-30T23:59:59Z','1M'));
+   assert.notEqual(x('2026-11-30T23:59:59Z','1M'),x('2026-12-01T00:00:00Z','1M'));
+   assert.equal(x('2026-10-01T00:00:00Z','3M'),x('2026-12-31T00:00:00Z','3M'));
+   assert.notEqual(x('2026-12-31T00:00:00Z','3M'),x('2027-01-01T00:00:00Z','3M'));
+   assert.equal(x('2026-11-23T00:00:00Z','1W'),x('2026-11-29T23:59:59Z','1W'));
+   assert.notEqual(x('2026-11-29T23:59:59Z','1W'),x('2026-11-30T00:00:00Z','1W'));
+   assert.equal(x('2026-01-01T00:00:00Z','12M'),x('2026-12-31T00:00:00Z','12M'));
+   assert.notEqual(x('2026-12-31T00:00:00Z','12M'),x('2027-01-01T00:00:00Z','12M'));
+ }],
  ['DEX pool identity is exact, not just the symbol',()=>{
    const a=make({symbol:'AAA@base',exchange:'DEX',marketType:'spot',chainId:'base',pairAddress:'0xdef'});
    const dex={...market,symbol:'AAA@base',source:'DEX',marketType:'spot' as const,
@@ -93,4 +104,4 @@ for(let round=1;round<=10;round++){
    try{check();}catch(error){throw new Error('Alert check '+round+'/10 · '+name,{cause:error});}
  }
 }
-console.log('Alert engine: 11 scenarios × 10 rounds = 110 assertions suites passed.');
+console.log('Alert engine: 12 scenarios × 10 rounds = 120 scenario runs passed.');

@@ -24,6 +24,23 @@ export function alertTimeframeSeconds(value:string|undefined):number{
   };
   return secs[value||'1m']||60;
 }
+/** UTC time bucket; calendar month/quarter/year are NOT fixed 30-day intervals.
+ * Dedicated exchange-session calendars would require licensed venue session metadata. */
+export function alertBarBucket(at:number,timeframe:string|undefined):number{
+  if(!Number.isFinite(at)||at<=0)return NaN;
+  const d=new Date(at),year=d.getUTCFullYear(),month=d.getUTCMonth();
+  if(timeframe==='1M')return Date.UTC(year,month,1)/1000;
+  if(timeframe==='3M')return Date.UTC(year,Math.floor(month/3)*3,1)/1000;
+  if(timeframe==='12M')return Date.UTC(year,0,1)/1000;
+  if(timeframe==='1W'){
+    const today=Date.UTC(year,month,d.getUTCDate());
+    // Monday (ISO week) is day zero; Sunday is six.
+    const daysSinceMonday=(d.getUTCDay()+6)%7;
+    return (today-daysSinceMonday*86400000)/1000;
+  }
+  const duration=alertTimeframeSeconds(timeframe);
+  return Math.floor(at/1000/duration)*duration;
+}
 export function alertIsExpired(alert:PriceAlert,at:number):boolean{
   return Number.isFinite(alert.expiresAt)&&alert.expiresAt!<=at;
 }
@@ -63,8 +80,7 @@ export function evaluatePriceAlerts(
     // A repeated event in the same minute/bar cannot issue duplicate notifications.
     if(freq==='once_per_minute'&&alert.lastTriggeredAt!==undefined&&at-alert.lastTriggeredAt<60000)return alert;
     const barId=observation.kind==='closed-bar'?observation.barTime!:
-      Math.floor(at/1000/alertTimeframeSeconds(alert.timeframe))*
-        alertTimeframeSeconds(alert.timeframe);
+      alertBarBucket(at,alert.timeframe);
     if((freq==='once_per_bar'||closeOnly)&&alert.lastTriggeredBar===barId)return alert;
     const next:PriceAlert={...alert,
       triggered:freq==='once',lastTriggeredAt:at,

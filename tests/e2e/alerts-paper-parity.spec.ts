@@ -32,6 +32,20 @@ test('alerts dialog saves TradingView-style conditions, recurrence and expiratio
   await page.reload();
   await page.locator('#open-alerts-modal-btn').click();
   await expect(page.locator('#alerts-modal-window')).toContainText('QA test alert — no order');
+  await page.evaluate(()=>{
+    const alerts=JSON.parse(localStorage.getItem('tv_alerts')||'[]');
+    const target=alerts.find((a:any)=>a.notes==='QA test alert — no order');
+    if(target){target.triggered=true;target.paused=false;}
+    localStorage.setItem('tv_alerts',JSON.stringify(alerts));
+  });
+  await page.reload();
+  await page.locator('#open-alerts-modal-btn').click();
+  await page.locator('#alerts-modal-window').getByRole('button',{name:'Rearm'}).click();
+  await expect.poll(()=>page.evaluate(()=>{
+    const saved=JSON.parse(localStorage.getItem('tv_alerts')||'[]');
+    const found=saved.find((a:any)=>a.notes==='QA test alert — no order');
+    return found?String(found.triggered)+'|'+String(found.paused):'missing';
+  })).toBe('false|false');
   expect(errors).toEqual([]);
 });
 
@@ -93,7 +107,7 @@ test('paper order amendment validates marketability, maintains reserved margin a
   await page.getByLabel('Amend order units').fill('3');
   await page.getByLabel('Amend order price').fill('110');
   await page.getByRole('button',{name:'Save changes'}).click();
-  await expect(page.getByRole('alert')).toContainText('Marketable replacement');
+  await expect(page.getByRole('alert').filter({hasText:'Marketable replacement'}).last()).toBeVisible();
   await page.getByLabel('Amend order price').fill('94');
   await page.getByRole('button',{name:'Save changes'}).click();
   await expect(page.getByText('3 units')).toBeVisible();
