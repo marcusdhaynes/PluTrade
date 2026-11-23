@@ -17,6 +17,8 @@ interface BottomToolbarProps {
   onFitContent: () => void;
   onGoToDate:(utcDate:string)=>boolean;
   onApplyTimeScaleSettings:(settings:{barSpacing:number;rightOffset:number})=>boolean;
+  showMobileChartLegend:boolean;
+  onShowMobileChartLegend:(visible:boolean)=>void;
 }
 
 export const BottomToolbar: React.FC<BottomToolbarProps> = ({
@@ -25,6 +27,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onFitContent,
   onGoToDate,
   onApplyTimeScaleSettings,
+  showMobileChartLegend,onShowMobileChartLegend,
 }) => {
   const [chartCornerHost,setChartCornerHost]=useState<HTMLElement|null>(null);
   useEffect(()=>{setChartCornerHost(document.getElementById('chart-workspace-viewport'));},[]);
@@ -140,6 +143,15 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             }}/>
         </label>
         {scaleError&&<p role="alert" className="text-[#ffacb3]">{scaleError}</p>}
+        <div className="border-t border-[#3e4a61] pt-2">
+          <strong className="block mb-1">Mobile chart display</strong>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input id="mobile-chart-legend-setting" type="checkbox"
+              checked={showMobileChartLegend}
+              onChange={event=>onShowMobileChartLegend(event.target.checked)}/>
+            Show chart legend
+          </label>
+        </div>
         <p className="border-t border-[#3e4a61] pt-2 text-[10px] text-[#99abc3]">
           Charting library: <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer"
             className="text-[#a5c7ff] underline">Lightweight Charts™ by TradingView</a>.
