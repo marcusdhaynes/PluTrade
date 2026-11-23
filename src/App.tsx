@@ -2060,6 +2060,8 @@ export default function App() {
             accountEquity={paperAccount.equity} accountBalance={paperAccount.balance}
             equityPercent={mobileEquityPercent} onEquityPercent={setMobileEquityPercent}
             onEnter={openMobileEntry}
+            onOpenOrder={()=>setIsTradeTicketOpen(true)}
+            onOpenPaperWorkspace={()=>setIsBottomTradingOpen(open=>!open)}
             onExit={()=>{if(activePosition)handleClosePosition(activePosition.id);}}
             onEditStops={handleEditPaperStops}
             onEditTargets={handleEditPaperTargets}
@@ -2117,7 +2119,7 @@ export default function App() {
           setActiveTab={setRightSidebarTab}
           onOpenTradeJournal={() => setIsTradeJournalOpen(true)}
           onOpenHelp={()=>setShortcutHelpOpen(true)}
-          onTakeSnapshot={() => chartRef.current?.takeSnapshot()}
+          onOpenIndicators={()=>setIsIndicatorsOpen(true)}
           onOpenConditionalOrder={handleOpenCreateConditionalOrder}
         />
       </div>
