@@ -58,7 +58,7 @@ test('saved chart has functioning local save and restore',async ({page})=>{
   await expect(page.getByRole('dialog',{name:'Save and restore charts'})).toContainText('Browser automation saved chart');
 });
 
-test('sidebars and chart ranges expose real states without fake news',async ({page})=>{
+test('sidebars and chart timeframes expose real states without fake news',async ({page})=>{
   const errors:string[]=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('./');
@@ -72,8 +72,12 @@ test('sidebars and chart ranges expose real states without fake news',async ({pa
   await expect(page.locator('#right-sidebar-content-pane')).toBeVisible();
   await page.locator('#right-tab-alerts').click();
   await expect(page.locator('#tradingview-alerts-panel')).toBeVisible();
-  for(const range of ['1D','5D','1M','3M','6M','YTD','1Y','ALL']){
-    await page.locator('#range-btn-'+range).click();
+  for(const timeframe of ['1m','5m','1h','1D']){
+    await page.locator('#tf-btn-'+timeframe).click();
   }
+  await page.locator('#chart-timeframe-dropdown-trigger').click();
+  await expect(page.getByRole('dialog',{name:'All chart intervals'})).toBeVisible();
+  await page.getByRole('button',{name:'Choose timeframe 15m'}).click();
+  await expect(page.locator('#chart-timeframe-dropdown-trigger')).toContainText('15m');
   expect(errors).toEqual([]);
 });

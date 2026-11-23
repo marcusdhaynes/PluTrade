@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Asset,
   ChartType,
@@ -43,6 +43,8 @@ import { PaperAccountModal } from './components/PaperAccountModal';
 import { SavedChartsModal } from './components/SavedChartsModal';
 import type { SavedChartIdea } from './services/savedCharts';
 import {combineHistoryWithLive,mergeLiveCandle} from './services/chartCandles';
+import {customIntervalBase,isCustomInterval,resampleCustomCandles,
+  type CustomInterval} from './services/customChartIntervals';
 import {chartStarterMarket,type ChartLoadState} from './services/chartRecovery';
 import { cancelPaperOrder,amendPendingPaperOrder,evaluatePaperOrders,expirePaperOrders,submitPaperOrder,estimatePaperQty,withOrderReservations,type PaperOrderRequest,type PaperAmendRequest } from './services/paperOrders';
 import { SymbolSearchModal } from './components/SymbolSearchModal';
@@ -142,6 +144,39 @@ export default function App() {
       '45m','1h','2h','3h','4h','1D','1W','1M','3M','12M'];
     return allowed.includes(saved as Timeframe) ? saved as Timeframe : '1m';
   });
+  const [customChartInterval,setCustomChartInterval]=useState<CustomInterval|null>(()=>{
+    const saved=readLocalJson<unknown>('plutrade_custom_chart_interval_v1',null);
+    return isCustomInterval(saved)?saved:null;
+  });
+  useEffect(()=>{
+    try{
+      if(customChartInterval)localStorage.setItem('plutrade_custom_chart_interval_v1',JSON.stringify(customChartInterval));
+      else localStorage.removeItem('plutrade_custom_chart_interval_v1');
+    }catch(error){console.warn('Could not persist custom chart interval',error);}
+  },[customChartInterval]);
+  const selectStandardChartTimeframe=(timeframe:Timeframe)=>{
+    setCustomChartInterval(null);
+    setActiveTimeframe(timeframe);
+  };
+  const selectCustomChartTimeframe=(spec:CustomInterval):string|null=>{
+    const availability=customIntervalBase(spec,activeAsset);
+    if(!availability.base)return availability.warning;
+    setCustomChartInterval({...spec});
+    setActiveTimeframe(availability.base);
+    return null;
+  };
+  useEffect(()=>{
+    if(!customChartInterval)return;
+    const availability=customIntervalBase(customChartInterval,activeAsset);
+    if(!availability.base){
+      // Moving from a supported 1-second market to a venue without that feed
+      // should restore a usable default, not strand the chart on empty 1s data.
+      setCustomChartInterval(null);
+      setActiveTimeframe('1m');
+      return;
+    }
+    if(activeTimeframe!==availability.base)setActiveTimeframe(availability.base);
+  },[activeAsset.symbol,activeAsset.source,activeAsset.exchange,customChartInterval,activeTimeframe]);
   const [chartType, setChartType] = useState<ChartType>(() => {
     const saved = localStorage.getItem('tv_chart_type');
     const allowed:ChartType[]=['candlestick','bar','hollow','heikin-ashi','line',
@@ -154,6 +189,12 @@ export default function App() {
   const [isLoadingCandles, setIsLoadingCandles] = useState(true);
   const [chartHistoryState,setChartHistoryState]=useState<ChartLoadState>('loading');
   const [chartRetry,setChartRetry]=useState(0);
+  // The live feed, order engine and verified source history retain their actual
+  // provider timeframe. Custom chart intervals are derived only from those
+  // observed candles and never create synthetic broker quotes or tick bars.
+  const chartCandles=useMemo(()=>customChartInterval?
+    resampleCustomCandles(candles,customChartInterval,activeTimeframe):candles,
+    [candles,customChartInterval,activeTimeframe]);
   const [sessionVwapEnabled,setSessionVwapEnabled]=useState<boolean>(()=>readLocalJson<boolean>('plutrade_utc_session_vwap_v1',false)===true);
   useEffect(()=>{try{localStorage.setItem('plutrade_utc_session_vwap_v1',JSON.stringify(sessionVwapEnabled));}catch{}},[sessionVwapEnabled]);
 
@@ -1830,7 +1871,6 @@ export default function App() {
       <TopNavbar
         activeAsset={activeAsset}
         activeTimeframe={activeTimeframe}
-        setActiveTimeframe={setActiveTimeframe}
         chartType={chartType}
         setChartType={handleSetChartType}
         onOpenSymbolSearch={() => {setAddingWatchlistSymbol(false);setIsSymbolSearchOpen(true);}}
@@ -1906,10 +1946,14 @@ export default function App() {
 
         {/* Center: Multi-Chart Resizable Workspace + Bottom Trading Panel + Bottom Bar */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
-          {/* Chart range and scale toolbar above the plotting surface (not the chart axes) */}
+          {/* Chart-attached interval row and calendar; native axes remain inside the plot. */}
           <BottomToolbar
             chart={chartRef.current?.getChart() || null}
-            onSelectRange={(days) => chartRef.current?.selectRange(days)}
+            activeAsset={activeAsset}
+            activeTimeframe={activeTimeframe}
+            onStandardTimeframe={selectStandardChartTimeframe}
+            customInterval={customChartInterval}
+            onCustomTimeframe={selectCustomChartTimeframe}
             onFitContent={() => chartRef.current?.fitContent()}
             onGoToDate={date=>chartRef.current?.goToUtcDate(date)??false}
             onApplyTimeScaleSettings={({barSpacing,rightOffset})=>{
@@ -1929,7 +1973,7 @@ export default function App() {
             activeTimeframe={activeTimeframe}
             setActiveTimeframe={setActiveTimeframe}
             chartType={chartType}
-            primaryCandles={candles}
+            primaryCandles={chartCandles}
             primaryHistoryState={chartHistoryState}
             onReloadPrimary={()=>setChartRetry(n=>n+1)}
             sessionVwapEnabled={sessionVwapEnabled}

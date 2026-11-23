@@ -27,10 +27,13 @@ import {
   Type,
   Maximize,
   Star,
+  Save,
+  Download,
+  Wallet,
+  FlaskConical,
+  Play,
 } from 'lucide-react';
 import { LAYOUT_TEMPLATES } from '../data/layoutTemplates';
-import {CHART_INTERVALS,marketTimeframeKey,sanitizeTimeframeFavorites,updateMarketTimeframes,
-  visibleTimeframeIntervals,TIMEFRAME_FAVORITES_KEY,type IntervalFavorites} from '../services/timeframeFavorites';
 import { LayoutTemplate, LayoutSyncSettings, SavedChartLayout } from '../types/layout';
 import { LayoutDropdown } from './layout/LayoutDropdown';
 import { LayoutManagerDropdown } from './layout/LayoutManagerDropdown';
@@ -38,7 +41,6 @@ import { LayoutManagerDropdown } from './layout/LayoutManagerDropdown';
 interface TopNavbarProps {
   activeAsset: Asset;
   activeTimeframe: Timeframe;
-  setActiveTimeframe: (tf: Timeframe) => void;
   chartType: ChartType;
   setChartType: (type: ChartType) => void;
   onOpenSymbolSearch: () => void;
@@ -89,7 +91,6 @@ interface TopNavbarProps {
 export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   activeAsset,
   activeTimeframe,
-  setActiveTimeframe,
   chartType,
   setChartType,
   onOpenSymbolSearch,
@@ -137,44 +138,16 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
 }) => {
   const [isChartTypeOpen, setIsChartTypeOpen] = useState(false);
   const [isMobileChartStyleOpen,setIsMobileChartStyleOpen]=useState(false);
-  const [isTimeframeFavoritesOpen,setIsTimeframeFavoritesOpen]=useState(false);
   const mobileChartStyleRef=useRef<HTMLDivElement>(null);
-  const timeframeFavoritesRef=useRef<HTMLDivElement>(null);
   const desktopChartStyleRef=useRef<HTMLDivElement>(null);
   const [showQuickDrawingTools,setShowQuickDrawingTools]=useState<boolean>(()=>{
     try{return localStorage.getItem('plutrade_quick_drawing_tools_v1')!=='false';}
     catch{return true;}
   });
   useEffect(()=>{try{localStorage.setItem('plutrade_quick_drawing_tools_v1',String(showQuickDrawingTools));}catch{}},[showQuickDrawingTools]);
-  const [timeframeFavoritesByTicker,setTimeframeFavoritesByTicker]=useState<IntervalFavorites>(()=>{
-    try{return sanitizeTimeframeFavorites(JSON.parse(localStorage.getItem(TIMEFRAME_FAVORITES_KEY)||'{}'));}
-    catch{return {};}
-  });
-  const tickerKey=marketTimeframeKey(activeAsset);
-  const favoriteTimeframes=timeframeFavoritesByTicker[tickerKey]||[];
-  const visibleTimeframes=visibleTimeframeIntervals(timeframeFavoritesByTicker,tickerKey);
-  const [draftTimeframes,setDraftTimeframes]=useState<Timeframe[]>([]);
-  useEffect(()=>{
-    try{localStorage.setItem(TIMEFRAME_FAVORITES_KEY,JSON.stringify(timeframeFavoritesByTicker));}
-    catch(error){console.warn('Could not save ticker interval favorites',error);}
-  },[timeframeFavoritesByTicker]);
-  useEffect(()=>{
-    setIsTimeframeFavoritesOpen(false);
-    setDraftTimeframes([]);
-  },[tickerKey]);
-  const toggleTimeframeFavoriteMenu=()=>{
-    if(!isTimeframeFavoritesOpen)setDraftTimeframes([...favoriteTimeframes]);
-    setIsTimeframeFavoritesOpen(open=>!open);
-  };
-  const saveTickerTimeframeFavorites=()=>{
-    setTimeframeFavoritesByTicker(prev=>updateMarketTimeframes(prev,tickerKey,draftTimeframes));
-    setIsTimeframeFavoritesOpen(false);
-  };
   useEffect(()=>{
     const dismiss=(event:PointerEvent)=>{
       const node=event.target as Node;
-      if(isTimeframeFavoritesOpen&&!timeframeFavoritesRef.current?.contains(node))
-        setIsTimeframeFavoritesOpen(false);
       if(isMobileChartStyleOpen&&!mobileChartStyleRef.current?.contains(node))
         setIsMobileChartStyleOpen(false);
       if(isChartTypeOpen&&!desktopChartStyleRef.current?.contains(node))
@@ -182,7 +155,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
     };
     const escape=(event:KeyboardEvent)=>{
       if(event.key==='Escape'){
-        setIsTimeframeFavoritesOpen(false);
         setIsMobileChartStyleOpen(false);
         setIsChartTypeOpen(false);
       }
@@ -193,7 +165,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
       window.removeEventListener('pointerdown',dismiss,true);
       window.removeEventListener('keydown',escape);
     };
-  },[isTimeframeFavoritesOpen,isMobileChartStyleOpen,isChartTypeOpen]);
+  },[isMobileChartStyleOpen,isChartTypeOpen]);
 
   const chartTypes: { id: ChartType; label: string; group: string; icon: React.ReactNode }[] = [
     {
@@ -427,7 +399,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           No interval selector or hamburger is needed: both get dedicated rows. */}
       <div id="plutrade-mobile-navbar" className="flex md:hidden h-9 min-h-9 w-full min-w-0 items-center gap-1 px-1">
         <button type="button" id="mobile-symbol-search-trigger" onClick={onOpenSymbolSearch}
-          className="min-w-0 flex-1 truncate rounded border border-[#3a4356] bg-[#1b2434] px-1.5 py-1.5 text-left font-semibold text-[#e6edfa]"
+          className="w-[min(20vw,76px)] max-w-[76px] min-w-0 flex-none truncate rounded border border-[#3a4356] bg-[#1b2434] px-1 py-1.5 text-left text-[10px] font-semibold text-[#e6edfa]"
           title={activeAsset.symbol+' · '+(activeAsset.source||activeAsset.exchange)}>
           <span className="block truncate">{activeAsset.symbol}</span>
         </button>
@@ -917,97 +889,42 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
       </div>
       </div>
 
-      {/* Every chart interval lives in this permanently visible horizontal row.
-          An empty ticker-specific favorite set means show *all* intervals. */}
-      <div id="chart-timeframe-bar" className="flex h-[25px] min-h-[25px] w-full min-w-0 items-center border-t border-[#2b3443] bg-[#151c29] px-1">
-        <div id="chart-timeframe-scroll" role="toolbar" aria-label="Chart timeframes"
-          className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain whitespace-nowrap scrollbar-none"
-          style={{touchAction:'pan-x'}}>
-          {visibleTimeframes.map(tf=>
-            <button type="button" id={'tf-btn-'+tf} key={tf} aria-label={'Timeframe '+tf}
-              title={'Show '+tf+' chart'} aria-pressed={activeTimeframe===tf}
-              onClick={()=>setActiveTimeframe(tf)}
-              className={'h-[21px] shrink-0 rounded px-2 text-[10px] font-semibold '+(activeTimeframe===tf?
-                'bg-[#2962ff] text-white':'text-[#aab7cc] hover:bg-[#283448] hover:text-white')}>
-              {tf}
-            </button>)}
-        </div>
-        <div ref={timeframeFavoritesRef} className="relative z-[100] ml-1 shrink-0 border-l border-[#364358] pl-1">
-          <button type="button" id="timeframe-favorites-button"
-            aria-label={'Favorite timeframes for '+activeAsset.symbol}
-            title={'Save favorite timeframe loadout for '+activeAsset.symbol}
-            aria-expanded={isTimeframeFavoritesOpen} onClick={toggleTimeframeFavoriteMenu}
-            className={'flex h-6 w-7 items-center justify-center rounded '+(favoriteTimeframes.length?
-              'text-[#ffbe55] bg-[#3b3328]':'text-[#9baac0] hover:bg-[#293649]')}>
-            <Star size={15} fill={favoriteTimeframes.length?'currentColor':'none'}/>
-          </button>
-          {isTimeframeFavoritesOpen&&<div id="ticker-timeframe-favorites-menu" role="dialog"
-            aria-label={'Favorite intervals for '+activeAsset.symbol}
-            className="absolute right-0 top-full z-[130] mt-1 w-[min(290px,calc(100vw-14px))] rounded-lg border border-[#485770] bg-[#1b2638] p-2 text-[#dae6f8] shadow-2xl">
-            <p className="mb-2 text-[11px] font-semibold">Favorite intervals · {activeAsset.symbol}</p>
-            <p className="mb-2 text-[10px] leading-snug text-[#9fb0c9]">
-              Save favorite timeframes for this exact ticker. With none saved, the bar shows all intervals.
-            </p>
-            <div className="grid grid-cols-4 gap-1">
-              {CHART_INTERVALS.map(tf=>
-                <button type="button" key={tf} id={'favorite-timeframe-option-'+tf}
-                  aria-label={(draftTimeframes.includes(tf)?'Remove ':'Favorite ')+tf}
-                  aria-pressed={draftTimeframes.includes(tf)}
-                  onClick={()=>setDraftTimeframes(prev=>prev.includes(tf)?
-                    prev.filter(item=>item!==tf):[...prev,tf])}
-                  className={'flex h-7 items-center justify-center gap-1 rounded border text-[10px] '+(draftTimeframes.includes(tf)?
-                    'border-[#ae8746] bg-[#4b3a27] text-[#ffd288]':'border-[#394860] text-[#c0cde0]')}>
-                  {draftTimeframes.includes(tf)&&<Star size={10} fill="currentColor"/>}{tf}
-                </button>)}
-            </div>
-            <div className="mt-2 flex items-center justify-between gap-1">
-              <button type="button" onClick={()=>setDraftTimeframes([])}
-                className="rounded px-2 py-1.5 text-[10px] text-[#a8bacf] hover:bg-[#344156]">Clear all</button>
-              <div className="flex gap-1">
-                <button type="button" onClick={()=>setIsTimeframeFavoritesOpen(false)}
-                  className="rounded border border-[#43516b] px-2.5 py-1.5 text-[10px]">Cancel</button>
-                <button type="button" id="save-ticker-timeframe-favorites" onClick={saveTickerTimeframeFavorites}
-                  className="rounded bg-[#2962ff] px-3 py-1.5 text-[10px] font-semibold text-white">Save for ticker</button>
-              </div>
-            </div>
-          </div>}
-        </div>
-      </div>
-
       {/* Replace the mobile three-lines popup with always-visible compact rows.
           Important actions stay reachable without hiding the actual chart. */}
-      <div id="mobile-chart-action-rows" className="grid md:hidden w-full min-w-0 grid-cols-5 gap-px border-t border-[#30394a] bg-[#121923] p-px">
-        <label className="flex h-[23px] min-w-0 items-center rounded bg-[#253146] px-0.5">
-          <span className="sr-only">Mobile chart layout</span>
+      <div id="mobile-chart-action-rows"
+        className="grid md:hidden w-full min-w-0 grid-cols-5 gap-px border-t border-[#30394a] bg-[#121923] p-px">
+        <label title="Chart layout" className="relative flex h-[23px] min-w-0 cursor-pointer items-center justify-center gap-0.5 rounded bg-[#253146] text-[#c2d3e8]">
+          <LayoutGrid size={15}/><ChevronDown size={9}/>
           <select aria-label="Mobile chart layout" value={currentTemplateId}
             onChange={event=>{
               const template=LAYOUT_TEMPLATES.find(item=>item.id===event.target.value);
               if(template)onSelectTemplate(template);
             }}
-            className="h-full w-full min-w-0 bg-transparent text-center text-[9px] font-medium text-[#c2d3e8]">
+            className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
             {LAYOUT_TEMPLATES.map(template=><option key={template.id} value={template.id}>{template.name}</option>)}
           </select>
         </label>
         {([
-          ['Alert',onOpenAlerts,false],
-          ['Replay',onOpenReplay,false],
-          ['Strategy',onOpenStrategyLab,false],
-          ['Undo',onUndoDrawing,!canUndo],
-          ['Redo',onRedoDrawing,!canRedo],
-          ['Save Chart',onOpenSavedCharts,false],
-          ['Save Layout',onSaveLayout,false],
-          ['Snapshot',onTakeSnapshot,false],
-          [isFullscreen?'Exit Full':'Fullscreen',onToggleFullscreen,false],
-          [isPipActive?'Close PiP':'PiP',onTogglePip,false],
-          [sessionVwapEnabled?'VWAP On':'VWAP',onToggleSessionVwap,false],
-          ['Trade Ticket',onToggleTradingPanel,false],
-          ['Paper Trading',onTogglePaperWorkspace,false],
-          ['Download Data',onDownloadData,false],
-        ] as Array<[string,(()=>void)|undefined,boolean]>).map(([label,action,disabled])=>
+          ['Alert',onOpenAlerts,false,<Bell size={15}/>],
+          ['Replay',onOpenReplay,false,<RotateCcw size={15}/>],
+          ['Strategy',onOpenStrategyLab,false,<FlaskConical size={15}/>],
+          ['Undo',onUndoDrawing,!canUndo,<Undo2 size={15}/>],
+          ['Redo',onRedoDrawing,!canRedo,<Redo2 size={15}/>],
+          ['Save Chart',onOpenSavedCharts,false,<Save size={15}/>],
+          ['Save Layout',onSaveLayout,false,<LayoutGrid size={15}/>],
+          ['Snapshot',onTakeSnapshot,false,<Camera size={15}/>],
+          [isFullscreen?'Exit Full':'Fullscreen',onToggleFullscreen,false,
+            isFullscreen?<Minimize2 size={15}/>:<Maximize2 size={15}/>],
+          [isPipActive?'Close PiP':'PiP',onTogglePip,false,<PictureInPicture2 size={15}/>],
+          [sessionVwapEnabled?'VWAP On':'VWAP',onToggleSessionVwap,false,<LineChart size={15}/>],
+          ['Trade Ticket',onToggleTradingPanel,false,<TrendingUp size={15}/>],
+          ['Paper Trading',onTogglePaperWorkspace,false,<Wallet size={15}/>],
+          ['Download Data',onDownloadData,false,<Download size={15}/>],
+        ] as Array<[string,(()=>void)|undefined,boolean,React.ReactNode]>).map(([label,action,disabled,icon])=>
           <button type="button" key={label} disabled={disabled}
             title={label} aria-label={label}
-            className="h-[23px] min-w-0 truncate rounded bg-[#202b3d] px-0.5 text-[9px] font-medium text-[#c2d3e8] disabled:opacity-30 hover:bg-[#35435a] active:bg-[#4169a0]"
-            onClick={()=>action?.()}>{label}</button>)}
+            className="flex h-[23px] min-w-0 items-center justify-center rounded bg-[#202b3d] text-[#c2d3e8] disabled:opacity-30 hover:bg-[#35435a] active:bg-[#4169a0]"
+            onClick={()=>action?.()}>{icon}</button>)}
       </div>
     </header>
   );
