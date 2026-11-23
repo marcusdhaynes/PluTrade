@@ -1905,6 +1905,23 @@ export default function App() {
 
         {/* Center: Multi-Chart Resizable Workspace + Bottom Trading Panel + Bottom Bar */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+          {/* Chart range and scale toolbar above the plotting surface (not the chart axes) */}
+          <BottomToolbar
+            chart={chartRef.current?.getChart() || null}
+            onSelectRange={(days) => chartRef.current?.selectRange(days)}
+            onFitContent={() => chartRef.current?.fitContent()}
+            onGoToDate={date=>chartRef.current?.goToUtcDate(date)??false}
+            onApplyTimeScaleSettings={({barSpacing,rightOffset})=>{
+              const chart=chartRef.current?.getChart();
+              if(!chart)return false;
+              try{chart.timeScale().applyOptions({barSpacing,rightOffset});return true;}
+              catch{return false;}
+            }}
+            isLogScale={isLogScale}
+            setIsLogScale={setIsLogScale}
+            isPercentScale={isPercentScale}
+            setIsPercentScale={setIsPercentScale}
+          />
           <div className="flex-1 min-h-0 w-full relative" id="chart-workspace-viewport">
           <MultiChartWorkspace
             ref={chartRef}
@@ -1996,23 +2013,7 @@ export default function App() {
             setIsExpanded={setIsBottomTradingExpanded}
           />
 
-          {/* Bottom Bar for time ranges and scale controls */}
-          <BottomToolbar
-            chart={chartRef.current?.getChart() || null}
-            onSelectRange={(days) => chartRef.current?.selectRange(days)}
-            onFitContent={() => chartRef.current?.fitContent()}
-            onGoToDate={date=>chartRef.current?.goToUtcDate(date)??false}
-            onApplyTimeScaleSettings={({barSpacing,rightOffset})=>{
-              const chart=chartRef.current?.getChart();
-              if(!chart)return false;
-              try{chart.timeScale().applyOptions({barSpacing,rightOffset});return true;}
-              catch{return false;}
-            }}
-            isLogScale={isLogScale}
-            setIsLogScale={setIsLogScale}
-            isPercentScale={isPercentScale}
-            setIsPercentScale={setIsPercentScale}
-          />
+
           <MobileTradingControls
             asset={activeAsset} position={activePosition}
             accountEquity={paperAccount.equity} accountBalance={paperAccount.balance}

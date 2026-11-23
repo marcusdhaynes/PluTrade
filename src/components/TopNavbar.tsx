@@ -27,7 +27,9 @@ import {
   Type,
   Maximize,
   Star,
+  Menu,
 } from 'lucide-react';
+import { LAYOUT_TEMPLATES } from '../data/layoutTemplates';
 import { LayoutTemplate, LayoutSyncSettings, SavedChartLayout } from '../types/layout';
 import { LayoutDropdown } from './layout/LayoutDropdown';
 import { LayoutManagerDropdown } from './layout/LayoutManagerDropdown';
@@ -205,6 +207,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   setIsLayoutManagerOpen,
 }) => {
   const [isChartTypeOpen, setIsChartTypeOpen] = useState(false);
+  const [mobileMoreOpen,setMobileMoreOpen]=useState(false);
   const [showQuickDrawingTools,setShowQuickDrawingTools]=useState<boolean>(()=>{
     try{return localStorage.getItem('plutrade_quick_drawing_tools_v1')!=='false';}
     catch{return true;}
@@ -496,10 +499,77 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   return (
     <header
       id="tradingview-top-navbar"
-      className="h-8 bg-[#131722] border-b border-[#2a2e39] px-1.5 flex items-center justify-between text-[11px] select-none z-50 shrink-0 relative overflow-visible"
+      className="h-9 md:h-8 bg-[#131722] border-b border-[#2a2e39] px-1.5 flex items-center justify-between text-[11px] select-none z-50 shrink-0 relative overflow-visible"
     >
+      {/* Phone header: essential controls stay visible without sideways scroll.
+          Secondary actions have a compact menu instead of overflowing the chart. */}
+      <div id="plutrade-mobile-navbar" className="flex md:hidden h-full w-full min-w-0 items-center gap-1">
+        <button type="button" id="mobile-symbol-search-trigger" onClick={onOpenSymbolSearch}
+          className="min-w-0 flex-1 truncate rounded border border-[#3a4356] bg-[#1b2434] px-1.5 py-1.5 text-left font-semibold text-[#e6edfa]"
+          title={activeAsset.symbol+' · '+(activeAsset.source||activeAsset.exchange)}>
+          <span className="block truncate">{activeAsset.symbol}</span>
+        </button>
+        <select id="mobile-timeframe-selector" aria-label="Mobile chart timeframe" value={activeTimeframe}
+          onChange={event=>setActiveTimeframe(event.target.value as Timeframe)}
+          className="h-7 w-[54px] shrink-0 rounded border border-[#3a4356] bg-[#1b2434] px-0.5 text-[10px] text-[#e3ebfb]">
+          {ALL_TIMEFRAMES_CHRONOLOGICAL.map(tf=><option key={tf} value={tf}>{tf}</option>)}
+        </select>
+        <select id="mobile-chart-style-selector" aria-label="Mobile chart style" value={chartType}
+          onChange={event=>setChartType(event.target.value as ChartType)}
+          className="h-7 w-[73px] shrink-0 rounded border border-[#3a4356] bg-[#1b2434] px-0.5 text-[10px] text-[#e3ebfb]">
+          {chartTypes.map(type=><option key={type.id} value={type.id}>{type.label}</option>)}
+        </select>
+        <button type="button" aria-label="Open mobile indicators" onClick={onOpenIndicators}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded border border-[#3a4356] text-[#9eb3d1]">
+          <SlidersHorizontal size={15}/>
+        </button>
+        <button type="button" id="mobile-top-tools-trigger" aria-label="More mobile chart actions"
+          aria-expanded={mobileMoreOpen} onClick={()=>setMobileMoreOpen(v=>!v)}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded border border-[#3a4356] text-[#b2c7e2]">
+          <Menu size={16}/>
+        </button>
+        {mobileMoreOpen&&<>
+          <div className="fixed inset-0 z-[90]" onClick={()=>setMobileMoreOpen(false)} aria-hidden="true"/>
+          <div id="mobile-top-tools-menu" role="menu" aria-label="Additional chart actions"
+            className="absolute right-1 top-full z-[100] mt-1 w-[min(300px,calc(100vw-8px))] max-h-[min(70dvh,440px)] overflow-y-auto rounded-lg border border-[#3f4b60] bg-[#182232] p-2 text-[#d9e4f7] shadow-2xl">
+            <label className="flex items-center justify-between gap-2 border-b border-[#303c4f] pb-2 text-[11px]">
+              <span>Chart layout</span>
+              <select aria-label="Mobile chart layout" value={currentTemplateId}
+                onChange={event=>{
+                  const selected=LAYOUT_TEMPLATES.find(template=>template.id===event.target.value);
+                  if(selected)onSelectTemplate(selected);
+                  setMobileMoreOpen(false);
+                }}
+                className="max-w-[185px] rounded border border-[#45526a] bg-[#111b2b] p-1 text-[10px]">
+                {LAYOUT_TEMPLATES.map(template=><option key={template.id} value={template.id}>{template.name}</option>)}
+              </select>
+            </label>
+            <div className="mt-2 grid grid-cols-2 gap-1">
+              {([
+                ['Alert',onOpenAlerts,false],
+                ['Replay',onOpenReplay,false],
+                ['Strategy',onOpenStrategyLab,false],
+                ['Undo',onUndoDrawing,!canUndo],
+                ['Redo',onRedoDrawing,!canRedo],
+                ['Save chart',onOpenSavedCharts,false],
+                ['Save layout',onSaveLayout,false],
+                ['Snapshot',onTakeSnapshot,false],
+                [isFullscreen?'Exit fullscreen':'Fullscreen',onToggleFullscreen,false],
+                [isPipActive?'Close PiP':'Picture in picture',onTogglePip,false],
+                [sessionVwapEnabled?'Disable VWAP':'Session VWAP',onToggleSessionVwap,false],
+                ['Trade ticket',onToggleTradingPanel,false],
+              ] as Array<[string,(()=>void)|undefined,boolean]>).map(([label,action,disabled])=>
+                <button key={label} type="button" role="menuitem" disabled={disabled}
+                  className="min-w-0 rounded border border-[#34445c] bg-[#222d40] px-2 py-1.5 text-left text-[11px] disabled:opacity-35 hover:bg-[#334564]"
+                  onClick={()=>{setMobileMoreOpen(false);action?.();}}>{label}</button>
+              )}
+            </div>
+          </div>
+        </>}
+      </div>
+
       {/* Left Section: User Avatar, Symbol Search, Timeframes, Chart Styles, Indicators, Tools */}
-      <div className="flex items-center gap-0.5 py-0.5 overflow-visible">
+      <div className="hidden md:flex items-center gap-0.5 py-0.5 overflow-visible">
         {/* User Avatar with Green Circle 'M' and Red Badge '7' */}
         <div className="relative mr-1 shrink-0 cursor-pointer">
           <div className="w-5.5 h-5.5 rounded-full bg-[#089981] flex items-center justify-center font-bold text-white text-[10px] shadow-xs">
@@ -935,7 +1005,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
       </div>
 
       {/* Right Section: Layout Grid Picker (to the left of Unnamed), Layout Manager, Search, Settings, Fullscreen, Camera, Trade, Publish */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="hidden md:flex items-center gap-1 shrink-0">
         {/* Window Layout Options Dropdown (Directly to the left of Unnamed) */}
         <LayoutDropdown
           currentTemplateId={currentTemplateId}

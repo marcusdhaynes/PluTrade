@@ -26,6 +26,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   setIsPercentScale,
 }) => {
   const [currentTimeStr, setCurrentTimeStr] = useState('');
+  const [timeZoneStr,setTimeZoneStr]=useState('UTC');
   const [datePanelOpen,setDatePanelOpen]=useState(false);
   const [dateValue,setDateValue]=useState('');
   const [dateError,setDateError]=useState('');
@@ -51,6 +52,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
       const offset = -now.getTimezoneOffset();
       const zone = `UTC${offset >= 0 ? '+' : '-'}${String(Math.floor(Math.abs(offset)/60)).padStart(2,'0')}:${String(Math.abs(offset)%60).padStart(2,'0')}`;
       setCurrentTimeStr(`${String(h).padStart(2, '0')}:${m}:${s} ${ampm} ${zone}`);
+      setTimeZoneStr(zone);
     };
 
     updateTime();
@@ -72,16 +74,18 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   return (
     <div
       id="tradingview-bottom-bar"
-      className="relative h-[22px] bg-[#131722] border-t border-[#2a2e39] px-2 flex items-center justify-between text-[11px] select-none shrink-0 z-20"
+      data-layout="above-chart"
+      aria-label="Chart range and scale controls"
+      className="relative z-30 grid h-[44px] w-full min-w-0 shrink-0 grid-rows-2 border-b border-[#2a2e39] bg-[#131722] px-1 text-[11px] select-none md:h-[22px] md:flex md:items-center md:justify-between md:px-2"
     >
       {/* Time Range Quick Selectors */}
-      <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-none">
+      <div id="chart-range-choices" className="grid w-full min-w-0 grid-cols-[repeat(8,minmax(0,1fr))_20px] items-center gap-0 md:flex md:w-auto md:gap-0.5">
         {ranges.map((r) => (
           <button
             key={r.label}
             id={`range-btn-${r.label}`}
             onClick={() => onSelectRange(r.days)}
-            className="px-1 py-0.2 text-[10px] font-medium text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition"
+            className="min-w-0 px-0 py-0.5 text-center text-[9px] font-semibold whitespace-nowrap text-[#9aa3b6] hover:text-white hover:bg-[#1e222d] rounded transition md:px-1 md:text-[10px]"
           >
             {r.label}
           </button>
@@ -98,10 +102,13 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
       </div>
 
       {/* Right side: Time & Timezone, Fit, % / log / auto */}
-      <div className="flex items-center gap-1.5 text-[#787b86] font-mono text-[10px]">
+      <div className="flex w-full min-w-0 items-center justify-end gap-2 border-t border-[#252c3a] text-[#8d9bad] font-mono text-[10px] md:w-auto md:gap-1.5 md:border-t-0">
         {/* Live Ticking Time (01:08:13 AM UTC-4) */}
-        <span className="text-[#787b86] text-[9.5px] select-all cursor-pointer hover:text-[#d1d4dc]">
+        <span className="hidden text-[#787b86] text-[9.5px] select-all cursor-pointer hover:text-[#d1d4dc] md:inline" title="Local clock and timezone">
           {currentTimeStr || '—'}
+        </span>
+        <span className="mr-auto shrink-0 text-[9px] text-[#9baac3] md:hidden" title={currentTimeStr || 'Local timezone'}>
+          {timeZoneStr}
         </span>
 
         {/* % Percentage scale toggle */}
@@ -153,7 +160,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         </button>
       </div>
       {datePanelOpen&&<form role="dialog" aria-label="Go to chart date"
-        className="absolute left-2 bottom-full mb-1 z-50 min-w-[240px] rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl flex flex-col gap-2 text-[#dce4f0]"
+        className="absolute left-1 top-full mt-1 z-50 min-w-[min(240px,calc(100vw-42px))] rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl flex flex-col gap-2 text-[#dce4f0]"
         onSubmit={event=>{
           event.preventDefault();
           if(!dateValue||!onGoToDate(dateValue)){setDateError('No loaded market candles for that UTC date.');return;}
@@ -170,7 +177,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         </div>
       </form>}
       {scalePanelOpen&&<section role="dialog" aria-label="Time scale settings"
-        className="absolute right-2 bottom-full mb-1 z-50 w-[240px] rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl text-[#dce4f0] space-y-2">
+        className="absolute right-1 top-full mt-1 z-50 w-[min(240px,calc(100vw-42px))] rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl text-[#dce4f0] space-y-2">
         <strong>Chart time scale</strong>
         <label className="block">Bar spacing
           <input type="number" aria-label="Bar spacing" min={2} max={30} step={1} value={barSpacing}
