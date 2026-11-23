@@ -525,3 +525,22 @@ test('right Indicators and Alerts are sole launchers and Order is first',async (
   await page.locator('#right-tab-alerts').click();
   await expect(page.locator('#tradingview-alerts-panel')).toBeVisible();
 });
+
+
+test('mobile equity and stop-loss tool windows layer above sidebar and close off-click',async ({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const bar=page.locator('#plutrade-mobile-trade-controls');
+  await bar.getByRole('button',{name:/Eq/}).click();
+  const equity=page.getByRole('dialog',{name:'Equity allocation'});
+  await expect(equity).toBeVisible();
+  const z=await bar.evaluate(el=>Number(getComputedStyle(el).zIndex));
+  expect(z).toBeGreaterThan(1400);
+  await page.locator('#chart-timeframe-bar').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await expect(equity).toHaveCount(0);
+  await bar.getByRole('button',{name:/Stop loss/}).click();
+  const stops=page.getByRole('dialog',{name:'Stop loss options'});
+  await expect(stops).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(stops).toHaveCount(0);
+});
