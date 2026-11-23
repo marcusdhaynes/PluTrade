@@ -2,10 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import {createPortal} from 'react-dom';
 import type { IChartApi } from 'lightweight-charts';
 import { Calendar, RotateCcw, Settings } from 'lucide-react';
+import type {Asset,Timeframe} from '../types';
+import type {CustomInterval} from '../services/customChartIntervals';
+import {TimeframeBar} from './TimeframeBar';
 
 interface BottomToolbarProps {
   chart: IChartApi | null;
-  onSelectRange: (days: number) => void;
+  activeAsset:Asset;
+  activeTimeframe:Timeframe;
+  onStandardTimeframe:(tf:Timeframe)=>void;
+  customInterval:CustomInterval|null;
+  onCustomTimeframe:(spec:CustomInterval)=>string|null;
   onFitContent: () => void;
   onGoToDate:(utcDate:string)=>boolean;
   onApplyTimeScaleSettings:(settings:{barSpacing:number;rightOffset:number})=>boolean;
@@ -13,12 +20,11 @@ interface BottomToolbarProps {
 
 export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   chart,
-  onSelectRange,
+  activeAsset,activeTimeframe,onStandardTimeframe,customInterval,onCustomTimeframe,
   onFitContent,
   onGoToDate,
   onApplyTimeScaleSettings,
 }) => {
-  const [currentTimeStr, setCurrentTimeStr] = useState('');
   const [chartCornerHost,setChartCornerHost]=useState<HTMLElement|null>(null);
   useEffect(()=>{setChartCornerHost(document.getElementById('chart-workspace-viewport'));},[]);
   const [datePanelOpen,setDatePanelOpen]=useState(false);
@@ -53,61 +59,25 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
     setScaleError(ok?'':'No chart available to adjust.');
   };
 
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      // Format as 01:08:13 AM UTC-4
-      const hours = now.getHours();
-      const h = hours % 12 || 12;
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const m = String(now.getMinutes()).padStart(2, '0');
-      const s = String(now.getSeconds()).padStart(2, '0');
-      const offset = -now.getTimezoneOffset();
-      const zone = `UTC${offset >= 0 ? '+' : '-'}${String(Math.floor(Math.abs(offset)/60)).padStart(2,'0')}:${String(Math.abs(offset)%60).padStart(2,'0')}`;
-      setCurrentTimeStr(`${String(h).padStart(2, '0')}:${m}:${s} ${ampm} ${zone}`);
-
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const ranges: { label: string; days: number }[] = [
-    { label: '1D', days: 1 },
-    { label: '5D', days: 5 },
-    { label: '1M', days: 30 },
-    { label: '3M', days: 90 },
-    { label: '6M', days: 180 },
-    { label: 'YTD', days: -1 },
-    { label: '1Y', days: 365 },
-    { label: 'ALL', days: 0 },
-  ];
 
   return (
     <div id="tradingview-bottom-bar" ref={datePopoverRef}
       data-layout="above-chart"
-      aria-label="Chart range and scale controls"
+      aria-label="Chart timeframe and calendar controls"
       className="relative z-30 flex h-[24px] w-full min-w-0 shrink-0 items-center justify-between border-b border-[#2a2e39] bg-[#131722] px-0.5 text-[10px] select-none md:h-[22px] md:px-2">
-      <div id="chart-range-choices"
-        className="grid h-full w-full min-w-0 grid-cols-[repeat(8,minmax(0,1fr))_20px] items-center gap-0 md:flex md:w-auto md:gap-0.5">
-        {ranges.map(r=>(
-          <button key={r.label} type="button" id={`range-btn-${r.label}`}
-            title={r.label+' visible chart range'} onClick={()=>onSelectRange(r.days)}
-            className="min-w-0 truncate rounded px-0 py-0.5 text-center text-[9px] font-medium text-[#9ba9bc] hover:bg-[#1e222d] hover:text-white md:px-1 md:text-[10px]">
-            {r.label}
-          </button>
-        ))}
-        <button type="button" id="go-to-chart-date-btn" aria-expanded={datePanelOpen}
-          aria-label="Go to chart date"
-          title="Go to date"
-          onClick={()=>{setDatePanelOpen(v=>!v);setScalePanelOpen(false);setDateError('');}}
-          className="flex h-[20px] items-center justify-center text-[#9ba9bc] hover:text-white">
-          <Calendar size={12}/>
-        </button>
-      </div>
-      <span className="hidden shrink-0 text-[9px] font-mono text-[#8e9db5] lg:inline"
-        title="Current local clock and timezone">{currentTimeStr||'—'}</span>
+      <TimeframeBar
+        activeAsset={activeAsset}
+        activeTimeframe={activeTimeframe}
+        onStandardTimeframe={onStandardTimeframe}
+        customInterval={customInterval}
+        onCustomTimeframe={onCustomTimeframe}
+        calendarControl={<button type="button" id="go-to-chart-date-btn"
+          aria-expanded={datePanelOpen} aria-label="Go to chart date"
+          title="Go to date" onClick={()=>{setDatePanelOpen(v=>!v);setScalePanelOpen(false);setDateError('');}}
+          className="flex h-[21px] w-6 shrink-0 items-center justify-center text-[#9baac0] hover:text-white">
+          <Calendar size={14}/>
+        </button>}
+      />
       {datePanelOpen&&<form role="dialog" aria-label="Go to chart date"
         className="absolute left-1 top-full mt-1 z-50 min-w-[min(240px,calc(100vw-42px))] rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl flex flex-col gap-2 text-[#dce4f0]"
         onSubmit={event=>{
