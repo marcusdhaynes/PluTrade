@@ -695,3 +695,40 @@ html,body,#root {
   }
   #chart-quote-currency-anchor {width:var(--plutrade-mobile-bar-size) !important;}
 }
+
+/* Use the right tool rail as the universal mobile icon-gap reference. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  :root { --plutrade-mobile-icon-gap:2px; }
+
+  /* A consistent edge-to-edge 2px gap, including nested top-bar groups.
+     Retain the right-aligned PiP/fullscreen cluster and existing overflow limits. */
+  #plutrade-mobile-navbar,
+  #mobile-chart-style-anchor,
+  #mobile-chart-style-favorites,
+  #mobile-top-chart-actions,
+  #mobile-window-actions {
+    gap:var(--plutrade-mobile-icon-gap) !important;
+    column-gap:var(--plutrade-mobile-icon-gap) !important;
+  }
+
+  /* The left drawing tools previously used gap-1 (4px); match the
+     2px between buttons in the right icon bar, including favorites. */
+  #tradingview-left-toolbar > div:first-child,
+  #tradingview-left-toolbar #left-toolbar-starred-tools,
+  #tradingview-right-icon-bar > div {
+    gap:var(--plutrade-mobile-icon-gap) !important;
+    row-gap:var(--plutrade-mobile-icon-gap) !important;
+  }
+
+  /* Keep the current-price badge just inside the plot, not over the
+     separate 24px price axis; it must also clear the native time axis. */
+  #chart-current-price-label {
+    z-index:90;
+    border-radius:2px;
+    box-shadow:0 1px 3px #0008;
+    font-size:8px;
+    line-height:11px;
+    padding:1px 3px;
+    max-width:calc(100% - var(--plutrade-mobile-bar-size) - 8px);
+  }
+}
