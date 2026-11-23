@@ -304,7 +304,7 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
       </div>}>
         {tab==='cloud'&&<CloudSyncPanel/>}
         {tab==='replay'&&<ReplayBacktestPanel asset={activeAsset} timeframe={activeTimeframe}/>}
-        {tab==='strategyLab'&&<StrategyLabPanel asset={activeAsset} timeframe={activeTimeframe}/>}
+        {tab==='strategyLab'&&<StrategyLabPanel asset={activeAsset} timeframe={activeTimeframe} markets={allMarkets}/>}
         {tab==='screener'&&<MarketScreenerPanel assets={allMarkets} onSelect={onSelectScreenedMarket} onAdd={onAddScreenedMarket}/>}
         {tab==='dataHealth'&&<MarketDataHealthPanel health={feedHealth} status={marketStatus}/>}
       </React.Suspense>

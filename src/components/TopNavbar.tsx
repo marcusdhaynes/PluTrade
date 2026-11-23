@@ -130,6 +130,7 @@ interface TopNavbarProps {
   onToggleTradingPanel?: () => void;
   onOpenSavedCharts?: () => void;
   onOpenReplay?: () => void;
+  onOpenStrategyLab?: () => void;
   marketStatus?: { connected: boolean; provider: string; latencyMs: number };
   // Window Layout & Multi-Chart Management
   currentTemplateId: string;
@@ -177,6 +178,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   onToggleTradingPanel,
   onOpenSavedCharts,
   onOpenReplay,
+  onOpenStrategyLab,
   marketStatus,
   currentTemplateId,
   onSelectTemplate,
@@ -826,6 +828,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
         >
           <RotateCcw className="w-3 h-3" />
           <span>Replay</span>
+        </button>
+        <button className="flex items-center gap-1 px-1.5 py-0.5 text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition text-[11px]"
+          title="Open Strategy Lab" aria-label="Open Strategy Lab" onClick={onOpenStrategyLab}>
+          <TrendingUp className="w-3 h-3"/><span>Strategy</span>
         </button>
 
         <div className="h-3 w-px bg-[#2a2e39] mx-0.5" />

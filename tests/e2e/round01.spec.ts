@@ -17,9 +17,12 @@ test('legacy watchlist changes migrate once and persist across reloads',async ({
     localStorage.getItem('tv_watchlists_v4')||'[]')[0]?.name)).toBe('Round 01 Persisted');
 });
 
-test('replay is visibly unavailable rather than an inert working-looking button',async ({page})=>{
+test('replay shortcut opens the historical research workspace',async ({page})=>{
   await page.goto('./');
-  await expect(page.getByRole('button',{name:'Bar replay unavailable'})).toBeDisabled();
+  await page.getByRole('button',{name:'Open historical replay'}).click();
+  const replay=page.locator('#plutrade-historical-lab');
+  await expect(replay).toBeVisible();
+  await expect(replay.getByRole('button',{name:'Load Verified History'})).toBeVisible();
 });
 
 test('new alerts are scoped to the exact market venue',async ({page})=>{

@@ -202,3 +202,15 @@ export function walkForwardSma(bars:readonly OHLCV[],timeframe:Timeframe,
   if(!out.result)return {error:out.error};
   return {train:best.result,test:out.result,fast:best.fast,slow:best.slow,splitAt:holdout[0].time};
 }
+
+/** Research-only signal snapshot. Entry/exit are evaluated on the last verified closed bar. */
+export function latestLabSignal(input:readonly OHLCV[],timeframe:Timeframe,
+  strategy:LabStrategy,nowSeconds=Date.now()/1000):
+  {at?:number;entry?:boolean;exit?:boolean;error?:string}{
+  if(!validateLabStrategy(strategy))return {error:'Invalid strategy rules.'};
+  const verified=validateHistoricalBacktestBars(input,timeframe,nowSeconds);
+  if(verified.error)return {error:verified.error};
+  const index=verified.bars.length-1,evaluate=ruleEvaluator(verified.bars,strategy);
+  return {at:verified.bars[index].time,entry:evaluate(strategy.entry,index),
+    exit:evaluate(strategy.exit,index)};
+}

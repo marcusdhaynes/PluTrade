@@ -1698,6 +1698,7 @@ export default function App() {
         onToggleTradingPanel={() => setIsTradeTicketOpen(prev=>!prev)}
         onOpenSavedCharts={()=>setIsSavedChartsOpen(true)}
         onOpenReplay={()=>requestBottomPanel('replay')}
+        onOpenStrategyLab={()=>requestBottomPanel('strategyLab')}
         marketStatus={marketStatus}
         currentTemplateId={currentTemplateId}
         onSelectTemplate={handleSelectTemplate}

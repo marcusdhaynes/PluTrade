@@ -7,7 +7,7 @@ Implementation date: November 22, 2026. This increment must pass CI before it is
 - Browser visual rule editor, validated JSON editor, locally saved strategy, and trade CSV export.
 - Deterministic research backtest using native, continuous, complete candles from the venue selected in the workspace. Signals from fully closed candle n are eligible only at candle n+1 open. Historical gaps, malformed prices, and forming candles are refused.
 - Conservative stop-first behavior when one OHLC bar intersects stop and target; open-gap behavior priced at bar open; execution assumptions include adverse modeled spreads, slippage, and entry/exit fees.
-- Single-symbol comparison, grid search over 20 bounded SMA pairs, and chronologically separated 70% train / 30% untouched holdout selection and evaluation. Selection uses training return minus max close-based drawdown and excludes candidate results with fewer than two completed trades.
+- Single-symbol comparison and a research-only, manual multi-market scan of up to six independently fetched venues showing last completed-bar entry/exit signal and the same backtest per market; missing/corrupt data is displayed as unavailable. Grid search over 20 bounded SMA pairs, and chronologically separated 70% train / 30% untouched holdout selection and evaluation. Selection uses training return minus max close-based drawdown and excludes candidate results with fewer than two completed trades.
 - Per-bar, unannualized Sharpe and Sortino, expectancy, win rate, profit factor, exposure, close-based drawdown and elapsed bars, equity curve, and trade-level report.
 - The previously disabled Replay button in the top chart toolbar opens the existing independent Replay & Backtest dock tab; existing chart state and paper accounts are not mutated.
 - The new engine test is included in the full test:paper suite that gates the Pages build.
@@ -29,6 +29,7 @@ Implementation date: November 22, 2026. This increment must pass CI before it is
 6. 10x workload stress and broad venue coverage are not proven by these tests and must not be claimed.
 
 ## Subsequent increments — NOT implemented
+- Continuous market monitoring, strategy watchlist alerts, and authenticated, durable alert delivery.
 - Sandboxed typed scripting language with static compiler and version control.
 - Multi-venue, multi-timeframe portfolio evaluation and custom strategy screener.
 - Multi-fold walk-forward, Monte Carlo, regimes and deeper parameter sensitivity.

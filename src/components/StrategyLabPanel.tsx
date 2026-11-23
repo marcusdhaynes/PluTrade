@@ -4,10 +4,12 @@ import {fetchHistoricalData} from '../services/dataFeed';
 import {DEFAULT_BACKTEST,validateHistoricalBacktestBars,type BacktestConfig} from '../services/historicalBacktest';
 import {marketIdentity} from '../services/marketIdentity';
 import {smaCrossStrategy,rsiRecoveryStrategy,runStrategyLabBacktest,walkForwardSma,
-  optimizeSmaCandidates,validateLabStrategy,type LabCondition,type LabMetric,type LabOperand,
+  optimizeSmaCandidates,latestLabSignal,validateLabStrategy,type LabCondition,type LabMetric,type LabOperand,
   type LabResult,type LabRule,type LabStrategy} from '../services/strategyLab';
 
-type Props={asset:Asset;timeframe:Timeframe};
+type Props={asset:Asset;timeframe:Timeframe;markets:Asset[]};
+type MatrixRow={key:string;label:string;at?:number;entry?:boolean;exit?:boolean;
+  result?:LabResult;error?:string};
 type Part='entry'|'exit';
 const STORE='plutrade-strategy-lab-v1';
 const number=(n:number)=>Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:2}):'—';
@@ -30,7 +32,7 @@ function downloadTrades(result:LabResult){
  const link=document.createElement('a');link.href=url;link.download='plutrade-strategy-trades.csv';
  link.click();URL.revokeObjectURL(url);
 }
-export const StrategyLabPanel:React.FC<Props>=({asset,timeframe})=>{
+export const StrategyLabPanel:React.FC<Props>=({asset,timeframe,markets})=>{
  const [history,setHistory]=useState<OHLCV[]>([]);
  const [strategy,setStrategy]=useState<LabStrategy>(smaCrossStrategy);
  const [config,setConfig]=useState<BacktestConfig>({...DEFAULT_BACKTEST});
@@ -41,13 +43,22 @@ export const StrategyLabPanel:React.FC<Props>=({asset,timeframe})=>{
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState('');
  const [message,setMessage]=useState('');
+ const [selectedKeys,setSelectedKeys]=useState<string[]>([marketIdentity(asset)]);
+ const [picker,setPicker]=useState('');
+ const [matrix,setMatrix]=useState<MatrixRow[]>([]);
+ const [scanning,setScanning]=useState(false);
  const [showJson,setShowJson]=useState(false);
  const [draft,setDraft]=useState('');
  const request=useRef(0);
+ const scanRequest=useRef(0);
+ const marketIndex=new Map<string,Asset>([...markets,asset].map((m):[string,Asset]=>[marketIdentity(m),m]));
+ const available=[...marketIndex.entries()].filter(([,m])=>m.quoteStatus!=='unavailable').slice(0,200);
  const key=marketIdentity(asset)+'|'+timeframe;
- useEffect(()=>{request.current++;setHistory([]);setResult(null);setComparison([]);setWalk(null);
-   setCandidates([]);setError('');setMessage('');setLoading(false);},[key]);
- const clear=()=>{setResult(null);setComparison([]);setWalk(null);setCandidates([]);setError('');setMessage('');};
+ useEffect(()=>{request.current++;scanRequest.current++;setHistory([]);setResult(null);setComparison([]);setWalk(null);
+   setCandidates([]);setMatrix([]);setScanning(false);setSelectedKeys([marketIdentity(asset)]);
+   setPicker('');setError('');setMessage('');setLoading(false);},[key]);
+ const clear=()=>{scanRequest.current++;setScanning(false);setMatrix([]);
+   setResult(null);setComparison([]);setWalk(null);setCandidates([]);setError('');setMessage('');};
  const updateStrategy=(next:LabStrategy)=>{setStrategy(next);clear();};
  const editRule=(part:Part,mutate:(old:LabRule)=>LabRule)=>{
    updateStrategy({...strategy,[part]:mutate(strategy[part])});
@@ -95,6 +106,31 @@ export const StrategyLabPanel:React.FC<Props>=({asset,timeframe})=>{
    if(output.error){setError(output.error);return;}
    setWalk(output);
    setMessage('Best SMA parameters selected using training bars only. Holdout never used for selection.');
+ };
+ const scanMarkets=async()=>{
+   const id=++scanRequest.current;
+   const selected=selectedKeys.map(k=>[k,marketIndex.get(k)] as const)
+     .filter((item):item is readonly [string,Asset]=>item[1]!==undefined);
+   if(!selected.length){setError('Select at least one market.');return;}
+   setScanning(true);setMatrix([]);setError('');setMessage('');
+   const at=Date.now()/1000;
+   const rows=await Promise.all(selected.slice(0,6).map(async ([marketKey,market])=>{
+     const label=market.symbol+' · '+(market.source||market.exchange);
+     try{
+       const raw=await fetchHistoricalData(market,timeframe);
+       const checked=validateHistoricalBacktestBars(raw,timeframe,at);
+       if(checked.error)return {key:marketKey,label,error:checked.error};
+       const snap=latestLabSignal(checked.bars,timeframe,strategy,at);
+       const backtest=runStrategyLabBacktest(checked.bars,timeframe,strategy,config,at);
+       if(snap.error||backtest.error)return {key:marketKey,label,
+         error:snap.error||backtest.error};
+       return {key:marketKey,label,at:snap.at,entry:snap.entry,exit:snap.exit,
+         result:backtest.result} as MatrixRow;
+     }catch(e){return {key:marketKey,label,
+       error:e instanceof Error?e.message:'History request failed.'};}
+   }));
+   if(id===scanRequest.current){setMatrix(rows);setScanning(false);
+     setMessage('Snapshot only: latest completed candle, not an automated alert or continuous scan.');}
  };
  const save=()=>{
    if(!validateLabStrategy(strategy)){setError('Strategy failed validation.');return;}
@@ -238,6 +274,41 @@ export const StrategyLabPanel:React.FC<Props>=({asset,timeframe})=>{
      <button type="button" disabled={!history.length} onClick={optimize} className={pill}>Rank SMA Parameters</button>
      <button type="button" disabled={history.length<120} onClick={walkForward} className={pill}>70/30 Walk-Forward</button>
      {result&&<button type="button" className={pill} onClick={()=>downloadTrades(result)}>Export Trades CSV</button>}
+   </div>
+   <div className="rounded-lg border border-[#334157] bg-[#151e2c] p-3 space-y-2">
+     <strong>Multi-Market Strategy Scan · Up to 6 exact venue instruments</strong>
+     <p className="text-[#aab9cd]">Run this same rule set across separately fetched completed histories.
+       Symbols that lack qualifying history show an error instead of an invented result.</p>
+     <div className="flex flex-wrap gap-2 items-center">
+       <select aria-label="Choose market for strategy scan" className={inputClass}
+         value={picker} onChange={e=>setPicker(e.target.value)}>
+         <option value="">Choose market…</option>
+         {available.map(([id,m])=><option value={id} key={id}>{m.symbol} · {m.source||m.exchange}</option>)}
+       </select>
+       <button type="button" className={pill} disabled={!picker||selectedKeys.includes(picker)||selectedKeys.length>=6}
+         onClick={()=>{setSelectedKeys(previous=>[...previous,picker]);setPicker('');setMatrix([]);}}>Add Market</button>
+       <button type="button" className={pill} disabled={scanning||selectedKeys.length===0}
+         onClick={scanMarkets}>{scanning?'Scanning…':'Scan Selected Markets'}</button>
+     </div>
+     <div className="flex flex-wrap gap-1">
+       {selectedKeys.map(key=><button type="button" key={key} className={pill}
+         aria-label={'Remove '+(marketIndex.get(key)?.symbol||key)}
+         title="Remove market" onClick={()=>{setSelectedKeys(previous=>previous.filter(k=>k!==key));setMatrix([]);}}>
+         {marketIndex.get(key)?.symbol||key} ×</button>)}
+     </div>
+     {!!matrix.length&&<div className="max-h-56 overflow-auto">
+       <table className="w-full text-left"><thead><tr>
+         {['Venue · Symbol','Closed-bar signal','Last signal bar (UTC)','Strategy return','Max drawdown','Completed trades / Error']
+           .map(h=><th key={h} className="px-2">{h}</th>)}
+       </tr></thead><tbody>{matrix.map(row=><tr key={row.key} className="border-t border-[#344357]">
+         <td className="px-2">{row.label}</td>
+         <td>{row.error?'Unavailable':row.entry&&row.exit?'Entry & exit':row.entry?'Entry':row.exit?'Exit':'None'}</td>
+         <td>{row.at?new Date(row.at*1000).toISOString():'—'}</td>
+         <td>{row.result?pct(row.result.totalReturnPct):'—'}</td>
+         <td>{row.result?pct(row.result.maxDrawdownPct):'—'}</td>
+         <td>{row.error||row.result?.trades.length||0}</td>
+       </tr>)}</tbody></table>
+     </div>}
    </div>
    {result&&<div className="space-y-2 border-t border-[#38455c] pt-3">
      <strong>Results · {result.strategy.name} ({result.strategy.side})</strong>{report(result)}

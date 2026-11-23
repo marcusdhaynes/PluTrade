@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {DEFAULT_BACKTEST} from './historicalBacktest';
 import {smaCrossStrategy,rsiRecoveryStrategy,validateLabStrategy,runStrategyLabBacktest,
-  optimizeSmaCandidates,walkForwardSma,type LabStrategy} from './strategyLab';
+  optimizeSmaCandidates,walkForwardSma,latestLabSignal,type LabStrategy} from './strategyLab';
 const first=1800000000;
 const bars=Array.from({length:260},(_,i)=>{
   const close=100+Math.sin(i/5)*6+Math.sin(i/17)*2;
@@ -55,3 +55,11 @@ const checked=runStrategyLabBacktest(flat,'1m',simple,{...DEFAULT_BACKTEST,stopL
 assert.ok(checked.result);
 assert.equal(checked.result!.trades[0]?.entryAt,first+41*60);
 console.log('Round 12: strategy validation, no future-bar fills, long/short, deterministic costs, optimization and held-out walk-forward pass.');
+
+const lastSignal=latestLabSignal;
+const last=lastSignal(flat,'1m',simple,now);
+assert.equal(last.at,flat[flat.length-1].time);
+assert.equal(last.entry,false);
+assert.equal(last.exit,false);
+assert.ok(lastSignal(flat.slice(0,39),'1m',simple,now).error);
+assert.ok(lastSignal([...flat.slice(0,25),...flat.slice(26)],'1m',simple,now).error);
