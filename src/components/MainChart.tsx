@@ -41,6 +41,7 @@ import {mayUseIncrementalChartUpdate} from '../services/chartUpdatePolicy';
 import {marketIdentity} from '../services/marketIdentity';
 import {calculateUtcSessionVwap} from '../services/sessionVWAP';
 import {chartEmptyExplanation,type ChartLoadState} from '../services/chartRecovery';
+import {chartPositionExitLevels,type ChartExitLevel} from '../services/chartPositionLevels';
 import {
   Eye,
   Settings,
@@ -78,6 +79,7 @@ interface MainChartProps {
   isPercentScale: boolean;
   openPosition?: PaperPosition | null;
   onClosePosition?: (id: string) => void;
+  onEditPositionStop?: (id:string,kind:'sl'|'tp')=>void;
   onOpenConditionalOrder?: (dep: DependencyContext) => void;
   chartHistoryState?:ChartLoadState;
   onRetryChartHistory?:()=>void;
@@ -132,6 +134,7 @@ export const MainChart = React.memo(
       isPercentScale,
       openPosition,
       onClosePosition,
+      onEditPositionStop,
       onOpenConditionalOrder,
       chartHistoryState='empty',
       onRetryChartHistory,
@@ -952,6 +955,8 @@ export const MainChart = React.memo(
     // Calculate dynamic Y pixel position for open position line overlay
     const [positionY, setPositionY] = useState<number | null>(null);
     const [currentPriceY, setCurrentPriceY] = useState<number | null>(null);
+    const [exitLinePositions,setExitLinePositions]=useState<Array<ChartExitLevel & {y:number}>>([]);
+    const exitSignature=JSON.stringify(chartPositionExitLevels(openPosition));
 
     useEffect(() => {
       const chart = chartApiRef.current;
@@ -969,6 +974,12 @@ export const MainChart = React.memo(
           } else {
             setPositionY(null);
           }
+          const exits=chartPositionExitLevels(openPosition).flatMap(level=>{
+            const coordinate=mainSeriesRef.current?.priceToCoordinate(level.price);
+            return coordinate===null||coordinate===undefined||!Number.isFinite(coordinate)?[]:
+              [{...level,y:Math.round(Number(coordinate))}];
+          });
+          setExitLinePositions(prev=>JSON.stringify(prev)===JSON.stringify(exits)?prev:exits);
 
           const currY = mainSeriesRef.current.priceToCoordinate(asset.price);
           if (currY !== null) {
@@ -996,7 +1007,7 @@ export const MainChart = React.memo(
         if (rafId !== null) cancelAnimationFrame(rafId);
         chart.timeScale().unsubscribeVisibleLogicalRangeChange(scheduledUpdate);
       };
-    }, [openPosition?.entryPrice, asset.price, asset.symbol]);
+    }, [openPosition?.entryPrice,exitSignature,asset.price,asset.symbol,chartType]);
 
     return (
       <div className="relative flex-1 w-full h-full min-h-0 overflow-hidden bg-[#131722] select-none">
@@ -1129,18 +1140,22 @@ export const MainChart = React.memo(
             {/* Position Controls Marker Pill */}
             <div
               onClick={e=>e.stopPropagation()}
-              className="absolute right-16 -translate-y-1/2 z-30 flex items-center bg-[#131722] border border-[#2962ff] rounded-md text-[11px] font-mono shadow-xl overflow-hidden"
+              className="absolute right-12 md:right-16 -translate-y-1/2 z-30 flex items-center max-w-[calc(100%-4rem)] bg-[#131722] border border-[#2962ff] rounded-md text-[10px] md:text-[11px] font-mono shadow-xl overflow-hidden"
               style={{ top: `${positionY}px` }}
             >
               <div className="px-1.5 py-0.5 bg-[#2962ff] text-white font-bold text-[10px]">
                 {openPosition.side==='Long'?'L':'S'}
               </div>
-              <div className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#aeb6c8]" title="Take-profit controls are available in the paper trade ticket">TP</div>
-              <div className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#aeb6c8]" title="Stop-loss controls are available in the paper trade ticket">SL</div>
-              <div className="px-2 py-0.5 border-r border-[#2962ff]/40 text-[#2962ff] font-semibold">
+              <button type="button" onClick={()=>onEditPositionStop?.(openPosition.id,'tp')}
+                className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#66d9b5] hover:bg-[#274438]"
+                title="Edit take-profit levels">TP</button>
+              <button type="button" onClick={()=>onEditPositionStop?.(openPosition.id,'sl')}
+                className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#ff9ca7] hover:bg-[#4a2633]"
+                title="Edit stop-loss levels">SL</button>
+              <div className="hidden min-[360px]:block px-1 md:px-2 py-0.5 border-r border-[#2962ff]/40 text-[#2962ff] font-semibold truncate">
                 {openPosition.qty.toLocaleString()}
               </div>
-              <div className="px-2 py-0.5 border-r border-[#2962ff]/40 text-[#089981] font-semibold">
+              <div className="hidden sm:block px-1 md:px-2 py-0.5 border-r border-[#2962ff]/40 text-[#089981] font-semibold">
                 {openPosition.unrealizedPnL >= 0 ? '+' : ''}{openPosition.unrealizedPnL.toFixed(2)} {asset.currency}
               </div>
               <button
@@ -1161,6 +1176,28 @@ export const MainChart = React.memo(
             </div>
           </>
         )}
+
+        {/* Effective stops and every partial/full target use actual paper-ledger levels.
+            They are only visible on the exact market for the displayed position. */}
+        {openPosition&&exitLinePositions.map(level=>{
+          const isStop=level.kind==='sl';
+          const tint=isStop?'#f06b7e':'#31c79a';
+          if(level.y<12||level.y>Math.max(0,chartContainerRef.current?.clientHeight||0)-12)return null;
+          return <React.Fragment key={level.id}>
+            <div aria-hidden="true" className="absolute left-0 right-14 border-b border-dashed pointer-events-none z-20"
+              style={{top:level.y,borderColor:tint}}/>
+            <button type="button" title={'Edit '+level.label} aria-label={'Edit '+level.label+' at '+level.price}
+              onClick={e=>{e.stopPropagation();onEditPositionStop?.(openPosition.id,level.kind);}}
+              className="absolute right-12 md:right-16 -translate-y-1/2 z-30 max-w-[calc(100%-4rem)] truncate rounded border px-1.5 py-0.5 text-[9px] font-semibold font-mono shadow-lg bg-[#131722] hover:bg-[#273142]"
+              style={{top:level.y,color:tint,borderColor:tint}}>
+              {level.label}{level.quantity!==undefined?' · '+level.quantity.toLocaleString():''}
+            </button>
+            <div aria-hidden="true" className="absolute right-0 -translate-y-1/2 z-30 rounded-l px-1 py-0.5 text-[9px] font-mono font-bold text-[#121820] pointer-events-none"
+              style={{top:level.y,backgroundColor:tint}}>
+              {level.price.toFixed(asset.digits)}
+            </div>
+          </React.Fragment>;
+        })}
 
         {/* Active Price Scale Badge on Right (Purple tag as in screenshot!) */}
         {currentPriceY !== null && (
