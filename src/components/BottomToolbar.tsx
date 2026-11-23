@@ -85,11 +85,11 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   ];
 
   return (
-    <div id="tradingview-bottom-bar"
+    <div id="tradingview-bottom-bar" ref={datePopoverRef}
       data-layout="above-chart"
       aria-label="Chart range and scale controls"
       className="relative z-30 flex h-[24px] w-full min-w-0 shrink-0 items-center justify-between border-b border-[#2a2e39] bg-[#131722] px-0.5 text-[10px] select-none md:h-[22px] md:px-2">
-      <div id="chart-range-choices" ref={datePopoverRef}
+      <div id="chart-range-choices"
         className="grid h-full w-full min-w-0 grid-cols-[repeat(8,minmax(0,1fr))_20px] items-center gap-0 md:flex md:w-auto md:gap-0.5">
         {ranges.map(r=>(
           <button key={r.label} type="button" id={`range-btn-${r.label}`}
