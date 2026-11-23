@@ -279,7 +279,7 @@ export const MainChart = React.memo(
           visible:true,
           borderVisible:true,
           ticksVisible:true,
-          minimumWidth:52,
+          minimumWidth:24,
           borderColor: '#363a45',
           mode: isLogScale
             ? PriceScaleMode.Logarithmic
@@ -293,7 +293,7 @@ export const MainChart = React.memo(
           visible:true,
           borderVisible:true,
           ticksVisible:true,
-          minimumHeight:20,
+          minimumHeight:24,
           borderColor: '#2a2e39',
           timeVisible: true,
           secondsVisible: false,
