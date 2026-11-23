@@ -226,7 +226,7 @@ test('mobile chart controls are always visible and visual style favorites can be
   await expect(style).toHaveAttribute('title','Chart type: Line');
   await style.click();
   await expect(styles).toBeVisible();
-  await page.locator('#chart-timeframe-scroll').click({position:{x:3,y:5}});
+  await page.locator('#chart-workspace-viewport').dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
   await expect(styles).toHaveCount(0);
   await page.locator('#right-tab-alerts').click();
   await expect(page.locator('#tradingview-alerts-panel')).toBeVisible();
