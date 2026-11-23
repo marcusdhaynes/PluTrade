@@ -107,14 +107,14 @@ function compactMobilePrice(price:number):string {
   const shorten=(scaled:number,suffix:string)=>{
     const width=prefix.length+suffix.length;
     const precision=scaled>=100?0:scaled>=10?0:width>=2?0:1;
-    return prefix+scaled.toFixed(precision).replace(/\\.0$/,'')+suffix;
+    return prefix+scaled.toFixed(precision).replace(/\.0$/,'')+suffix;
   };
   if(abs>=1e9)return shorten(abs/1e9,'B');
   if(abs>=1e6)return shorten(abs/1e6,'M');
   if(abs>=1e3)return shorten(abs/1e3,'k');
   if(abs>=100)return prefix+Math.round(abs).toString();
   if(abs>=10)return prefix+Math.round(abs).toString();
-  if(abs>=1)return prefix+abs.toFixed(1).replace(/\\.0$/,'');
+  if(abs>=1)return prefix+abs.toFixed(1).replace(/\.0$/,'');
   if(abs>=0.1)return prefix+abs.toFixed(2).replace(/^0/,'');
   if(abs>=0.01)return prefix+abs.toFixed(3).replace(/^0/,'');
   if(abs>=1e-3)return shorten(abs*1e3,'m');
@@ -452,7 +452,9 @@ export const MainChart = React.memo(
       const low=Math.min(topPrice,bottomPrice),high=Math.max(topPrice,bottomPrice);
       const first=Math.ceil(low/step)*step;
       const next:Array<{y:number;value:number;label:string}>=[];
-      for(let value=first,i=0;i<35&&value<=high+step*0.00001;i++,value=first+step*(i+1)){
+      for(let i=0;i<35;i++){
+        const value=first+step*i;
+        if(value>high+step*0.00001)break;
         const y=series.priceToCoordinate(value);
         if(y!==null&&y>=yTop&&y<=yBottom&&
           (next.length===0||Math.abs(y-next[next.length-1].y)>14))
