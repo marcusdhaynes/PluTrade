@@ -10,6 +10,7 @@ interface FloatingPortalProps {
   ariaLabel?:string;
   className?:string;
   width?:number;
+  zIndex?:number;
   placement?:Placement;
 }
 /** Draw transient tool windows in the document-level overlay layer so that
