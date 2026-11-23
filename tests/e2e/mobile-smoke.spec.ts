@@ -92,3 +92,20 @@ test('mobile chart reserves time/price axes and disables page-touch zoom only on
   const root=page.locator('#tradingview-app-root');
   expect(await root.evaluate(node=>node.scrollWidth<=window.innerWidth+1)).toBe(true);
 });
+
+
+test('right price scale remains clear until mobile chart tools menu is requested',async ({page})=>{
+  await page.goto('./');
+  const menu=page.getByRole('button',{name:'Mobile chart tools menu'});
+  const icons=page.locator('#tradingview-right-icon-bar');
+  await expect(menu).toBeVisible();
+  await expect(icons).toBeHidden();
+  await menu.click();
+  await expect(icons).toBeVisible();
+  await icons.locator('#right-tab-watchlist').click();
+  await expect(page.locator('#right-sidebar-content-pane')).toBeVisible();
+  await expect(icons).toBeHidden();
+  await menu.click();
+  await icons.locator('#right-tab-watchlist').click();
+  await expect(page.locator('#right-sidebar-content-pane')).toHaveCount(0);
+});
