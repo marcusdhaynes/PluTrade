@@ -396,7 +396,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-150">
       <div
         id="conditional-order-builder-modal"
         className="w-full max-w-2xl bg-[#131722] border border-[#2a2e39] rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-[#d1d4dc] font-sans"
