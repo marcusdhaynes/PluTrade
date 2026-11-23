@@ -11,5 +11,5 @@ assert.equal(result.timeLabel,'3m · 3 bars');
 const reverse=rulerMetrics(end,start,bars,2);
 assert.equal(reverse.percentLabel,'−9.09%');
 assert.equal(reverse.timeLabel,'−3m · 3 bars');
-assert.equal(rulerMetrics({time:0,price:0},end,[],4).percentLabel,'+0.00%');
+assert.equal(rulerMetrics({time:0,price:0},end,[],4).percentLabel,'0.00%');
 console.log('Ruler price, percent, ticks and observed bars: pass');
