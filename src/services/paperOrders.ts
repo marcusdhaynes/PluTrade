@@ -1,3 +1,4 @@
+import {attachDynamicTrailing,validDynamicTrail,type DynamicTrailingSettings} from './dynamicTrailing';
 import type {Asset} from '../types';
 import {matchesExactMarket} from './marketIdentity';
 import {
@@ -17,6 +18,7 @@ export interface PaperEntryOrder {
   chainId?:string;pairAddress?:string;
   leverage:number;tp?:number;sl?:number;
   trailingStopPercent?:number;
+  dynamicTrailing?:DynamicTrailingSettings;
   takeProfitLevels?:PaperPartialTarget[];
   createdAt:number;expiresAt?:number;
   status:'pending'|'triggered';
@@ -31,6 +33,7 @@ export interface PaperOrderRequest {
   side:PaperOrderSide;kind:PaperOrderKind;qty:number;
   price?:number;limitPrice?:number;tp?:number;sl?:number;timeInForce?:PaperTimeInForce;
   trailingStopPercent?:number;
+  dynamicTrailing?:DynamicTrailingSettings;
   takeProfitLevels?:PaperPartialTarget[];
 }
 const finitePositive=(n:number)=>Number.isFinite(n)&&n>0;
@@ -73,6 +76,10 @@ export function withOrderValidation(p:PaperPortfolio,a:Asset,request:PaperOrderR
     throw new Error('Take-profit price must be on the profitable side of entry.');
   if(request.sl!==undefined&&(!finitePositive(request.sl)||(request.side==='Long'?request.sl>=entryPrice:request.sl<=entryPrice)))
     throw new Error('Stop-loss price must be on the protective side of entry.');
+  if(request.dynamicTrailing!==undefined && !validDynamicTrail(request.dynamicTrailing))
+    throw new Error('Invalid dynamic ATR trail settings.');
+  if(request.dynamicTrailing!==undefined&&request.trailingStopPercent!==undefined)
+    throw new Error('Choose one trailing method: ATR or fixed percent.');
   if(request.trailingStopPercent!==undefined &&
     (!Number.isFinite(request.trailingStopPercent) ||
      request.trailingStopPercent<=0 || request.trailingStopPercent>=100))
@@ -90,6 +97,10 @@ export function withOrderValidation(p:PaperPortfolio,a:Asset,request:PaperOrderR
   const required=request.qty*entryPrice/leverage+paperCommission(p.settings,a,request.qty,entryPrice);
   if(required>cash+1e-8)throw new Error('Insufficient free margin after accounting for pending orders and commissions.');
   return {leverage,price};
+}
+function applyDynamicTrail(p:PaperPortfolio,settings:DynamicTrailingSettings|undefined):PaperPortfolio{
+  if(settings===undefined||!p.positions.length)return p;
+  return attachDynamicTrailing(p,p.positions[0].id,settings);
 }
 function applyTrailingStop(p:PaperPortfolio,percent:number|undefined):PaperPortfolio {
   if(percent===undefined || !p.positions.length) return p;
@@ -112,8 +123,8 @@ export function submitPaperOrder(p:PaperPortfolio,a:Asset,request:PaperOrderRequ
     // A marketable limit fills immediately at the observed quote, never at a
     // worse price than the limit. All fills remain explicitly simulated.
     const filled=placePaperPosition(p,a,request.side,request.qty,leverage,request.tp,request.sl,now,request.kind);
-    const final=withOrderReservations(applyTrailingStop(
-      applyPartialTargets(filled,request.takeProfitLevels),request.trailingStopPercent));
+    const final=withOrderReservations(applyDynamicTrail(applyTrailingStop(
+      applyPartialTargets(filled,request.takeProfitLevels),request.trailingStopPercent),request.dynamicTrailing));
     return recordEvent(final,{id:filled.positions[0].id,symbol:a.symbol,exchange:a.source||a.exchange,
       side:request.side,kind:request.kind,qty:request.qty,price:filled.positions[0].entryPrice},
       'filled',now,filled.positions[0].entryPrice);
@@ -126,6 +137,7 @@ export function submitPaperOrder(p:PaperPortfolio,a:Asset,request:PaperOrderRequ
     chainId:a.chainId,pairAddress:a.pairAddress,
     leverage,tp:request.tp,sl:request.sl,
     trailingStopPercent:request.trailingStopPercent,
+    dynamicTrailing:request.dynamicTrailing,
     takeProfitLevels:request.takeProfitLevels,createdAt:now,
     expiresAt:ttl?now+ttl:undefined,status:'pending',
   };
@@ -152,6 +164,7 @@ export function amendPendingPaperOrder(
     tp:existing.tp,sl:existing.sl,timeInForce:'GTC',
     trailingStopPercent:existing.trailingStopPercent,
     takeProfitLevels:existing.takeProfitLevels,
+    dynamicTrailing:existing.dynamicTrailing,
   };
   // Reject implicit immediately-executable limit replacements. A new marketable
   // entry must use the reviewed order ticket, not a side-effect of the edit form.
@@ -211,10 +224,10 @@ export function evaluatePaperOrders(p:PaperPortfolio,a:Asset,at=Date.now()):Pape
     try{
       const synthetic={...a,price:fillPrice,quoteUpdatedAt:at,quoteStatus:'live' as const};
       // Attached exits must be valid against the actual executable fill.
-      next=withOrderReservations(applyTrailingStop(
+      next=withOrderReservations(applyDynamicTrail(applyTrailingStop(
         applyPartialTargets(placePaperPosition(without,synthetic,order.side,
           order.qty,order.leverage,order.tp,order.sl,at,order.kind),order.takeProfitLevels),
-        order.trailingStopPercent));
+        order.trailingStopPercent),order.dynamicTrailing));
       next=recordEvent(next,order,'filled',at,next.positions[0].entryPrice);
     }catch{
       // Keep the pending instruction intact if the wallet cannot support

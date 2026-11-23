@@ -25,6 +25,21 @@ export function drawingPriceAt(d:Drawing,time:number,operator:string):number|und
 export function drawingConditionMet(d:Drawing,operator:string,price:number,
   previous:number|undefined,time:number,previousTime:number|undefined):boolean{
   if(!Number.isFinite(price)||price<=0)return false;
+  if(d.type==='rectangle'&&d.points.length>=2&&
+    ['enters_zone','exits_zone','inside_zone','outside_zone','touches'].includes(operator)){
+    const [a,b]=d.points;
+    const from=Math.min(a.time,b.time),to=Math.max(a.time,b.time);
+    if(time<from||time>to)return false;
+    const lower=Math.min(a.price,b.price),upper=Math.max(a.price,b.price);
+    const inside=price>=lower&&price<=upper;
+    if(operator==='touches'||operator==='inside_zone')return inside;
+    if(operator==='outside_zone')return !inside;
+    if(previous===undefined||previousTime===undefined||
+      previousTime<from||previousTime>to)return false;
+    const wasInside=previous>=lower&&previous<=upper;
+    if(operator==='enters_zone')return !wasInside&&inside;
+    if(operator==='exits_zone')return wasInside&&!inside;
+  }
   if(d.type==='rectangle'&&d.points.length>=2&&operator==='touches'){
     const [a,b]=d.points;
     return time>=Math.min(a.time,b.time)&&time<=Math.max(a.time,b.time)&&
@@ -35,6 +50,8 @@ export function drawingConditionMet(d:Drawing,operator:string,price:number,
   const priorTarget=previousTime===undefined?undefined:drawingPriceAt(d,previousTime,operator);
   if(operator==='crosses_above')return previous!==undefined&&priorTarget!==undefined&&previous<priorTarget&&price>=target;
   if(operator==='crosses_below')return previous!==undefined&&priorTarget!==undefined&&previous>priorTarget&&price<=target;
+  if(operator==='crosses_either')return previous!==undefined&&priorTarget!==undefined&&
+    ((previous<priorTarget&&price>=target)||(previous>priorTarget&&price<=target));
   if(operator==='greater_than')return price>target;
   if(operator==='less_than')return price<target;
   if(operator==='touches')return Math.abs(price-target)/target<=0.003;

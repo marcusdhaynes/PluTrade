@@ -1,3 +1,4 @@
+import {validDynamicTrail} from './dynamicTrailing';
 import type {ConditionalOrder} from '../types/conditionalOrders';
 import {withOrderReservations} from './paperOrders';
 import {INITIAL_ASSETS} from '../data/assets';
@@ -32,7 +33,8 @@ const validPortfolioPosition=(p:unknown):boolean=>{
     !maybe(p.leverage,positive)||!maybe(p.openedAt,nonnegative)||!maybe(p.lastMarkedAt,nonnegative)||
     !maybe(p.unrealizedPnL,finite)||!maybe(p.unrealizedPnLPct,finite)||
     !maybe(p.tp,positive)||!maybe(p.sl,positive)||!maybe(p.trailingPercent,n=>positive(n)&&Number(n)<100)||
-    !maybe(p.trailingAnchor,positive))return false;
+    !maybe(p.trailingAnchor,positive)||
+    !maybe(p.dynamicTrailing,validDynamicTrail))return false;
   return p.tpLevels===undefined||(Array.isArray(p.tpLevels)&&p.tpLevels.every(
     (level:unknown)=>object(level)&&typeof level.id==='string'&&positive(level.price)&&positive(level.quantity)));
 };
@@ -45,6 +47,7 @@ const validPendingOrder=(o:unknown):boolean=>object(o)&&typeof o.id==='string'&&
   positive(o.qty)&&positive(o.price)&&positive(o.leverage)&&
   maybe(o.limitPrice,positive)&&maybe(o.tp,positive)&&maybe(o.sl,positive)&&
   maybe(o.trailingStopPercent,v=>positive(v)&&Number(v)<100)&&
+  maybe(o.dynamicTrailing,validDynamicTrail)&&
   nonnegative(o.createdAt)&&maybe(o.expiresAt,v=>nonnegative(v)&&Number(v)>Number(o.createdAt))&&
   (o.status==='pending'||o.status==='triggered')&&
   (o.takeProfitLevels===undefined||(Array.isArray(o.takeProfitLevels)&&o.takeProfitLevels.every(

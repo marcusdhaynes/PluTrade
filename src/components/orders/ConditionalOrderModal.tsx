@@ -1,3 +1,5 @@
+import {DEFAULT_DYNAMIC_TRAIL,validDynamicTrail,type DynamicTrailingSettings} from '../../services/dynamicTrailing';
+import {ruleCanActivate} from '../../services/conditionalSafety';
 import React, { useState, useEffect } from 'react';
 import {
   ConditionalOrder,
@@ -34,6 +36,9 @@ interface ConditionalOrderModalProps {
   drawings: Drawing[];
   alerts: DetailedAlert[];
   positions: PaperPosition[];
+  accountOptions:{id:string;name:string;currency:string}[];
+  accountPositions:Record<string,PaperPosition[]>;
+  activeAccountId:string;
   initialDependency?: DependencyContext | null;
   orderToEdit?: ConditionalOrder | null;
   onSaveOrder: (order: ConditionalOrder) => void;
@@ -47,6 +52,9 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
   drawings,
   alerts,
   positions,
+  accountOptions,
+  accountPositions,
+  activeAccountId,
   initialDependency,
   orderToEdit,
   onSaveOrder,
@@ -60,10 +68,15 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [limitPrice, setLimitPrice] = useState<number>(activeAsset.price);
   const [size, setSize] = useState<number>(1000);
-  const [sizeUnit, setSizeUnit] = useState<'units' | 'usd' | 'percent'>('units');
+  const [sizeUnit, setSizeUnit] = useState<'units' | 'usd' | 'percent' | 'equity_percent'>('units');
   const [tpPercent, setTpPercent] = useState<number>(5.0);
   const [slPercent, setSlPercent] = useState<number>(2.5);
   const [trailingPercent, setTrailingPercent] = useState<number>(1.8);
+  const [dynamicSettings,setDynamicSettings]=useState<DynamicTrailingSettings>({...DEFAULT_DYNAMIC_TRAIL});
+  const [accountTarget,setAccountTarget]=useState<string>(activeAccountId);
+  const [positionTarget,setPositionTarget]=useState<string>('');
+  const [validationError,setValidationError]=useState('');
+  const scopedPositions=accountTarget==='all'?positions:(accountPositions[accountTarget]||[]);
   const [reducePercent, setReducePercent] = useState<number>(50);
   const [increasePercent, setIncreasePercent] = useState<number>(50);
   const [notes, setNotes] = useState('');
@@ -84,6 +97,10 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
       setTpPercent(orderToEdit.execution.tpPercent || 5.0);
       setSlPercent(orderToEdit.execution.slPercent || 2.5);
       setTrailingPercent(orderToEdit.execution.trailingPercent || 1.8);
+      setDynamicSettings(orderToEdit.execution.dynamicTrailing||{...DEFAULT_DYNAMIC_TRAIL});
+      setAccountTarget(orderToEdit.accountScope==='all_paper'?'all':(orderToEdit.accountId||activeAccountId));
+      setPositionTarget(orderToEdit.execution.positionId||'');
+      setValidationError('');
       setReducePercent(orderToEdit.execution.reducePercent || 50);
       setIncreasePercent(orderToEdit.execution.increasePercent || 50);
       setNotes(orderToEdit.notes || '');
@@ -125,8 +142,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
           operator: 'pnl_above_percent',
           thresholdValue: 5.0,
         };
-        setAction('sl_trailing');
-        setTitle(`Trailing Stop on ${activeAsset.symbol} Position`);
+        setTitle(`Dynamic ATR Protection for ${activeAsset.symbol} Position`);
       } else {
         initialCond = {
           id: `cond-${Date.now()}`,
@@ -151,7 +167,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
 
     setLogicType('IF');
     setConditions([initialCond]);
-    setAction('enter_long');
+    setAction(initialDependency?.type==='position'?'sl_dynamic':'enter_long');
     setOrderType('market');
     setLimitPrice(activeAsset.price);
     setSize(activeAsset.symbol.includes('BTC') ? 0.1 : activeAsset.symbol.includes('ETH') ? 1 : 2500);
@@ -159,17 +175,21 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
     setTpPercent(5.0);
     setSlPercent(2.5);
     setTrailingPercent(1.8);
+    setDynamicSettings({...DEFAULT_DYNAMIC_TRAIL});
+    setAccountTarget(activeAccountId);
+    setPositionTarget('');
+    setValidationError('');
     setReducePercent(50);
     setIncreasePercent(50);
     setNotes('');
-  }, [isOpen, initialDependency, orderToEdit, activeAsset]);
+  }, [isOpen, initialDependency, orderToEdit, activeAsset, activeAccountId]);
 
   if (!isOpen) return null;
 
   // Add condition for IF (AND) or IF (OR)
   const handleAddCondition = () => {
     const newCond: SingleCondition = {
-      id: `cond-${Date.now()}`,
+      id: `cond-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
       dependencyType: 'price',
       dependencyLabel: `${activeAsset.symbol} Price Level`,
       operator: 'greater_than',
@@ -186,6 +206,8 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
 
         // Automatically update label if type changed
         if (updates.dependencyType && updates.dependencyType !== c.dependencyType) {
+          updated.dependencyId=undefined;
+          updated.secondaryValue=undefined;
           if (updates.dependencyType === 'drawing') {
             const firstDrawing = drawings[0];
             if (firstDrawing) {
@@ -193,9 +215,11 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
               updated.dependencyId = firstDrawing.id;
               updated.dependencyLabel = `${firstDrawing.type.toUpperCase()} at $${p.toFixed(activeAsset.digits)}`;
               updated.thresholdValue = p;
+              updated.operator = 'crosses_either';
             } else {
               updated.dependencyLabel = 'Chart Trendline / Level';
               updated.thresholdValue = activeAsset.price;
+              updated.operator='crosses_either';
             }
           } else if (updates.dependencyType === 'alert') {
             const firstAlert = alerts[0];
@@ -208,13 +232,25 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
             updated.thresholdValue = 70;
             updated.operator = 'crosses_above';
           } else if (updates.dependencyType === 'position') {
-            updated.dependencyLabel = `${activeAsset.symbol} Open Position`;
+            const selected=scopedPositions.find(p=>p.symbol===activeAsset.symbol&&
+              p.exchange===(activeAsset.source||activeAsset.exchange));
+            updated.dependencyId=selected?.id;
+            updated.dependencyLabel = selected?`${selected.side} ${selected.symbol}`:`${activeAsset.symbol} Open Position`;
             updated.operator = 'pnl_above_percent';
             updated.thresholdValue = 5.0;
           } else if (updates.dependencyType === 'price') {
             updated.dependencyLabel = `${activeAsset.symbol} Price`;
             updated.thresholdValue = activeAsset.price;
             updated.operator = 'crosses_above';
+          } else if (updates.dependencyType === 'account') {
+            updated.dependencyLabel='Paper account equity / available funds';
+            updated.operator='equity_greater_than';
+            updated.thresholdValue=10000;
+          } else if (updates.dependencyType === 'utc_session') {
+            updated.dependencyLabel='UTC session (start/end hour)';
+            updated.operator='in_utc_hours';
+            updated.thresholdValue=9;
+            updated.secondaryValue=17;
           } else if (updates.dependencyType === 'volume') {
             updated.dependencyLabel = '24h Volume Spike';
             updated.thresholdValue = 50000000;
@@ -234,7 +270,9 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
   // Build the ConditionalOrder object
   const buildOrderObject = (): ConditionalOrder => {
     return {
-      id: orderToEdit ? orderToEdit.id : `cond-ord-${Date.now()}`,
+      id: orderToEdit ? orderToEdit.id : `cond-ord-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+      accountScope:accountTarget==='all'?'all_paper':'single',
+      accountId:accountTarget==='all'?undefined:accountTarget,
       symbol: orderToEdit?.symbol || activeAsset.symbol,
       exchange: orderToEdit ? orderToEdit.exchange : (activeAsset.source || activeAsset.exchange),
       marketType: orderToEdit ? orderToEdit.marketType : activeAsset.marketType,
@@ -249,6 +287,8 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
         limitPrice: orderType === 'limit' ? limitPrice : undefined,
         size,
         sizeUnit,
+        positionId:positionTarget||undefined,
+        dynamicTrailing:action==='sl_dynamic'?dynamicSettings:undefined,
         tpPercent: action.includes('enter') || action === 'tp' ? tpPercent : undefined,
         slPercent: action.includes('enter') || action === 'sl_set' ? slPercent : undefined,
         trailingPercent: action === 'sl_trailing' ? trailingPercent : undefined,
@@ -258,7 +298,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
       status: orderToEdit?.status || 'active',
       createdAt: orderToEdit ? orderToEdit.createdAt : Date.now(),
       triggerCount: orderToEdit ? orderToEdit.triggerCount : 0,
-      maxTriggers: logicType === 'WHENEVER' ? 9999 : 1,
+      maxTriggers: logicType === 'WHENEVER'||logicType==='WHILE' ? 9999 : 1,
       notes,
       sourceDependency: initialDependency
         ? {
@@ -273,6 +313,25 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
 
   const handleSave = () => {
     const order = buildOrderObject();
+    if(!ruleCanActivate(order)){
+      setValidationError('This rule has invalid/unavailable conditions, size, or protection settings. Select a supported drawing, threshold and action.');
+      return;
+    }
+    const invalidDrawing=order.conditions.some(c=>c.dependencyType==='drawing'&&
+      (!drawings.some(d=>d.id===c.dependencyId)||
+        (['enters_zone','exits_zone','inside_zone','outside_zone'].includes(c.operator)&&
+          drawings.find(d=>d.id===c.dependencyId)?.type!=='rectangle')));
+    if(invalidDrawing){
+      setValidationError('Select an existing chart drawing. Zone entry/exit operators require a rectangle.');
+      return;
+    }
+    if(accountTarget!=='all'&&!accountOptions.some(a=>a.id===accountTarget)){
+      setValidationError('Select an existing paper account.');return;
+    }
+    if(action==='sl_dynamic'&&!validDynamicTrail(dynamicSettings)){
+      setValidationError('Check ATR period, lookback, multiplier and timeframe.');return;
+    }
+    setValidationError('');
     onSaveOrder(order);
     onClose();
   };
@@ -315,6 +374,9 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
       case 'sl_trailing':
         actionSummary = `Activate Trailing Stop (${trailingPercent}% offset)`;
         break;
+      case 'sl_dynamic':
+        actionSummary = `Enable Dynamic Chandelier Stop (ATR ${dynamicSettings.period} × ${dynamicSettings.multiplier} on ${dynamicSettings.timeframe})`;
+        break;
       case 'reduce_position':
         actionSummary = `Reduce Position by ${reducePercent}%`;
         break;
@@ -350,7 +412,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                   {activeAsset.symbol}
                 </span>
                 <span className="text-[10px] text-[#787b86]">
-                  {activeAsset.exchange || 'Kraken'} • ${activeAsset.price.toFixed(activeAsset.digits)}
+                  {activeAsset.source||activeAsset.exchange} • ${activeAsset.price.toFixed(activeAsset.digits)}
                 </span>
               </div>
               <p className="text-[11px] text-[#787b86]">
@@ -388,12 +450,13 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
             <label className="block text-[11px] font-semibold text-[#787b86] uppercase tracking-wider mb-1.5">
               Condition Logic Operator
             </label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[
                 { type: 'IF', desc: 'Single trigger event' },
                 { type: 'IF (AND)', desc: 'All conditions required' },
                 { type: 'IF (OR)', desc: 'Any condition triggers' },
-                { type: 'WHENEVER', desc: 'Persistent automated rule' },
+                { type: 'WHENEVER', desc: 'Retrigger on a new false → true edge' },
+                { type: 'WHILE', desc: 'Maintain condition; one action per activation' },
               ].map(({ type, desc }) => (
                 <button
                   key={type}
@@ -414,6 +477,22 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
             </div>
           </div>
 
+          <div className="p-3.5 bg-[#181b24] border border-[#2a2e39] rounded-xl space-y-2">
+            <label className="block text-xs font-semibold text-[#c5d7f6]">Execution account</label>
+            <select aria-label="Rule execution account" id="conditional-rule-account" value={accountTarget}
+              onChange={e=>{
+                setAccountTarget(e.target.value);
+                setPositionTarget('');
+                setConditions(prev=>prev.map(c=>c.dependencyType==='position'?
+                  {...c,dependencyId:undefined,dependencyLabel:'Any matching position'}:c));
+              }}
+              className="w-full rounded-md border border-[#455066] bg-[#121823] px-3 py-2 text-[#ecf0f7] text-xs">
+              {accountOptions.map(item=><option key={item.id} value={item.id}>{item.name} · {item.currency}{item.id===activeAccountId?' (active)':''}</option>)}
+              <option value="all">Every Paper Account (independent execution)</option>
+            </select>
+            <p className="text-[10px] text-[#96a7c5]">Rule executions use the selected PAPER ledger(s) only; no real broker order is placed. Each account's market currency, available margin, quote freshness, and risk rules are checked independently. Unavailable accounts cannot fill.</p>
+          </div>
+
           {/* Conditions & Dependencies Section */}
           <div className="p-3.5 bg-[#181b24] border border-[#2a2e39] rounded-xl space-y-3">
             <div className="flex items-center justify-between">
@@ -422,7 +501,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                 Trigger Dependencies & Events
               </span>
 
-              {(logicType === 'IF (AND)' || logicType === 'IF (OR)') && (
+              {(logicType === 'IF (AND)' || logicType === 'IF (OR)' || logicType==='WHILE') && (
                 <button
                   type="button"
                   onClick={handleAddCondition}
@@ -462,6 +541,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                     <div>
                       <label className="block text-[10px] text-[#787b86] mb-1">Dependency Source</label>
                       <select
+                        aria-label={`Condition ${idx+1} source`}
                         value={cond.dependencyType}
                         onChange={(e) =>
                           handleUpdateCondition(cond.id, {
@@ -474,7 +554,9 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                         <option value="alert">🔔 Alert Event</option>
                         <option value="indicator">📊 RSI / Price − SMA20 (1m candle close)</option>
                         <option value="price">💲 Exact Price Level</option>
-                        <option value="position">💼 Position PnL / Equity</option>
+                        <option value="position">💼 Position PnL / Exists</option>
+                        <option value="account">🏦 Paper Equity / Available Funds</option>
+                        <option value="utc_session">🕒 UTC Trading Session</option>
                         <option value="volume" disabled title="Not implemented">🌊 Volume Surge</option>
                         <option value="orderbook" disabled title="Not implemented">📖 Order Book Imbalance</option>
                       </select>
@@ -484,6 +566,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                     <div>
                       <label className="block text-[10px] text-[#787b86] mb-1">Operator</label>
                       <select
+                        aria-label={`Condition ${idx+1} operator`}
                         value={cond.operator}
                         onChange={(e) =>
                           handleUpdateCondition(cond.id, {
@@ -492,14 +575,30 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                         }
                         className="w-full px-2 py-1.5 bg-[#131722] border border-[#2a2e39] rounded text-white text-[11px] focus:outline-hidden focus:border-[#2962ff]"
                       >
-                        <option value="crosses_above">Crosses Above (↑)</option>
-                        <option value="crosses_below">Crosses Below (↓)</option>
-                        <option value="touches">Touches Level</option>
-                        <option value="greater_than">Greater Than (&gt;)</option>
-                        <option value="less_than">Less Than (&lt;)</option>
-                        <option value="triggered">Is Triggered</option>
-                        <option value="pnl_above_percent">PnL % &gt;= Target</option>
-                        <option value="pnl_below_percent">PnL % &lt;= Stop Loss</option>
+                        {(cond.dependencyType==='drawing'?[
+                          ['crosses_above','Crosses Above'],['crosses_below','Crosses Below'],
+                          ['crosses_either','Crosses Either Direction'],['touches','Touches Level'],
+                          ['greater_than','Above Drawing'],['less_than','Below Drawing'],
+                          ['enters_zone','Enters Rectangle'],['exits_zone','Exits Rectangle'],
+                          ['inside_zone','Inside Rectangle'],['outside_zone','Outside Rectangle'],
+                        ]:cond.dependencyType==='alert'?[
+                          ['triggered','Alert Fired (New Event)'],
+                        ]:cond.dependencyType==='position'?[
+                          ['position_exists','Position Exists'],['pnl_above_percent','PnL ≥ +%'],
+                          ['pnl_below_percent','PnL ≤ −%'],
+                        ]:cond.dependencyType==='account'?[
+                          ['equity_greater_than','Equity Above'],['equity_less_than','Equity Below'],
+                          ['available_greater_than','Available Funds Above'],['available_less_than','Available Funds Below'],
+                        ]:cond.dependencyType==='utc_session'?[
+                          ['in_utc_hours','Within UTC Hours'],['outside_utc_hours','Outside UTC Hours'],
+                        ]:cond.dependencyType==='indicator'?[
+                          ['crosses_above','Crosses Above'],['crosses_below','Crosses Below'],
+                          ['greater_than','Greater Than'],['less_than','Less Than'],
+                        ]:[
+                          ['crosses_above','Crosses Above'],['crosses_below','Crosses Below'],
+                          ['crosses_either','Crosses Either Direction'],['touches','Touches Level'],
+                          ['greater_than','Greater Than'],['less_than','Less Than']
+                        ]).map(([value,label])=><option key={value} value={value}>{label}</option>)}
                       </select>
                     </div>
 
@@ -508,6 +607,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                       <label className="block text-[10px] text-[#787b86] mb-1">Threshold / Level</label>
                       <div className="flex items-center gap-1">
                         <input
+                          aria-label={`Condition ${idx+1} threshold`}
                           type="number"
                           step="any"
                           value={cond.thresholdValue != null ? cond.thresholdValue : ''}
@@ -581,6 +681,22 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                     </div>
                   )}
 
+                  {cond.dependencyType==='utc_session'&&<label className="flex items-center gap-2 text-[11px] text-[#b9c9e1]">
+                    UTC End Hour (0–23.75)
+                    <input aria-label="UTC session end hour" type="number" step="0.25" min="0" max="23.75"
+                      value={cond.secondaryValue??17} onChange={e=>handleUpdateCondition(cond.id,{secondaryValue:Number(e.target.value)})}
+                      className="w-20 bg-[#131722] border border-[#49516a] rounded px-2 py-1 text-white"/>
+                  </label>}
+                  {cond.dependencyType==='position'&&<label className="flex gap-2 items-center text-[11px] text-[#b7c9e0]">
+                    Specific Position
+                    <select aria-label="Condition position" value={cond.dependencyId||''}
+                      onChange={e=>handleUpdateCondition(cond.id,{dependencyId:e.target.value||undefined,
+                        dependencyLabel:e.target.value?'Position '+e.target.value:'Any matching position'})}
+                      className="flex-1 min-w-0 bg-[#131722] border border-[#49516a] rounded px-2 py-1 text-[#edf1f7]">
+                      <option value="">Any matching position</option>
+                      {(accountTarget==='all'?[]:scopedPositions).map(p=><option key={p.id} value={p.id}>{p.side} {p.symbol} · {p.qty} units · {p.id.slice(0,10)}</option>)}
+                    </select>
+                  </label>}
                   {/* If alert, allow selecting which alert */}
                   {cond.dependencyType === 'alert' && alerts.length > 0 && (
                     <div className="mt-1 pt-1.5 border-t border-[#2a2e39]/60 flex items-center gap-2 text-[11px]">
@@ -627,6 +743,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                 { type: 'exit_short', label: 'Exit Short', color: 'hover:border-[#2962ff] hover:text-[#2962ff]', active: 'bg-[#2962ff]/20 border-[#2962ff] text-[#2962ff]' },
                 { type: 'tp', label: 'TP (Take Profit)', color: 'hover:border-[#089981] hover:text-[#089981]', active: 'bg-[#089981]/20 border-[#089981] text-[#089981]' },
                 { type: 'sl_set', label: 'SL (Set Fixed)', color: 'hover:border-[#f23645] hover:text-[#f23645]', active: 'bg-[#f23645]/20 border-[#f23645] text-[#f23645]' },
+                { type: 'sl_dynamic', label: 'Dynamic ATR Stop', color: 'hover:border-[#fbba59] hover:text-[#fbba59]', active: 'bg-[#fbba59]/20 border-[#fbba59] text-[#fbba59]' },
                 { type: 'sl_trailing', label: 'SL (Trailing Stop)', color: 'hover:border-[#ff9800] hover:text-[#ff9800]', active: 'bg-[#ff9800]/20 border-[#ff9800] text-[#ff9800]' },
                 { type: 'reduce_position', label: 'Reduce Position', color: 'hover:border-[#9c27b0] hover:text-[#9c27b0]', active: 'bg-[#9c27b0]/20 border-[#9c27b0] text-[#9c27b0]' },
                 { type: 'increase_position', label: 'Increase / Scale In', color: 'hover:border-[#00bcd4] hover:text-[#00bcd4]', active: 'bg-[#00bcd4]/20 border-[#00bcd4] text-[#00bcd4]' },
@@ -647,6 +764,15 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
               ))}
             </div>
 
+            {(action==='exit_long'||action==='exit_short'||action==='tp'||action==='sl_set'||
+              action==='sl_trailing'||action==='sl_dynamic'||action==='reduce_position')&&
+              <label className="block text-[11px] text-[#b4c6e0]">Target Position
+                <select aria-label="Target position" value={positionTarget} onChange={e=>setPositionTarget(e.target.value)}
+                  className="mt-1 w-full bg-[#131722] border border-[#46536b] rounded px-2 py-1.5 text-white">
+                  <option value="">First matching position on each selected account</option>
+                  {(accountTarget==='all'?[]:scopedPositions).map(p=><option key={p.id} value={p.id}>{p.side} {p.symbol} · {p.qty} units · {p.id.slice(0,8)}</option>)}
+                </select>
+              </label>}
             {/* Execution Detail Parameters */}
             {action !== 'cancel_all' && (
               <div className="pt-2 border-t border-[#2a2e39]/60 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -708,12 +834,19 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                       >
                         <option value="units">{activeAsset.symbol.replace('USD', '')}</option>
                         <option value="usd">USD</option>
-                        <option value="percent">% of Bal</option>
+                        <option value="percent">% Available Funds</option>
+                        <option value="equity_percent">% of Equity</option>
                       </select>
                     </div>
                   </div>
                 )}
 
+                {(action.includes('enter')||action==='increase_position')&&<div className="flex items-end">
+                  <button type="button" className="rounded border border-[#4c66a1] px-3 py-2 text-[11px] text-[#a8caff] hover:bg-[#293959]"
+                    onClick={()=>{setSizeUnit('equity_percent');setSize(99);}}>
+                    Use 99% of Equity
+                  </button>
+                </div>}
                 {/* TP & SL for Entry orders */}
                 {action.includes('enter') && (
                   <>
@@ -755,6 +888,30 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
                   </div>
                 )}
 
+                {action==='sl_dynamic'&&<div className="md:col-span-3 space-y-2 rounded-md border border-[#4a5266] bg-[#202938] p-3">
+                  <strong className="block text-xs text-[#ffd08a]">Chandelier Exit · Wilder ATR (Closed Candles)</strong>
+                  <p className="text-[10px] text-[#a6b7d2]">Long: highest high − ATR × factor. Short: lowest low + ATR × factor. Stop only tightens. Requires real historical candles; missing bars leave the existing fixed stop in place.</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <label className="text-[10px] text-[#abbdd7]">ATR Period
+                      <input aria-label="Dynamic ATR period" type="number" min="2" max="100" step="1"
+                        value={dynamicSettings.period} onChange={e=>setDynamicSettings(v=>({...v,period:Number(e.target.value)}))}
+                        className="mt-1 w-full bg-[#141d2b] border border-[#4a576e] rounded p-1.5 text-white"/></label>
+                    <label className="text-[10px] text-[#abbdd7]">High/Low Lookback
+                      <input aria-label="Dynamic lookback" type="number" min="2" max="100" step="1"
+                        value={dynamicSettings.lookback} onChange={e=>setDynamicSettings(v=>({...v,lookback:Number(e.target.value)}))}
+                        className="mt-1 w-full bg-[#141d2b] border border-[#4a576e] rounded p-1.5 text-white"/></label>
+                    <label className="text-[10px] text-[#abbdd7]">ATR Multiplier
+                      <input aria-label="Dynamic ATR multiplier" type="number" min="0.25" max="10" step="0.25"
+                        value={dynamicSettings.multiplier} onChange={e=>setDynamicSettings(v=>({...v,multiplier:Number(e.target.value)}))}
+                        className="mt-1 w-full bg-[#141d2b] border border-[#4a576e] rounded p-1.5 text-white"/></label>
+                    <label className="text-[10px] text-[#abbdd7]">Candle Timeframe
+                      <select aria-label="Dynamic timeframe" value={dynamicSettings.timeframe}
+                        onChange={e=>setDynamicSettings(v=>({...v,timeframe:e.target.value as DynamicTrailingSettings['timeframe']}))}
+                        className="mt-1 w-full bg-[#141d2b] border border-[#4a576e] rounded p-1.5 text-white">
+                        {['1m','5m','15m','1h','4h','1D'].map(tf=><option key={tf} value={tf}>{tf}</option>)}
+                      </select></label>
+                  </div>
+                </div>}
                 {/* Reduce Position % */}
                 {action === 'reduce_position' && (
                   <div>
@@ -781,6 +938,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
             )}
           </div>
 
+          <p className="text-[10px] text-[#a7b9d5]">IF triggers once. WHENEVER and WHILE respond to a new false → true transition, not every tick. Dynamic ATR protection continues once activated even when a WHILE rule becomes false; stops never loosen automatically.</p>
           {/* Interactive Sentence Preview */}
           <div className="p-3 bg-[#1e222d] border border-[#2a2e39] rounded-xl flex items-center gap-2.5">
             <Info className="w-4 h-4 text-[#2962ff] shrink-0" />
@@ -791,6 +949,7 @@ export const ConditionalOrderModal: React.FC<ConditionalOrderModalProps> = ({
           </div>
         </div>
 
+        {validationError&&<p role="alert" className="px-5 py-2 text-xs text-[#ffc5c5] bg-[#3c2634]">{validationError}</p>}
         {/* Modal Footer */}
         <div className="px-5 py-3 bg-[#1e222d] border-t border-[#2a2e39] flex items-center justify-between">
           <button

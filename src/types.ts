@@ -1,3 +1,5 @@
+import type {DynamicTrailingSettings} from './services/dynamicTrailing';
+
 export type AssetCategory =
   | 'crypto'
   | 'stocks'
@@ -240,6 +242,7 @@ export interface PaperPosition {
   tpLevels?:PaperTargetLevel[];
   trailingPercent?:number;
   trailingAnchor?:number;
+  dynamicTrailing?:DynamicTrailingSettings;
 }
 
 export interface PaperAccount {

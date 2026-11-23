@@ -14,11 +14,31 @@ export function ruleConditionMet(cond:SingleCondition,market:Asset,previous:numb
   if(cond.dependencyType==='alert')
     return !!cond.dependencyId&&alertEvents.has(cond.dependencyId)&&cond.operator==='triggered';
   if(cond.dependencyType==='position'){
-    const position=portfolio.positions.find(p=>matchesExactMarket(p,market));
+    const position=portfolio.positions.find(p=>matchesExactMarket(p,market)&&
+      (!cond.dependencyId||p.id===cond.dependencyId));
+    if(cond.operator==='position_exists')return !!position;
     if(!position||!Number.isFinite(threshold))return false;
     if(cond.operator==='pnl_above_percent')return position.unrealizedPnLPct>=Math.abs(threshold!);
     if(cond.operator==='pnl_below_percent')return position.unrealizedPnLPct<=-Math.abs(threshold!);
     return false;
+  }
+  if(cond.dependencyType==='account'){
+    if(!Number.isFinite(threshold))return false;
+    const field=cond.operator.startsWith('equity_')?portfolio.account.equity:
+      portfolio.account.availableFunds;
+    if(cond.operator==='equity_greater_than'||cond.operator==='available_greater_than')
+      return field>threshold!;
+    if(cond.operator==='equity_less_than'||cond.operator==='available_less_than')
+      return field<threshold!;
+    return false;
+  }
+  if(cond.dependencyType==='utc_session'){
+    if(!Number.isFinite(threshold)||!Number.isFinite(cond.secondaryValue))return false;
+    const hour=new Date(market.quoteUpdatedAt||Date.now()).getUTCHours()+
+      new Date(market.quoteUpdatedAt||Date.now()).getUTCMinutes()/60;
+    const start=threshold!,end=cond.secondaryValue!;
+    const inside=start<end?hour>=start&&hour<end:hour>=start||hour<end;
+    return cond.operator==='in_utc_hours'?inside:cond.operator==='outside_utc_hours'?!inside:false;
   }
   if(cond.dependencyType==='indicator')
     return !!indicator&&indicatorConditionMet(cond.dependencyId||'',cond.operator,threshold!,indicator);
@@ -31,6 +51,9 @@ export function ruleConditionMet(cond:SingleCondition,market:Asset,previous:numb
     !Number.isFinite(threshold)||!Number.isFinite(market.price)||threshold!<=0)return false;
   if(cond.operator==='crosses_above')return previous!==undefined&&previous<threshold!&&market.price>=threshold!;
   if(cond.operator==='crosses_below')return previous!==undefined&&previous>threshold!&&market.price<=threshold!;
+  if(cond.operator==='crosses_either')return previous!==undefined&&
+    ((previous<threshold!&&market.price>=threshold!)||
+     (previous>threshold!&&market.price<=threshold!));
   if(cond.operator==='greater_than')return market.price>threshold!;
   if(cond.operator==='less_than')return market.price<threshold!;
   if(cond.operator==='touches')return Math.abs(market.price-threshold!)/threshold!<=0.003;
@@ -42,12 +65,12 @@ export function ruleConditionsMet(order:ConditionalOrder,market:Asset,previous:n
   if(!ruleCanActivate(order)||!ruleMatchesMarket(order,market))return false;
   const values=order.conditions.map(c=>ruleConditionMet(c,market,previous,portfolio,alertEvents,drawings,previousAt,indicator));
   if(!values.length)return false;
-  if(order.conditionLogic==='IF (AND)')return values.every(Boolean);
+  if(order.conditionLogic==='IF (AND)'||order.conditionLogic==='WHILE')return values.every(Boolean);
   if(order.conditionLogic==='IF (OR)')return values.some(Boolean);
   return values[0]===true;
 }
 export function ruleEligibleOnTick(order:ConditionalOrder,met:boolean,at:number):boolean{
   if(order.status!=='active'||!met||order.triggerCount>=order.maxTriggers)return false;
-  if(order.conditionLogic==='WHENEVER'&&order.lastConditionSatisfied)return false;
+  if((order.conditionLogic==='WHENEVER'||order.conditionLogic==='WHILE')&&order.lastConditionSatisfied)return false;
   return at-(order.lastTriggeredAt||0)>20000;
 }

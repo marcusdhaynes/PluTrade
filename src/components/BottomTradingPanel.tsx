@@ -1,3 +1,4 @@
+import {DEFAULT_DYNAMIC_TRAIL,validDynamicTrail,type DynamicTrailingSettings} from '../services/dynamicTrailing';
 import React, {useState,useEffect} from 'react';
 import {createPortal} from 'react-dom';
 import {ChevronDown, Maximize2, Minimize2, Minus, X, Download, Edit2, Zap, Plus, Settings2, Check} from 'lucide-react';
@@ -44,7 +45,8 @@ export interface BottomTradingPanelProps {
   orderEvents:PaperOrderEvent[];
   onCancelPendingOrder:(id:string)=>void;
   onAmendPendingOrder:(id:string,request:PaperAmendRequest)=>string|null;
-  onEditPosition:(id:string,tp?:number,sl?:number,trailing?:number|null)=>void;
+  onEditPosition:(id:string,tp?:number,sl?:number,trailing?:number|null,
+    dynamic?:DynamicTrailingSettings|null)=>void;
   onResetPaper:()=>void; onResolvePaperRecovery:()=>void; paperError:string;paperTradingBlocked:boolean; fills:PaperFill[];
   conditionalOrders:ConditionalOrder[];
   onOpenCreateConditionalOrder:(dep?:DependencyContext|null)=>void;
@@ -101,6 +103,8 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
   const [editSl,setEditSl]=useState('');
   const [editTrailingEnabled,setEditTrailingEnabled]=useState(false);
   const [editTrailingPercent,setEditTrailingPercent]=useState('0.50');
+  const [editDynamicEnabled,setEditDynamicEnabled]=useState(false);
+  const [editDynamicSettings,setEditDynamicSettings]=useState<DynamicTrailingSettings>({...DEFAULT_DYNAMIC_TRAIL});
   const live=isFreshPaperQuote(activeAsset);
   // Settled cash balance history is reconstructed from execution ledger entries,
   // never from fabricated equity snapshots.
@@ -221,12 +225,20 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
             {p.trailingPercent&&<small className="block text-[#88b2fa]">
               Trailing {p.trailingPercent}% · {p.side==='Long'?'peak':'trough'} {amount(p.trailingAnchor??p.entryPrice)}
             </small>}
+            {p.dynamicTrailing&&<small className="block text-[#ffcb87]">
+              Dynamic ATR {p.dynamicTrailing.period}/{p.dynamicTrailing.lookback} × {p.dynamicTrailing.multiplier} · {p.dynamicTrailing.timeframe}
+              {p.dynamicTrailing.lastBarTime
+                ?' · ATR '+amount(p.dynamicTrailing.atr||0)
+                :' · Waiting for verified closed bars'}
+            </small>}
           </td><td className="flex items-center gap-2 py-2">
             <button title="Add conditional order" onClick={()=>onOpenCreateConditionalOrder({type:'position',label:p.symbol+' position'})}><Zap size={13}/></button>
             <button title="Edit TP and SL" onClick={()=>{setEditId(editId===p.id?null:p.id);
               setEditTp(p.tp?.toString()||'');setEditSl(p.sl?.toString()||'');
               setEditTrailingEnabled(!!p.trailingPercent);
-              setEditTrailingPercent(p.trailingPercent?.toString()||'0.50');}}><Edit2 size={13}/></button>
+              setEditTrailingPercent(p.trailingPercent?.toString()||'0.50');
+              setEditDynamicEnabled(!!p.dynamicTrailing);
+              setEditDynamicSettings(p.dynamicTrailing||{...DEFAULT_DYNAMIC_TRAIL});}}><Edit2 size={13}/></button>
             <button title="Close at latest verified price" className="text-[#f77f90]" onClick={()=>onClosePosition(p.id)}><X size={13}/></button>
           </td>
         </tr>
@@ -235,7 +247,10 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
           <label className="ml-4">Stop loss <input type="number" step="any" min="0" value={editSl} onChange={e=>setEditSl(e.target.value)} className="ml-1 w-24 bg-[#0c1320] rounded px-2"/></label>
           <label className="ml-4 inline-flex items-center gap-1.5 cursor-pointer">
             <input type="checkbox" aria-label="Trail stop loss for open position"
-              checked={editTrailingEnabled} onChange={e=>setEditTrailingEnabled(e.target.checked)}
+              checked={editTrailingEnabled} onChange={e=>{
+                setEditTrailingEnabled(e.target.checked);
+                if(e.target.checked)setEditDynamicEnabled(false);
+              }}
               className="accent-[#789ffe]"/>
             Trailing SL
           </label>
@@ -246,9 +261,43 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
               onChange={e=>setEditTrailingPercent(e.target.value)}
               className="w-20 bg-[#0c1320] rounded px-2 disabled:opacity-40"/>%
           </label>
-          <button className="ml-3 text-[#7ea7ff]" onClick={()=>{
+          <div className="mt-2 flex gap-3 items-center flex-wrap border-t border-[#3d4658] pt-2">
+            <label className="inline-flex items-center gap-2 text-[#ffcb87]">
+              <input type="checkbox" aria-label="Dynamic ATR Chandelier trailing stop"
+                checked={editDynamicEnabled} onChange={e=>{
+                  setEditDynamicEnabled(e.target.checked);
+                  if(e.target.checked)setEditTrailingEnabled(false);
+                }} className="accent-[#d6a254]"/>
+              Dynamic ATR Chandelier
+            </label>
+            {editDynamicEnabled&&<>
+              <label>ATR bars <input aria-label="Position ATR period" type="number" min="2" max="100"
+                value={editDynamicSettings.period}
+                onChange={e=>setEditDynamicSettings(v=>({...v,period:Number(e.target.value)}))}
+                className="ml-1 w-14 rounded bg-[#111a29] px-1"/></label>
+              <label>Lookback <input aria-label="Position dynamic lookback" type="number" min="2" max="100"
+                value={editDynamicSettings.lookback}
+                onChange={e=>setEditDynamicSettings(v=>({...v,lookback:Number(e.target.value)}))}
+                className="ml-1 w-14 rounded bg-[#111a29] px-1"/></label>
+              <label>ATR × <input aria-label="Position dynamic ATR multiplier" type="number" min=".25" max="10" step=".25"
+                value={editDynamicSettings.multiplier}
+                onChange={e=>setEditDynamicSettings(v=>({...v,multiplier:Number(e.target.value)}))}
+                className="ml-1 w-16 rounded bg-[#111a29] px-1"/></label>
+              <label>Bars
+                <select aria-label="Position dynamic timeframe" value={editDynamicSettings.timeframe}
+                  onChange={e=>setEditDynamicSettings(v=>({...v,timeframe:e.target.value as DynamicTrailingSettings['timeframe']}))}
+                  className="ml-1 rounded bg-[#111a29] px-1">
+                  {['1m','5m','15m','1h','4h','1D'].map(tf=><option key={tf} value={tf}>{tf}</option>)}
+                </select>
+              </label>
+            </>}
+            <span className="text-[10px] text-[#9fb2d2]">Closed real bars only. A retained fixed stop remains active while ATR warms up; simulated stop fills require a fresh venue trade tick.</span>
+          </div>
+          <button className="ml-3 text-[#7ea7ff] disabled:opacity-40" disabled={paperTradingBlocked||
+            (editDynamicEnabled&&!validDynamicTrail(editDynamicSettings))} onClick={()=>{
             onEditPosition(p.id,editTp?Number(editTp):undefined,editSl?Number(editSl):undefined,
-              editTrailingEnabled?Number(editTrailingPercent):null);
+              editDynamicEnabled?null:editTrailingEnabled?Number(editTrailingPercent):null,
+              editDynamicEnabled?editDynamicSettings:null);
             setEditId(null);
           }}>Save stops</button>
           <button className="ml-3 text-[#98a1b6]" onClick={()=>setEditId(null)}>Cancel</button>

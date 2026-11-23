@@ -180,7 +180,7 @@ export function updatePaperStops(input: PaperPortfolio,id:string,tp?:number,sl?:
     if(x.id!==id)return x;
     // Editing a fixed stop must never loosen an already ratcheted trailing
     // stop. Disabling trailing keeps the last achieved stop as a fixed floor.
-    const safeStop=x.trailingPercent && x.sl!==undefined
+    const safeStop=(x.trailingPercent||x.dynamicTrailing) && x.sl!==undefined
       ? sl===undefined?x.sl:x.side==='Long'?Math.max(x.sl,sl):Math.min(x.sl,sl)
       :sl;
     return {...x,tp,sl:safeStop};
@@ -248,7 +248,7 @@ export function enableTrailingPaperStop(input:PaperPortfolio,id:string,percent:n
   const anchor=p.currentPrice;
   const sl=p.side==='Long'?anchor*(1-percent/100):anchor*(1+percent/100);
   return {...input,positions:input.positions.map(x=>x.id===id?
-    {...x,trailingPercent:percent,trailingAnchor:anchor,sl:x.sl===undefined?sl:
+    {...x,dynamicTrailing:undefined,trailingPercent:percent,trailingAnchor:anchor,sl:x.sl===undefined?sl:
       x.side==='Long'?Math.max(x.sl,sl):Math.min(x.sl,sl)}:x)};
 }
 
