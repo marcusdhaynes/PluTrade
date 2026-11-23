@@ -42,6 +42,8 @@ import {
   DEFAULT_LAYOUT_SETTINGS,
   JournalGridSettingsModal,
 } from './JournalGridSettingsModal';
+import {FloatingPortal} from '../FloatingPortal';
+import {journalTradeDate} from '../../services/journalTimes';
 
 interface JournalTradeLogProps {
   filterRequest?:number;
@@ -130,10 +132,34 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterPortfolio, setFilterPortfolio] = useState('All');
   const [filterDate, setFilterDate] = useState('All');
+  const [sortMode,setSortMode]=useState<'newest'|'oldest'|'best'|'worst'|'symbol'>('newest');
+  const [mobileFiltersOpen,setMobileFiltersOpen]=useState(false);
+  const mobileFilterAnchor=useRef<HTMLButtonElement>(null);
 
   // Open active filter dropdowns
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  useEffect(()=>{if(filterRequest>0)setActiveDropdown('symbol');},[filterRequest]);
+  useEffect(()=>{
+    if(filterRequest<=0)return;
+    if(window.matchMedia('(max-width:767px), (hover:none) and (pointer:coarse)').matches){
+      setMobileFiltersOpen(true);
+    }else setActiveDropdown('symbol');
+  },[filterRequest]);
+  useEffect(()=>{
+    if(!mobileFiltersOpen)return;
+    const outside=(event:PointerEvent)=>{
+      const node=event.target as Node;
+      if(!mobileFilterAnchor.current?.contains(node)&&
+         !(node instanceof Element&&node.closest('#journal-mobile-filters-popover')))
+        setMobileFiltersOpen(false);
+    };
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMobileFiltersOpen(false);};
+    window.addEventListener('pointerdown',outside,true);
+    window.addEventListener('keydown',escape);
+    return ()=>{
+      window.removeEventListener('pointerdown',outside,true);
+      window.removeEventListener('keydown',escape);
+    };
+  },[mobileFiltersOpen]);
 
   // Table selection & expansion state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -190,6 +216,20 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
     if (filterSide !== 'All' && t.side !== filterSide) return false;
     if (filterStatus !== 'All' && t.status !== filterStatus) return false;
     if (filterPortfolio !== 'All' && t.portfolio !== filterPortfolio) return false;
+    if(filterDate!=='All'){
+      const when=journalTradeDate(t.closeDate||t.openDate);
+      const now=new Date(),start=new Date(now);
+      if(filterDate==='Today')start.setHours(0,0,0,0);
+      else if(filterDate==='This Week'){
+        start.setHours(0,0,0,0);
+        start.setDate(start.getDate()-((start.getDay()+6)%7));
+      }else if(filterDate==='This Month'){
+        start.setDate(1);start.setHours(0,0,0,0);
+      }else if(filterDate==='Year to Date'){
+        start.setMonth(0,1);start.setHours(0,0,0,0);
+      }
+      if(!Number.isFinite(when.getTime())||when<start||when>now)return false;
+    }
     if (filterMistake !== 'All') {
       if (filterMistake === 'None' && t.mistakes && t.mistakes.length > 0) return false;
       if (filterMistake !== 'None' && (!t.mistakes || !t.mistakes.includes(filterMistake))) return false;
@@ -197,7 +237,17 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
     return true;
   });
 
+  const sortedTrades=[...filtered].sort((a,b)=>{
+    if(sortMode==='best')return b.netReturn-a.netReturn;
+    if(sortMode==='worst')return a.netReturn-b.netReturn;
+    if(sortMode==='symbol')return a.symbol.localeCompare(b.symbol);
+    const diff=journalTradeDate(a.openDate).getTime()-journalTradeDate(b.openDate).getTime();
+    return (sortMode==='oldest'?diff:-diff)||a.id.localeCompare(b.id);
+  });
   const uniqueSymbols = Array.from(new Set(trades.map((t) => t.symbol)));
+  const uniquePortfolios=Array.from(new Set(trades.map(t=>t.portfolio||'Main Account')));
+  const uniqueSetups=Array.from(new Set(trades.flatMap(t=>t.setups||[])));
+  const uniqueMistakes=Array.from(new Set(trades.flatMap(t=>t.mistakes||[])));
   const setupsBreakdown = getSetupsBreakdown(trades);
   const mistakesBreakdown = getMistakesBreakdown(trades);
 
@@ -328,11 +378,68 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
       <div
         onMouseDown={onStartWindowDrag}
         onDoubleClick={onToggleMaximize}
+        id="journal-tradelog-toolbar"
         className="bg-[#131722] px-3 py-1.5 border-b border-[#232836] flex flex-wrap items-center justify-between gap-2 shrink-0 z-20 cursor-default select-none"
         title={!isMaximized ? "Drag on empty space to reposition window" : undefined}
       >
-        {/* Left Filters Row */}
-        <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        {/* Mobile: one compact row for every filter and sort, with its full
+            selection controls in a screen-fitted popover, never a wrapped row. */}
+        <div id="journal-mobile-filter-strip" className="hidden min-w-0 flex-1 items-center gap-1" onClick={e=>e.stopPropagation()}>
+          <button ref={mobileFilterAnchor} type="button" id="journal-mobile-filters-trigger"
+            aria-label="Journal filters" aria-expanded={mobileFiltersOpen}
+            className="flex h-[26px] shrink-0 items-center gap-0.5 rounded border border-[#465a79] bg-[#263953] px-1.5 text-[10px] text-[#bcd7ff]"
+            onClick={()=>setMobileFiltersOpen(v=>!v)}>
+            <Filter size={13}/> Filters
+          </button>
+          <label className="flex h-[26px] min-w-0 flex-1 items-center gap-1 rounded border border-[#343e55] bg-[#151d2b] px-1.5">
+            <Search size={12} className="shrink-0 text-[#8d9ab0]"/>
+            <input aria-label="Search journal trades" value={searchQuery} onChange={event=>setSearchQuery(event.target.value)}
+              className="w-full min-w-0 bg-transparent text-[10px] text-white outline-none" placeholder="Search"/>
+          </label>
+          <select id="journal-mobile-sort" aria-label="Sort journal trades" value={sortMode}
+            onChange={event=>setSortMode(event.target.value as typeof sortMode)}
+            className="h-[26px] max-w-[77px] min-w-0 shrink-0 rounded border border-[#3d4e66] bg-[#192333] px-1 text-[10px] text-[#b4cae8]">
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="best">Best P/L</option>
+            <option value="worst">Worst P/L</option>
+            <option value="symbol">Symbol</option>
+          </select>
+          <button type="button" aria-label="Add journal trade" title="Add Trade" onClick={onOpenAddTrade}
+            className="grid h-[26px] w-7 shrink-0 place-items-center rounded bg-[#00a889] text-white"><Plus size={15}/></button>
+        </div>
+        {mobileFiltersOpen&&<FloatingPortal anchor={mobileFilterAnchor} placement="bottom-start" width={320}
+          id="journal-mobile-filters-popover" ariaLabel="Journal filter options"
+          className="rounded-lg border border-[#52627d] bg-[#172234] p-3 text-[#e3eaf8] shadow-2xl">
+          <strong className="block pb-2 text-xs">Trade filters</strong>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              ['Symbol',filterSymbol,setFilterSymbol,['All',...uniqueSymbols]],
+              ['Setup',filterSetup,setFilterSetup,['All',...uniqueSetups]],
+              ['Side',filterSide,setFilterSide,['All','LONG','SHORT']],
+              ['Mistake',filterMistake,setFilterMistake,['All','None',...uniqueMistakes]],
+              ['Status',filterStatus,setFilterStatus,['All','WIN','LOSS','OPEN','BE']],
+              ['Portfolio',filterPortfolio,setFilterPortfolio,['All',...uniquePortfolios]],
+              ['Date',filterDate,setFilterDate,['All','Today','This Week','This Month','Year to Date']],
+            ] as Array<[string,string,(value:string)=>void,string[]]>).map(([name,value,update,choices])=>
+              <label key={name} className="min-w-0 text-[10px] text-[#aebed6]">{name}
+                <select aria-label={'Filter '+name} value={value} onChange={event=>update(event.target.value)}
+                  className="mt-1 w-full min-w-0 rounded border border-[#435371] bg-[#101a2a] p-1.5 text-[11px] text-white">
+                  {choices.map(choice=><option key={choice} value={choice}>{choice}</option>)}
+                </select>
+              </label>)}
+          </div>
+          <div className="mt-3 flex justify-between gap-2">
+            <button type="button" className="rounded border border-[#425472] px-2 py-1.5 text-[10px]"
+              onClick={()=>{setFilterSymbol('All');setFilterSetup('All');setFilterSide('All');setFilterMistake('All');setFilterStatus('All');setFilterPortfolio('All');setFilterDate('All');}}>
+              Clear filters
+            </button>
+            <button type="button" onClick={()=>setMobileFiltersOpen(false)}
+              className="rounded bg-[#2962ff] px-3 py-1.5 text-[10px] text-white">Done</button>
+          </div>
+        </FloatingPortal>}
+        {/* Desktop filter row remains unchanged. */}
+        <div id="journal-desktop-filter-row" className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           {/* Active Filter Icon Pill */}
           <div className="w-6 h-6 rounded bg-[#2563eb] text-white flex items-center justify-center shadow-xs">
             <Filter className="w-3.5 h-3.5 fill-current" />
@@ -582,7 +689,7 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
         </div>
 
         {/* Right Actions (AI, Grid Settings, Add Trade, Refresh) */}
-        <div className="flex items-center gap-2">
+        <div id="journal-desktop-log-actions" className="flex items-center gap-2">
           {/* AI Snowflake / Sparkles */}
           <button
             className="p-1.5 text-[#a6adb9] hover:text-white rounded hover:bg-[#1e2433] transition"
@@ -657,7 +764,7 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
       </div>
 
       {/* Main Resizable Grid Container */}
-      <div className={`flex-1 flex flex-col overflow-hidden ${getPaddingClass()} ${getGapClass()}`}>
+      <div id="journal-trades-content" className={`flex-1 flex flex-col overflow-hidden ${getPaddingClass()} ${getGapClass()}`}>
         {/* ROW 1: TOP 3 METRIC CARDS (Draggable & Resizable within Grid) */}
         {visibleTopCards.length > 0 && (
           <div className={`grid grid-cols-1 md:grid-cols-${visibleTopCards.length} ${getGapClass()} shrink-0`}>
@@ -870,6 +977,7 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
         {/* ROW 2: MAIN WORKSPACE (Resizable Table Split + Right Column Cards) */}
         <div
           ref={containerRef}
+          id="journal-trade-main-grid"
           className={`flex-1 flex overflow-hidden ${getGapClass()} relative`}
         >
           {/* MASTER TRADES TABLE (Resizable Width) */}
@@ -878,9 +986,10 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
               style={{
                 width: visibleRightCards.length > 0 ? `${layoutSettings.horizontalSplitRatio * 100}%` : '100%',
               }}
+              id="journal-trade-table-panel"
               className={`bg-[#171b26] border border-[#232836] ${tableCornerClass} flex flex-col overflow-hidden shrink-0 transition-all duration-75`}
             >
-              <div className="flex-1 overflow-auto">
+              <div id="journal-desktop-trades-table" className="flex-1 overflow-auto">
                 <table className="w-full text-left border-collapse text-[11px]">
                   <thead className="bg-[#141721] sticky top-0 z-10 border-b border-[#232836] text-[#6b7280] font-semibold select-none">
                     <tr className="h-7.5">
@@ -928,7 +1037,7 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1e2330]">
-                    {filtered.map((trade) => {
+                    {sortedTrades.map((trade) => {
                       const isSelected = selectedIds.has(trade.id);
                       const isExpanded = expandedId === trade.id;
                       const isWin = trade.status === 'WIN';
@@ -1221,6 +1330,7 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
           {isSecEnabled('trade-log') && visibleRightCards.length > 0 && (
             <div
               onMouseDown={() => setIsResizingSplitter(true)}
+              id="journal-trade-splitter"
               className="w-1.5 hover:w-2 hover:bg-[#2563eb] cursor-col-resize transition-all z-20 flex items-center justify-center group shrink-0 select-none bg-transparent"
               title="Drag horizontally to resize table and right sidebar"
             >
@@ -1236,6 +1346,7 @@ export const JournalTradeLog: React.FC<JournalTradeLogProps> = ({
                   ? `${(1 - layoutSettings.horizontalSplitRatio) * 100}%`
                   : '100%',
               }}
+              id="journal-trade-widgets-column"
               className={`flex flex-col ${getGapClass()} overflow-y-auto shrink-0`}
             >
               {visibleRightCards.map((cardId) => {
