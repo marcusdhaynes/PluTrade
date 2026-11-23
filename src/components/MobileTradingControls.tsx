@@ -84,7 +84,7 @@ export const MobileTradingControls:React.FC<Props>=({
   const target=selectedKind&&position?
     exitPriceFromValue(position.entryPrice,position.qty,position.side,selectedKind,mode,raw,tick,accountBalance):undefined;
   const validTarget=!!target&&Number.isFinite(target)&&!!position&&
-    (selectedKind==='sl'?(position.side==='Long'?target<position.entryPrice:target>position.entryPrice):
+    (selectedKind==='sl'?(position.side==='Long'?target<position.currentPrice:target>position.currentPrice):
       (position.side==='Long'?target>position.entryPrice:target<position.entryPrice));
   const validTrail=Number.isFinite(Number(trailPercent))&&Number(trailPercent)>0&&Number(trailPercent)<100;
   const saveExit=()=>{
