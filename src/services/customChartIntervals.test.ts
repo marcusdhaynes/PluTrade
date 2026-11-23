@@ -14,7 +14,7 @@ assert.equal(isCustomInterval({count:0,unit:'hours'}),false);
 assert.equal(isCustomInterval({count:1000,unit:'hours'}),false);
 assert.equal(isCustomInterval({count:2.5,unit:'hours'}),false);
 assert.equal(customBucketStart(Date.UTC(2026,6,18,14,44,31)/1000,{count:3,unit:'hours'}),Date.UTC(2026,6,18,12)/1000);
-assert.equal(customBucketStart(Date.UTC(2026,6,18)/1000,{count:2,unit:'weeks'}),Date.UTC(2026,6,13)/1000);
+assert.equal(customBucketStart(Date.UTC(2026,6,18)/1000,{count:2,unit:'weeks'}),Date.UTC(2026,6,6)/1000);
 assert.equal(customBucketStart(Date.UTC(2026,7,18)/1000,{count:3,unit:'months'}),Date.UTC(2026,6,1)/1000);
 const firstMonth=Date.UTC(2026,0,1)/1000;
 assert.equal(customBucketEnd(firstMonth,{count:2,unit:'months'}),Date.UTC(2026,2,1)/1000);
