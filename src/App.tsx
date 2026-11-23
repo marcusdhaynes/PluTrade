@@ -1525,8 +1525,11 @@ export default function App() {
       if(!position)throw new Error('Position unavailable.');
       if(tp!==undefined&&(!Number.isFinite(tp)||tp<=0||(position.side==='Long'?tp<=position.entryPrice:tp>=position.entryPrice)))
         throw new Error('Take-profit target must be on the profitable side of the entry.');
-      if(sl!==undefined&&(!Number.isFinite(sl)||sl<=0||(position.side==='Long'?sl>=position.entryPrice:sl<=position.entryPrice)))
-        throw new Error('Stop-loss target must be on the protective side of the entry.');
+      // A ratcheted stop may legitimately lock in profit past entry. Changed
+      // levels must instead remain untriggered relative to the observed mark.
+      if(sl!==undefined&&(!Number.isFinite(sl)||sl<=0||
+        (sl!==position.sl&&(position.side==='Long'?sl>=position.currentPrice:sl<=position.currentPrice))))
+        throw new Error('Stop-loss target must be beyond the currently observed price.');
       let next=updatePaperStops(paperPortfolio,id,tp,sl);
       if(trailing===null)next=disableTrailingPaperStop(next,id);
       else if(trailing!==undefined)next=enableTrailingPaperStop(next,id,trailing);
