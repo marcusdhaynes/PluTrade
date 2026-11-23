@@ -819,14 +819,14 @@ test('mobile price marker stays compact and above chart overlays without coverin
     const timeAxis=rows[rows.length-1].getBoundingClientRect();
     const style=getComputedStyle(document.querySelector('#chart-current-price-label')!);
     return {badge:{left:badge.left,right:badge.right,top:badge.top,bottom:badge.bottom,height:badge.height},
-      railLeft:rail.left,plotLeft:plot.left,timeAxisTop:timeAxis.top,
+      railLeft:rail.left,plotLeft:plot.left,plotTop:plot.top,timeAxisTop:timeAxis.top,
       background:style.backgroundColor,zIndex:Number(style.zIndex)};
   });
   expect(geometry.badge.height).toBeLessThanOrEqual(17);
   expect(geometry.badge.left).toBeGreaterThanOrEqual(geometry.plotLeft);
   expect(geometry.badge.right).toBeLessThanOrEqual(geometry.railLeft-1);
   expect(geometry.badge.bottom).toBeLessThanOrEqual(geometry.timeAxisTop+1);
-  expect(geometry.badge.top).toBeGreaterThanOrEqual(geometry.plotLeft>=0?0:-1);
+  expect(geometry.badge.top).toBeGreaterThanOrEqual(geometry.plotTop-1);
   expect(geometry.background).toBe('rgb(41, 98, 255)');
   expect(geometry.zIndex).toBeGreaterThan(50);
 });
