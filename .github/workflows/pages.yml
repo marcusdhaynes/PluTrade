@@ -46,6 +46,10 @@ jobs:
         run: npm install --prefix tests/e2e --no-package-lock --ignore-scripts
       - name: Install real Chrome for the explicit Chrome test project
         run: cd tests/e2e && npx playwright install chrome
+      - name: Verify mobile right drawer header is not covered by timeframe controls
+        run: cd tests/e2e && npx playwright test mobile-smoke.spec.ts --grep "mobile right drawer header stays on top of timeframe row" --project mobile-chromium --project mobile-webkit
+        env:
+          HOME: /root
       - name: Exercise workspace controls in Chrome, Firefox, WebKit and mobile smoke
         run: cd tests/e2e && npm test
         env:
