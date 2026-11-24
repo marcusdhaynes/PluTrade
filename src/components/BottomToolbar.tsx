@@ -108,24 +108,26 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
       </form></FloatingPortal>}
       {chartCornerHost&&createPortal(
         <div id="chart-corner-controls" ref={chartCornerRef}
-          className="absolute bottom-0 right-0 z-[48] flex items-center gap-0.5 rounded-tl border border-r-0 border-b-0 border-[#384559] bg-[#151d2b]/95 p-0.5 text-[#9eaec4] shadow-lg">
-          <button type="button" id="fit-chart-content-btn" onClick={onFitContent}
-            title="Fit candles and restore automatic price scale"
-            aria-label="Fit chart" className="flex h-[19px] w-[19px] items-center justify-center rounded hover:bg-[#30405c] hover:text-white">
-            <RotateCcw size={13}/>
-          </button>
+          className="absolute bottom-0 right-0 z-[48] flex h-[24px] w-[24px] items-center justify-center rounded-none bg-[#151d2b]/95 p-0 text-[#9eaec4]">
           <button type="button" id="time-scale-settings-btn" aria-expanded={scalePanelOpen}
             aria-label="Chart time scale settings"
             title="Chart time scale settings"
             onClick={()=>{setScalePanelOpen(v=>!v);setDatePanelOpen(false);setScaleError('');}}
-            className="flex h-[19px] w-[19px] items-center justify-center rounded hover:bg-[#30405c] hover:text-white">
-            <Settings size={13}/>
+            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-none hover:text-white">
+            <Settings size={14}/>
           </button>
       {scalePanelOpen&&<FloatingPortal anchor={chartCornerRef} width={240} placement="top-end"
         id="chart-time-scale-popup" ariaLabel="Time scale settings"
         className="rounded-lg border border-[#3e4a61] bg-[#182231] p-3 shadow-xl text-[#dce4f0]">
       <section ref={scalePanelRef} className="space-y-2">
-        <strong>Chart time scale</strong>
+        <div className="flex items-center justify-between gap-2">
+          <strong>Chart time scale</strong>
+          <button id="fit-chart-content-btn" type="button" onClick={()=>{onFitContent();setScalePanelOpen(false);}}
+            title="Fit candles and reset automatic price scale"
+            aria-label="Fit chart" className="flex items-center gap-1 rounded border border-[#46536c] px-2 py-1 text-[#c6d6ec] hover:bg-[#30405c]">
+            <RotateCcw size={13}/> Fit
+          </button>
+        </div>
         <label className="block">Bar spacing
           <input type="number" aria-label="Bar spacing" min={2} max={30} step={1} value={barSpacing}
             className="w-full rounded border border-[#45536b] bg-[#111a27] p-1 text-white"
