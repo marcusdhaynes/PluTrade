@@ -479,20 +479,20 @@ export const MobileTradingControls:React.FC<Props>=({
       <button type="button" id="mobile-upl-cash" aria-label="Unrealized profit loss amount"
         title={'Unrealized P/L: '+moneyLabel(displayedPnl)+' · '+(showPosition?'active position':'whole account')}
         aria-expanded={pnlMenu==='cash'}
-        className="flex-[1.35_1_0%] min-w-0 h-[21px] flex flex-col justify-center items-center rounded border border-[#4b586e] bg-[#1c2a3d] px-px leading-[9px]"
+        className={baseButton+' flex-[1.35_1_0%] !flex !flex-col !justify-center !items-center !bg-[#1c2a3d] !border-[#4b586e] !leading-[10px]'}
         onClick={()=>{setAccountMenuOpen(false);setPanel(null);setPnlMenu(v=>v==='cash'?null:'cash');}}>
-        <span className="text-[7px] text-[#a9bbd2]">{accountCurrency==='USD'?'UP/L$':'UP/L '+accountCurrency}</span>
-        <span className={'block w-full truncate text-center text-[clamp(7px,2vw,9px)] font-semibold tabular-nums '+(displayedPnl>=0?'text-[#64e6b9]':'text-[#ff95a4]')}>
+        <span className="block w-full truncate text-center text-[10px] font-semibold tracking-tight text-[#a9bbd2]">{accountCurrency==='USD'?'UP/L$':'UP/L '+accountCurrency}</span>
+        <span className={'block w-full truncate text-center text-[10px] font-semibold tracking-tight tabular-nums '+(displayedPnl>=0?'text-[#64e6b9]':'text-[#ff95a4]')}>
           {compactMoney(displayedPnl)}
         </span>
       </button>
       <button type="button" id="mobile-upl-percent" aria-label="Unrealized profit loss percent"
         title={'Unrealized P/L percent · '+(showPosition?'active position':'whole account')}
         aria-expanded={pnlMenu==='percent'}
-        className="flex-[1.3_1_0%] min-w-0 h-[21px] flex flex-col justify-center items-center rounded border border-[#4b586e] bg-[#1c2a3d] px-px leading-[9px]"
+        className={baseButton+' flex-[1.3_1_0%] !flex !flex-col !justify-center !items-center !bg-[#1c2a3d] !border-[#4b586e] !leading-[10px]'}
         onClick={()=>{setAccountMenuOpen(false);setPanel(null);setPnlMenu(v=>v==='percent'?null:'percent');}}>
-        <span className="text-[7px] text-[#a9bbd2]">UP/L%</span>
-        <span className={'block w-full truncate text-center text-[clamp(7px,2vw,9px)] font-semibold tabular-nums '+(displayedPct===null?'text-[#d1d9e7]':displayedPct>=0?'text-[#64e6b9]':'text-[#ff95a4]')}>
+        <span className="block w-full truncate text-center text-[10px] font-semibold tracking-tight text-[#a9bbd2]">UP/L%</span>
+        <span className={'block w-full truncate text-center text-[10px] font-semibold tracking-tight tabular-nums '+(displayedPct===null?'text-[#d1d9e7]':displayedPct>=0?'text-[#64e6b9]':'text-[#ff95a4]')}>
           {displayedPct===null?'—':(displayedPct>0?'+':'')+displayedPct.toFixed(pnlDigits)+'%'}
         </span>
       </button>
@@ -507,7 +507,8 @@ export const MobileTradingControls:React.FC<Props>=({
         {quickSize.mode==='equity'?`${Math.round(quickSize.value)}% Equity`:moneyLabel(quickSize.value)}
       </button>
       {(['sl','tp'] as const).map(kind=><button key={kind} type="button"
-        className={baseButton+' '+(panel===kind?'border-[#709fff]':'')}
+        id={kind==='sl'?'mobile-stop-setup-btn':'mobile-target-setup-btn'}
+        className={baseButton+' flex-[0.5_1_0%] '+(panel===kind?'border-[#709fff]':'')}
         aria-label={kind==='sl'?'Stop loss; hold for all types':'Take profit; hold for all types'}
         title="Hold for all types"
         onContextMenu={e=>{e.preventDefault();clearHold();openExit(kind,true);}}
