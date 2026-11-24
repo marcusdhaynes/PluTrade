@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import {FloatingPortal,ViewportPortal} from './FloatingPortal';
 import { Asset, Watchlist, AssetCategory } from '../types';
 import {marketIdentity,resolveWatchlistEntry} from '../services/marketIdentity';
 import {readWatchlistBackupRaw} from '../services/watchlistStorage';
@@ -45,6 +46,7 @@ export const WatchlistPanel: React.FC<WatchlistPanelProps> = React.memo(({
   priceFlashMap,
 }) => {
   const [isWatchlistDropdownOpen, setIsWatchlistDropdownOpen] = useState(false);
+  const watchlistSelectorRef=React.useRef<HTMLButtonElement>(null);
   const [isCreateListModalOpen, setIsCreateListModalOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [filterCategory, setFilterCategory] = useState<AssetCategory | 'all'>(() => {
@@ -147,6 +149,7 @@ export const WatchlistPanel: React.FC<WatchlistPanelProps> = React.memo(({
           {/* Watchlist Dropdown Trigger */}
           <div className="relative">
             <button
+              ref={watchlistSelectorRef}
               id="watchlist-selector-dropdown-btn"
               onClick={() => setIsWatchlistDropdownOpen(!isWatchlistDropdownOpen)}
               className="flex items-center gap-1 text-[11px] font-semibold text-[#d1d4dc] hover:text-white transition"
@@ -156,9 +159,11 @@ export const WatchlistPanel: React.FC<WatchlistPanelProps> = React.memo(({
             </button>
 
             {isWatchlistDropdownOpen && (
-              <div
-                id="watchlist-dropdown-menu"
-                className="absolute left-0 top-full mt-1 bg-[#1e222d] border border-[#2a2e39] rounded-lg shadow-2xl py-1 w-48 z-50 divide-y divide-[#2a2e39]"
+              <FloatingPortal
+                anchor={watchlistSelectorRef} id="watchlist-dropdown-menu"
+                ariaLabel="Watchlist choices" width={192} zIndex={1750}
+                placement="bottom-start"
+                className="bg-[#1e222d] border border-[#2a2e39] rounded-lg shadow-2xl py-1 text-[#d1d4dc] divide-y divide-[#2a2e39]"
               >
                 <div className="py-0.5">
                   {watchlists.map((wl) => (
@@ -194,7 +199,7 @@ export const WatchlistPanel: React.FC<WatchlistPanelProps> = React.memo(({
                     New Watchlist...
                   </button>
                 </div>
-              </div>
+              </FloatingPortal>
             )}
           </div>
 
@@ -396,7 +401,11 @@ export const WatchlistPanel: React.FC<WatchlistPanelProps> = React.memo(({
 
       {/* New Watchlist Modal */}
       {isCreateListModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <ViewportPortal>
+        <div id="watchlist-create-modal"
+          role="presentation"
+          onPointerDown={event=>{if(event.target===event.currentTarget)setIsCreateListModalOpen(false);}}
+          className="fixed inset-0 z-[1900] bg-black/60 backdrop-blur-xs flex items-center justify-center overflow-y-auto p-3">
           <div className="bg-[#1e222d] border border-[#2a2e39] rounded-xl shadow-2xl p-3 w-full max-w-sm">
             <h3 className="text-xs font-semibold text-[#d1d4dc] mb-2.5">Create New Watchlist</h3>
             <form onSubmit={handleCreateWatchlist} className="space-y-2.5">
@@ -427,6 +436,7 @@ export const WatchlistPanel: React.FC<WatchlistPanelProps> = React.memo(({
             </form>
           </div>
         </div>
+        </ViewportPortal>
       )}
     </div>
   );
