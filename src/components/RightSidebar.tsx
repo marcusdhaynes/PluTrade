@@ -26,8 +26,8 @@ import {
   Bell,
   Calendar,
   Lightbulb,
+  FlaskConical,
   MessageSquare,
-  Bookmark,
   ChevronRight,
   ChevronLeft,
   HelpCircle,
@@ -368,7 +368,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
             active={isOpen&&activeTab==='technicals'} expanded={isOpen&&activeTab==='technicals'}
             onClick={()=>activateTab('technicals')}/>
           <RightRailButton id="right-tab-strategies" label="Strategies"
-            title="Strategies · strategy lab" icon={<Lightbulb className="h-3.5 w-3.5"/>}
+            title="Strategies · strategy lab" icon={<FlaskConical className="h-3.5 w-3.5"/>}
             active={strategyLabOpen} disabled={!onOpenStrategyLab} onClick={onOpenStrategyLab}/>
           <RightRailButton id="right-tab-news" label="News"
             icon={<Newspaper className="h-3.5 w-3.5"/>}
@@ -384,7 +384,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
             onClick={()=>activateTab('calendar')}/>
           <RightRailButton label="Community Ideas unavailable"
             title="Community Ideas requires a moderated backend and is not connected"
-            icon={<Bookmark className="h-3.5 w-3.5"/>} disabled/>
+            icon={<Lightbulb className="h-3.5 w-3.5"/>} disabled/>
           <RightRailButton label="Public and Private Chats unavailable"
             title="Chats require authenticated messaging and moderation and are not connected"
             icon={<MessageSquare className="h-3.5 w-3.5"/>} disabled/>
