@@ -797,3 +797,41 @@ html,body,#root {
     padding:0 !important;
   }
 }
+
+
+/* Nine mobile order controls occupy explicit minmax(0,fr) tracks.
+ * Border/padding no longer distort the Amount=2x and SL/TP=.5x ratios
+ * relative to Order. The chart remains 100% viewport width. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] {
+    display:grid !important;
+    grid-template-columns:
+      minmax(0,1.45fr)
+      minmax(0,1fr)
+      minmax(0,1.35fr)
+      minmax(0,1.3fr)
+      minmax(0,1fr)
+      minmax(0,1fr)
+      minmax(0,2fr)
+      minmax(0,.5fr)
+      minmax(0,.5fr);
+    gap:3px;
+    width:100%;
+    min-width:0;
+    align-items:center;
+  }
+  #plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] > button {
+    box-sizing:border-box;
+    width:100% !important;
+    max-width:100%;
+    min-width:0;
+    overflow:hidden;
+  }
+  #mobile-top-chart-actions,
+  #mobile-window-actions,
+  #mobile-layout-anchor {
+    height:22px;
+    align-self:center;
+    align-items:center;
+  }
+}
