@@ -46,7 +46,7 @@ import {combineHistoryWithLive,mergeLiveCandle} from './services/chartCandles';
 import {customIntervalBase,isCustomInterval,resampleCustomCandles,
   type CustomInterval} from './services/customChartIntervals';
 import {chartStarterMarket,type ChartLoadState} from './services/chartRecovery';
-import { cancelPaperOrder,amendPendingPaperOrder,evaluatePaperOrders,expirePaperOrders,submitPaperOrder,estimatePaperQty,withOrderReservations,type PaperOrderRequest,type PaperAmendRequest } from './services/paperOrders';
+import { cancelPaperOrder,amendPendingPaperOrder,evaluatePaperOrders,expirePaperOrders,submitPaperOrder,estimatePaperQty,withOrderReservations,type PaperOrderRequest,type PaperAmendRequest,type PaperExitMode } from './services/paperOrders';
 import { SymbolSearchModal } from './components/SymbolSearchModal';
 import { IndicatorsModal } from './components/IndicatorsModal';
 import { AlertsModal } from './components/AlertsModal';
@@ -912,14 +912,30 @@ export default function App() {
   },[persistPaperNow]);
   const [isBottomTradingOpen, setIsBottomTradingOpen] = useState(false);
   const [isTradeTicketOpen,setIsTradeTicketOpen]=useState(false);
-  const [mobileEquityPercent,setMobileEquityPercent]=useState(()=>{
-    try {const saved=Number(localStorage.getItem('plutrade_mobile_equity_percent_v1'));
-      return Number.isFinite(saved)&&saved>0&&saved<=100?saved:99;
-    }catch{return 99;}
+  // Mobile quick-entry sizing is explicit: % of currently AVAILABLE funds or
+  // an exact amount of available account-currency margin (not total equity).
+  const [mobileQuickSize,setMobileQuickSize]=useState<{mode:'equity'|'cash';value:number}>(()=>{
+    try{
+      const saved=JSON.parse(localStorage.getItem('plutrade_mobile_quick_size_v2')||'null');
+      if(saved&&(saved.mode==='equity'||saved.mode==='cash')&&Number.isFinite(saved.value)&&
+        saved.value>0&&(saved.mode==='cash'||saved.value<=100))return saved;
+      const old=Number(localStorage.getItem('plutrade_mobile_equity_percent_v1'));
+      return {mode:'equity',value:Number.isFinite(old)&&old>0&&old<=100?old:99};
+    }catch{return {mode:'equity',value:99};}
   });
+  const [mobileEntryExits,setMobileEntryExits]=useState<
+    Partial<Record<'sl'|'tp',{mode:PaperExitMode;value:string}>>
+  >({});
   const [mobileQuickTicket,setMobileQuickTicket]=useState<{focus?:'sl'|'tp';seq:number}|null>(null);
   const [mobileExitRequest,setMobileExitRequest]=useState<{id:string;kind:'sl'|'tp';seq:number}|null>(null);
-  useEffect(()=>{try{localStorage.setItem('plutrade_mobile_equity_percent_v1',String(mobileEquityPercent));}catch{}},[mobileEquityPercent]);
+  useEffect(()=>{
+    try{localStorage.setItem('plutrade_mobile_quick_size_v2',JSON.stringify(mobileQuickSize));}catch{}
+  },[mobileQuickSize]);
+  // Never carry entry-exit drafts across markets or paper accounts.
+  useEffect(()=>setMobileEntryExits({}),[
+    activeAsset.symbol,activeAsset.exchange,activeAsset.source,activeAsset.marketType,
+    paperAccounts.activeId,
+  ]);
   const openMobileEntry=(focus?:'sl'|'tp')=>{
     setMobileQuickTicket(prev=>({focus,seq:(prev?.seq||0)+1}));
     setIsTradeTicketOpen(true);
@@ -2070,7 +2086,8 @@ export default function App() {
 
           <MobileTradingControls
             asset={activeAsset} position={activePosition}
-            accountEquity={paperAccount.equity} accountBalance={paperAccount.balance}
+            accountEquity={paperAccount.equity} availableEquity={withOrderReservations(paperPortfolio).account.availableFunds}
+            accountBalance={paperAccount.balance}
             accountUnrealizedPnl={paperAccount.unrealizedPnL}
             accountCurrency={paperPortfolio.settings.currency}
             activeAccountName={activePaperRecord?.portfolio.account.name??null}
@@ -2080,7 +2097,9 @@ export default function App() {
             }))}
             onSelectAccount={selectPaperAccount}
             onManageAccounts={()=>setIsBottomTradingOpen(true)}
-            equityPercent={mobileEquityPercent} onEquityPercent={setMobileEquityPercent}
+            quickSize={mobileQuickSize} onQuickSize={setMobileQuickSize}
+            preparedExits={mobileEntryExits}
+            onPrepareExit={(kind,draft)=>setMobileEntryExits(prev=>({...prev,[kind]:draft}))}
             onEnter={openMobileEntry}
             onOpenOrder={()=>setIsTradeTicketOpen(true)}
             onOpenPaperWorkspace={()=>setIsBottomTradingOpen(open=>!open)}
@@ -2097,7 +2116,8 @@ export default function App() {
         <PaperTradeTicket open={isTradeTicketOpen} onClose={()=>setIsTradeTicketOpen(false)}
           asset={activeAsset} portfolio={paperPortfolio} bids={orderBook.bids} asks={orderBook.asks}
           onSubmit={handleSubmitTicketOrder} error={paperError}
-          quickEquityPercent={mobileEquityPercent}
+          quickSize={mobileQuickSize}
+          preparedExits={mobileEntryExits}
           quickFocus={mobileQuickTicket?.focus} quickOpenSequence={mobileQuickTicket?.seq}
           onOpenAccount={()=>setTradeTicketAccountSettings(true)}/>
         {tradeTicketAccountSettings&&<PaperAccountModal existing={activePaperRecord}
