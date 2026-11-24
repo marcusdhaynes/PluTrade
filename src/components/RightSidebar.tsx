@@ -113,7 +113,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
   useEffect(()=>{
     if(!isOpen)return;
     const dismiss=(event:PointerEvent)=>{
-      if(!dockRef.current?.contains(event.target as Node))setIsOpen(false);
+      const target=event.target;
+      // Watchlist menus/dialogs are intentionally rendered in document.body.
+      // Treat them as belonging to the dock so clicking a menu item does not
+      // tear down the very panel that owns its callback.
+      if(dockRef.current?.contains(target as Node))return;
+      if(target instanceof Element&&target.closest(
+        '#watchlist-dropdown-menu, #watchlist-create-modal'))return;
+      setIsOpen(false);
     };
     const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setIsOpen(false);};
     window.addEventListener('pointerdown',dismiss,true);
