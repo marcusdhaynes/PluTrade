@@ -460,7 +460,10 @@ test('mobile top bar is one row: window view, save, camera, data, PiP and fullsc
       await expect(element).toBeVisible();
       boxes.push((await element.boundingBox())!);
     }
-    expect(new Set(boxes.map(rect=>Math.round(rect.y))).size).toBe(1);
+    const topPositions=boxes.map(rect=>rect.y);
+    // Browser subpixel rounding may differ by 1px between the layout
+    // anchor and icon buttons; a wrapped second row would be ~22px away.
+    expect(Math.max(...topPositions)-Math.min(...topPositions)).toBeLessThanOrEqual(1.5);
     expect(boxes.every((rect,i)=>i===0||rect.x>boxes[i-1].x)).toBe(true);
     const ticker=(await page.locator('#mobile-symbol-search-trigger').boundingBox())!;
     expect(ticker.width).toBeLessThanOrEqual(67);
