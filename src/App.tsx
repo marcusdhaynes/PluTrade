@@ -2100,6 +2100,9 @@ export default function App() {
             quickSize={mobileQuickSize} onQuickSize={setMobileQuickSize}
             preparedExits={mobileEntryExits}
             onPrepareExit={(kind,draft)=>setMobileEntryExits(prev=>({...prev,[kind]:draft}))}
+            onClearPreparedExit={kind=>setMobileEntryExits(prev=>{
+              const next={...prev};delete next[kind];return next;
+            })}
             onEnter={openMobileEntry}
             onOpenOrder={()=>openMobileEntry()}
             onOpenPaperWorkspace={()=>setIsBottomTradingOpen(open=>!open)}
