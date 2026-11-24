@@ -55,6 +55,7 @@ export interface BottomTradingPanelProps {
   onDeleteConditionalOrder:(id:string)=>void;
   onTestTriggerConditionalOrder:(order:ConditionalOrder)=>void;
   requestedTab?:{tab:string;seq:number};
+  onActiveTabChange?:(tab:string)=>void;
   isOpen:boolean;setIsOpen:(open:boolean|((prev:boolean)=>boolean))=>void;
   isExpanded:boolean;setIsExpanded:(open:boolean|((prev:boolean)=>boolean))=>void;
 }
@@ -73,10 +74,11 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
   onOpenTicket,pendingOrders,orderEvents,onCancelPendingOrder,onAmendPendingOrder,
   paperAccounts,activePaperAccountId,paperSettings,onSelectPaperAccount,onSavePaperAccount,onDeletePaperAccount,
   conditionalOrders,onOpenCreateConditionalOrder,onEditConditionalOrder,onToggleConditionalOrderStatus,
-  onDeleteConditionalOrder,onTestTriggerConditionalOrder,requestedTab,isOpen,setIsOpen,isExpanded,setIsExpanded,
+  onDeleteConditionalOrder,onTestTriggerConditionalOrder,requestedTab,onActiveTabChange,isOpen,setIsOpen,isExpanded,setIsExpanded,
 })=>{
   const [tab,setTab]=useState<Tab>('positions');
   useEffect(()=>{if(requestedTab&&tabs.some(([id])=>id===requestedTab.tab))setTab(requestedTab.tab as Tab);},[requestedTab?.seq]);
+  useEffect(()=>{onActiveTabChange?.(tab);},[tab,onActiveTabChange]);
   const [quantity,setQuantity]=useState('1');
   const [accountListOpen,setAccountListOpen]=useState(false);
   // undefined = dialog closed; null = new account; string = edit existing account

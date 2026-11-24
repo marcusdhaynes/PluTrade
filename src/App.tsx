@@ -963,6 +963,7 @@ export default function App() {
 
   const [shortcutHelpOpen,setShortcutHelpOpen]=useState(false);
   const [requestedDockTab,setRequestedDockTab]=useState<{tab:string;seq:number}|undefined>();
+  const [activeDockTab,setActiveDockTab]=useState('positions');
   const [networkOffline,setNetworkOffline]=useState(()=>typeof navigator!=='undefined'&&!navigator.onLine);
   useEffect(()=>{
     const update=()=>setNetworkOffline(!navigator.onLine);
@@ -2071,6 +2072,7 @@ export default function App() {
             paperError={paperError}
             paperTradingBlocked={paperTradingBlocked}
             requestedTab={requestedDockTab}
+            onActiveTabChange={setActiveDockTab}
             fills={paperFills}
             conditionalOrders={conditionalOrders}
             onOpenCreateConditionalOrder={handleOpenCreateConditionalOrder}
@@ -2168,6 +2170,10 @@ export default function App() {
           onOpenTradeJournal={() => setIsTradeJournalOpen(true)}
           onOpenHelp={()=>setShortcutHelpOpen(true)}
           onOpenIndicators={()=>setIsIndicatorsOpen(true)}
+          indicatorsOpen={isIndicatorsOpen}
+          tradeJournalOpen={isTradeJournalOpen}
+          onOpenStrategyLab={()=>{setIsRightSidebarOpen(false);requestBottomPanel('strategyLab');}}
+          strategyLabOpen={isBottomTradingOpen&&activeDockTab==='strategyLab'}
           onOpenConditionalOrder={handleOpenCreateConditionalOrder}
         />
       </div>
