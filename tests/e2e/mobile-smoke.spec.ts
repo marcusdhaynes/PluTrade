@@ -42,7 +42,7 @@ test('mobile keeps one account/UPL/order/execution row and preloads equity sizin
   const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
   await expect(ticket).toBeVisible();
   await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('50');
-  await expect(ticket.getByRole('button',{name:'% Equity'})).toBeVisible();
+  await expect(ticket.getByRole('button',{name:'% Available Equity'})).toBeVisible();
   await ticket.getByTitle('Close order panel').click();
   await actions.nth(7).click();
   await expect(page.getByRole('dialog',{name:'Stop loss options'})).toBeVisible();
@@ -297,8 +297,9 @@ test('mobile has matched 24px execution/range bars and chart-corner settings',as
   expect(cornerRect!.y+cornerRect!.height).toBeLessThanOrEqual(chartRect!.y+chartRect!.height+1);
   await page.locator('#time-scale-settings-btn').click();
   await expect(page.getByRole('dialog',{name:'Time scale settings'})).toBeVisible();
-  await page.getByRole('dialog',{name:'Time scale settings'}).getByRole('button',{name:'Close'}).click();
+  await expect(page.locator('#fit-chart-content-btn')).toBeVisible();
   await page.locator('#fit-chart-content-btn').click();
+  await expect(page.getByRole('dialog',{name:'Time scale settings'})).toHaveCount(0);
   await expect(execution).toBeVisible();
 });
 
