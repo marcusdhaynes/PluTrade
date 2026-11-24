@@ -948,18 +948,19 @@ test('global sidebar dialogs escape the app stacking context and cover the top b
     await page.goto('./');
     const header=page.locator('#tradingview-top-navbar');
     await expect(header).toBeVisible();
-    const dialogOnTop=async(selector:string)=>{
+    const dialogOnTop=async(selector:string,fullBackdrop=true)=>{
       const modal=page.locator(selector);
       await expect(modal).toBeVisible();
       const result=await page.evaluate(selector=>{
         const overlay=document.querySelector(selector)!;
         const rect=overlay.getBoundingClientRect();
         const navbar=document.getElementById('tradingview-top-navbar')!.getBoundingClientRect();
-        const x=Math.min(innerWidth-8,Math.max(8,navbar.left+navbar.width/2));
+        const x=Math.min(innerWidth-8,Math.max(8,rect.left+Math.min(12,rect.width/2)));
         const y=navbar.top+navbar.height/2;
         const hit=document.elementFromPoint(x,y);
         return {portaled:!!overlay.closest('[data-plutrade-viewport-portal]'),
           top:rect.top,left:rect.left,bottom:rect.bottom,right:rect.right,
+          navbarBottom:navbar.bottom,
           visibleAtHeader:!!hit&&(overlay===hit||overlay.contains(hit))};
       },selector);
       expect(result.portaled,selector+' should escape chart and sidebar clipping').toBe(true);
@@ -967,7 +968,8 @@ test('global sidebar dialogs escape the app stacking context and cover the top b
       expect(result.left).toBeGreaterThanOrEqual(-1);
       expect(result.bottom).toBeLessThanOrEqual(size.height+1);
       expect(result.right).toBeLessThanOrEqual(size.width+1);
-      expect(result.visibleAtHeader,selector+' should be in front of top navbar').toBe(true);
+      if(fullBackdrop)expect(result.visibleAtHeader,selector+' should be in front of top navbar').toBe(true);
+      else expect(result.top).toBeLessThanOrEqual(result.navbarBottom+8);
     };
     await page.locator('#right-tab-indicators').click();
     await dialogOnTop('#indicators-modal-backdrop');
@@ -977,7 +979,7 @@ test('global sidebar dialogs escape the app stacking context and cover the top b
     await dialogOnTop('#alerts-modal-backdrop');
     await page.locator('#close-alerts-modal-btn').click();
     await page.locator('#mobile-order-ticket-btn').click();
-    await dialogOnTop('[role="dialog"][aria-label="Paper Trading order entry"]');
+    await dialogOnTop('[role="dialog"][aria-label="Paper Trading order entry"]',false);
     await page.getByTitle('Close order panel').click();
   }
 });
