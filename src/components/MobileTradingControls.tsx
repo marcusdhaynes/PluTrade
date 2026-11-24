@@ -501,14 +501,16 @@ export const MobileTradingControls:React.FC<Props>=({
       <button type="button" className={baseButton+' '+(position?'border-[#ad4851] bg-[#49272f] text-white':'opacity-40')}
         disabled={!position} aria-label="Exit paper position" onClick={onExit}>Exit</button>
       <button id="mobile-order-amount-btn" type="button"
-        className={baseButton+' flex-[2_1_0%] truncate'}
+        style={{flex:'2 1 0%'}}
+        className={baseButton+' truncate'}
         title={quickSize.mode==='equity'? `${quickSize.value}% of available equity`:`Cash margin ${moneyLabel(quickSize.value)}`}
         onClick={()=>{setSizeModeDraft(quickSize.mode);setSizeDraft(String(quickSize.value));setError('');setPanel('equity');}}>
         {quickSize.mode==='equity'?`${Math.round(quickSize.value)}% Equity`:moneyLabel(quickSize.value)}
       </button>
       {(['sl','tp'] as const).map(kind=><button key={kind} type="button"
         id={kind==='sl'?'mobile-stop-setup-btn':'mobile-target-setup-btn'}
-        className={baseButton+' flex-[0.5_1_0%] '+(panel===kind?'border-[#709fff]':'')}
+        style={{flex:'0.5 1 0%'}}
+        className={baseButton+' '+(panel===kind?'border-[#709fff]':'')}
         aria-label={kind==='sl'?'Stop loss; hold for all types':'Take profit; hold for all types'}
         title="Hold for all types"
         onContextMenu={e=>{e.preventDefault();clearHold();openExit(kind,true);}}
