@@ -1,4 +1,5 @@
-import React, {useEffect,useRef} from 'react';
+import React, {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {
   Asset,
   Watchlist,
@@ -110,6 +111,57 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
   onOpenConditionalOrder,
 }) => {
   const dockRef=useRef<HTMLDivElement>(null);
+  const paneRef=useRef<HTMLDivElement>(null);
+  const [compactDock,setCompactDock]=useState(()=>{
+    return typeof window!=='undefined'&&window.matchMedia('(max-width:767px), (hover:none) and (pointer:coarse)').matches;
+  });
+  const [paneGeometry,setPaneGeometry]=useState({top:0,left:0,width:0,height:0,ready:false});
+
+  useEffect(()=>{
+    const query=window.matchMedia('(max-width:767px), (hover:none) and (pointer:coarse)');
+    const update=()=>setCompactDock(query.matches);
+    update();
+    query.addEventListener('change',update);
+    return ()=>query.removeEventListener('change',update);
+  },[]);
+  // The expandable panel used to be an absolutely positioned child of the
+  // chart workspace. That workspace clips overflow and its timeframe row
+  // could sit on top of the panel's heading, intercepting every tap.
+  // Anchor the panel to the fixed right rail, but portal it into document.body.
+  useLayoutEffect(()=>{
+    if(!isOpen||!compactDock)return;
+    let frame=0;
+    const place=()=>{
+      const dock=dockRef.current?.getBoundingClientRect();
+      if(!dock)return;
+      const vw=window.innerWidth,vh=window.innerHeight;
+      const width=Math.max(0,Math.min(320,vw*0.82,vw-58,dock.left-28));
+      const top=Math.max(0,Math.min(vh,dock.top));
+      const height=Math.max(0,Math.min(vh,dock.bottom)-top);
+      const left=Math.max(0,Math.min(vw-width,dock.left-width));
+      setPaneGeometry(prev=>prev.ready&&
+        Math.abs(prev.top-top)<0.25&&Math.abs(prev.left-left)<0.25&&
+        Math.abs(prev.width-width)<0.25&&Math.abs(prev.height-height)<0.25?
+          prev:{top,left,width,height,ready:true});
+    };
+    const schedule=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(place);};
+    const resizeObserver=new ResizeObserver(schedule);
+    if(dockRef.current)resizeObserver.observe(dockRef.current);
+    place();
+    window.addEventListener('resize',schedule);
+    window.addEventListener('orientationchange',schedule);
+    window.addEventListener('scroll',schedule,true);
+    window.visualViewport?.addEventListener('resize',schedule);
+    return ()=>{
+      cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize',schedule);
+      window.removeEventListener('orientationchange',schedule);
+      window.removeEventListener('scroll',schedule,true);
+      window.visualViewport?.removeEventListener('resize',schedule);
+    };
+  },[isOpen,compactDock]);
+
   useEffect(()=>{
     if(!isOpen)return;
     const dismiss=(event:PointerEvent)=>{
@@ -117,7 +169,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
       // Watchlist menus/dialogs are intentionally rendered in document.body.
       // Treat them as belonging to the dock so clicking a menu item does not
       // tear down the very panel that owns its callback.
-      if(dockRef.current?.contains(target as Node))return;
+      if(dockRef.current?.contains(target as Node)||paneRef.current?.contains(target as Node))return;
       if(target instanceof Element&&target.closest(
         '#watchlist-dropdown-menu, #watchlist-create-modal'))return;
       setIsOpen(false);
@@ -130,12 +182,17 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
       window.removeEventListener('keydown',escape);
     };
   },[isOpen,setIsOpen]);
-  return (
-    <div ref={dockRef} id="tradingview-right-dock" className="flex h-full shrink-0 select-none z-20">
-      {/* Expandable Panel Content */}
-      {isOpen && (
+  const pane=isOpen?(
         <div
+          ref={paneRef}
           id="right-sidebar-content-pane"
+          data-viewport-drawer={compactDock?'true':'false'}
+          style={compactDock?{
+            position:'fixed',top:paneGeometry.top,left:paneGeometry.left,
+            right:'auto',width:paneGeometry.width,height:paneGeometry.height,
+            maxWidth:'none',zIndex:1450,pointerEvents:'auto',
+            visibility:paneGeometry.ready?'visible':'hidden'
+          }:undefined}
           className="w-64 md:w-72 h-full bg-[#131722] border-l border-[#2a2e39] flex flex-col overflow-hidden"
         >
           {activeTab === 'alerts' && (
@@ -236,7 +293,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
             </div>
           )}
         </div>
-      )}
+      ):null;
+  return (
+    <div ref={dockRef} id="tradingview-right-dock" className="flex h-full shrink-0 select-none z-20">
+      {/* On mobile the pane must escape the clipped chart workspace.
+          Desktop keeps its existing in-flow split layout. */}
+      {compactDock&&typeof document!=='undefined'?createPortal(pane,document.body):pane}
 
       {/* Rightmost Vertical Icon Tab Bar */}
       <div
