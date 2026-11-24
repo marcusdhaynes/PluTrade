@@ -831,3 +831,106 @@ test('mobile price marker stays compact and above chart overlays without coverin
   expect(geometry.background).toBe('rgb(41, 98, 255)');
   expect(geometry.zIndex).toBeGreaterThan(50);
 });
+
+
+test('quick cash sizing, precise available-equity percent and independent SL TP setups',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const amount=page.locator('#mobile-order-amount-btn');
+  await amount.click();
+  const quick=page.getByRole('dialog',{name:'Equity allocation'});
+  await expect(quick.getByText('Available equity:')).toBeVisible();
+  await quick.getByRole('group',{name:'Order size basis'}).getByRole('button',{name:'Cash Amount'}).click();
+  await quick.getByRole('spinbutton',{name:'Cash margin amount'}).fill('125.43');
+  await quick.getByRole('button',{name:'Apply to Entry'}).click();
+  await expect(amount).toContainText('$125.43');
+  await page.locator('#mobile-order-ticket-btn').click();
+  const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
+  await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('125.43');
+  await expect(ticket.getByRole('button',{name:'Cash Margin USD'})).toBeVisible();
+  await ticket.getByTitle('Close order panel').click();
+
+  await amount.click();
+  await quick.getByRole('group',{name:'Order size basis'}).getByRole('button',{name:'% Available Equity'}).click();
+  await quick.getByRole('spinbutton',{name:'Percent of equity'}).fill('12.345678');
+  await quick.getByRole('button',{name:'Apply to Entry'}).click();
+  await expect(amount).toContainText('12% Equity');
+  await page.getByRole('button',{name:'Enter',exact:true}).click();
+  await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('12.345678');
+  await expect(ticket.getByRole('button',{name:'% Available Equity'})).toBeVisible();
+  await ticket.getByTitle('Close order panel').click();
+
+  await page.locator('#mobile-stop-setup-btn').click();
+  const sl=page.getByRole('dialog',{name:'Stop loss options'});
+  await sl.getByRole('spinbutton',{name:'Exit level value'}).fill('1.25');
+  await sl.getByRole('button',{name:'Save SL setup'}).click();
+  await expect(ticket).toHaveCount(0);
+  await page.locator('#mobile-target-setup-btn').click();
+  const tp=page.getByRole('dialog',{name:'Take profit options'});
+  await tp.getByRole('spinbutton',{name:'Exit level value'}).fill('2.5');
+  await tp.getByRole('button',{name:'Save TP setup'}).click();
+  await expect(ticket).toHaveCount(0);
+  await page.getByRole('button',{name:'Enter',exact:true}).click();
+  await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','true');
+  await expect(ticket.getByRole('switch',{name:'Enable take profit'})).toHaveAttribute('aria-checked','true');
+  await expect(ticket.getByRole('spinbutton',{name:'Stop-loss value'})).toHaveValue('1.25');
+  await expect(ticket.getByRole('spinbutton',{name:'Take-profit value'})).toHaveValue('2.5');
+});
+
+test('mobile toolbar icon geometry matches right rail and bottom button width ratios',async({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(size);
+    await page.goto('./');
+    const measurements=await page.evaluate(()=>{
+      const rect=(selector:string)=>document.querySelector(selector)!.getBoundingClientRect();
+      const r=rect('#right-tab-indicators');
+      const buttons=['#mobile-save-chart-btn','#mobile-chart-snapshot-btn','#mobile-save-data-btn',
+        '#mobile-layout-picker-btn','#mobile-chart-style-trigger','#mobile-pip-btn','#mobile-fullscreen-btn',
+        '#left-tool-crosshair','#left-toolbar-edit'];
+      const icons=buttons.map(selector=>({selector,width:rect(selector).width,height:rect(selector).height}));
+      const order=rect('#mobile-order-ticket-btn').width;
+      const amount=rect('#mobile-order-amount-btn').width;
+      const sl=rect('#mobile-stop-setup-btn').width;
+      const tp=rect('#mobile-target-setup-btn').width;
+      const font=getComputedStyle(document.getElementById('mobile-order-ticket-btn')!).fontSize;
+      const cashFont=getComputedStyle(document.querySelector('#mobile-upl-cash span')!).fontSize;
+      const percentFont=getComputedStyle(document.querySelector('#mobile-upl-percent span')!).fontSize;
+      return {reference:r.width,icons,order,amount,sl,tp,font,cashFont,percentFont};
+    });
+    expect(measurements.reference).toBe(22);
+    for(const button of measurements.icons){
+      expect(button.width,button.selector).toBeCloseTo(measurements.reference,0);
+      expect(button.height,button.selector).toBeCloseTo(measurements.reference,0);
+    }
+    expect(Math.abs(measurements.amount/measurements.order-2)).toBeLessThan(0.12);
+    expect(Math.abs(measurements.sl/measurements.order-0.5)).toBeLessThan(0.12);
+    expect(Math.abs(measurements.tp/measurements.order-0.5)).toBeLessThan(0.12);
+    expect(measurements.cashFont).toBe(measurements.font);
+    expect(measurements.percentFont).toBe(measurements.font);
+  }
+});
+
+test('visual mobile chart layout picker and single centered settings gear',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const picker=page.locator('#mobile-layout-picker-btn');
+  await picker.click();
+  const choices=page.getByRole('dialog',{name:'Choose chart window layout'});
+  await expect(choices).toBeVisible();
+  expect(await choices.locator('button svg').count()).toBeGreaterThan(5);
+  await choices.getByRole('button',{name:'2 Columns',exact:true}).click();
+  await expect(choices).toHaveCount(0);
+  await expect(picker).toHaveAttribute('title',/2 Columns/);
+  await picker.click();
+  await choices.getByRole('button',{name:'Single'}).click();
+
+  const gear=page.locator('#time-scale-settings-btn');
+  const box=page.locator('#chart-corner-controls');
+  await expect(page.locator('#fit-chart-content-btn')).toHaveCount(0);
+  const g=await gear.boundingBox(),b=await box.boundingBox();
+  expect(g).not.toBeNull();expect(b).not.toBeNull();
+  expect(Math.abs((g!.x+g!.width/2)-(b!.x+b!.width/2))).toBeLessThanOrEqual(0.5);
+  expect(Math.abs((g!.y+g!.height/2)-(b!.y+b!.height/2))).toBeLessThanOrEqual(0.5);
+  await gear.click();
+  await expect(page.getByRole('dialog',{name:'Time scale settings'}).locator('#fit-chart-content-btn')).toBeVisible();
+});
