@@ -9,6 +9,7 @@ interface Props {
   asset:Asset;
   position:PaperPosition|null;
   accountEquity:number;
+  availableEquity:number;
   accountBalance:number;
   activeAccountName?:string|null;
   activeAccountId?:string|null;
@@ -17,8 +18,10 @@ interface Props {
   onManageAccounts?:()=>void;
   accountCurrency?:string;
   accountUnrealizedPnl?:number;
-  equityPercent:number;
-  onEquityPercent:(value:number)=>void;
+  quickSize:{mode:'equity'|'cash';value:number};
+  onQuickSize:(size:{mode:'equity'|'cash';value:number})=>void;
+  preparedExits:Partial<Record<ExitKind,{mode:PaperExitMode;value:string}>>;
+  onPrepareExit:(kind:ExitKind,draft:{mode:PaperExitMode;value:string})=>void;
   onEnter:(focus?:ExitKind)=>void;
   onOpenOrder:()=>void;
   onOpenPaperWorkspace?:()=>void;
@@ -38,9 +41,9 @@ const numeric=(n:number,digits=6)=>Number.isFinite(n)?n.toLocaleString(undefined
 /** A single, always-visible mobile trade row. Long-press SL/TP to reveal all
  * supported exit types without making a tap on a small screen execute a trade. */
 export const MobileTradingControls:React.FC<Props>=({
-  asset,position,accountEquity,accountBalance,activeAccountName,activeAccountId,
+  asset,position,accountEquity,availableEquity,accountBalance,activeAccountName,activeAccountId,
   availableAccounts=[],onSelectAccount,onManageAccounts,accountCurrency='USD',
-  accountUnrealizedPnl=0,equityPercent,onEquityPercent,
+  accountUnrealizedPnl=0,quickSize,onQuickSize,preparedExits,onPrepareExit,
   onEnter,onOpenOrder,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
 })=>{
   const [panel,setPanel]=useState<'equity'|ExitKind|null>(null);
@@ -53,7 +56,8 @@ export const MobileTradingControls:React.FC<Props>=({
   const [dynamic,setDynamic]=useState(false);
   const [dynamicSettings,setDynamicSettings]=useState<DynamicTrailingSettings>({...DEFAULT_DYNAMIC_TRAIL});
   const [trailPercent,setTrailPercent]=useState('0.50');
-  const [equityDraft,setEquityDraft]=useState(String(equityPercent));
+  const [sizeModeDraft,setSizeModeDraft]=useState<'equity'|'cash'>(quickSize.mode);
+  const [sizeDraft,setSizeDraft]=useState(String(quickSize.value));
   const [error,setError]=useState('');
   const [accountMenuOpen,setAccountMenuOpen]=useState(false);
   const [pnlMenu,setPnlMenu]=useState<'cash'|'percent'|null>(null);
@@ -99,8 +103,10 @@ export const MobileTradingControls:React.FC<Props>=({
     setDynamic(kind==='sl'&&!!position?.dynamicTrailing);
     setDynamicSettings(position?.dynamicTrailing||{...DEFAULT_DYNAMIC_TRAIL});
     setTrailPercent(String(position?.trailingPercent||0.5));
+    const priorDraft=!position?preparedExits[kind]:undefined;
     const existing=kind==='sl'?position?.sl:position?.tp;
-    if(existing!==undefined&&existing>0){
+    if(priorDraft){setMode(priorDraft.mode);setValue(priorDraft.value);}
+    else if(existing!==undefined&&existing>0){
       setMode('price');
       setValue(String(existing));
     }else{
@@ -223,23 +229,48 @@ export const MobileTradingControls:React.FC<Props>=({
     {panel&&<div ref={quickPanelRef} role="dialog" aria-label={panel==='equity'?'Equity allocation':panel==='sl'?'Stop loss options':'Take profit options'}
       className="absolute bottom-full left-0 right-0 z-50 max-h-[min(67dvh,440px)] overflow-y-auto rounded-t-xl border border-[#48556a] bg-[#182233] p-3 shadow-[0_-10px_45px_#000a] text-xs">
       <div className="flex items-center justify-between mb-3">
-        <strong>{panel==='equity'?'% Equity · new entries':panel==='sl'?'Stop loss':'Take profit'} <span className="font-normal text-[#8da0bd]">· Paper</span></strong>
+        <strong>{panel==='equity'?'Entry size · available equity':panel==='sl'?'Stop loss':'Take profit'} <span className="font-normal text-[#8da0bd]">· Paper</span></strong>
         <button type="button" onClick={close} aria-label="Close quick options" className="p-1 rounded hover:bg-[#35435b]">✕</button>
       </div>
       {panel==='equity'?<>
-        <label className="block text-[#a9bbd0]">Percentage of account equity
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order size basis">
+          <button type="button" aria-pressed={sizeModeDraft==='equity'}
+            onClick={()=>{setSizeModeDraft('equity');setSizeDraft(String(quickSize.mode==='equity'?quickSize.value:99));setError('');}}
+            className={'rounded border px-2 py-2 font-semibold '+(sizeModeDraft==='equity'?'border-[#709fff] bg-[#234577]':'border-[#526079]')}>
+            % Available Equity
+          </button>
+          <button type="button" aria-pressed={sizeModeDraft==='cash'}
+            onClick={()=>{setSizeModeDraft('cash');setSizeDraft(String(quickSize.mode==='cash'?quickSize.value:Math.min(availableEquity,100)));setError('');}}
+            className={'rounded border px-2 py-2 font-semibold '+(sizeModeDraft==='cash'?'border-[#709fff] bg-[#234577]':'border-[#526079]')}>
+            Cash Amount
+          </button>
+        </div>
+        <label className="block mt-3 text-[#a9bbd0]">{sizeModeDraft==='equity'?'Percent of available equity':'Cash margin amount ('+accountCurrency+')'}
           <div className="flex items-center gap-2 mt-1">
-            <input aria-label="Percent of equity" type="number" min="0.01" max="100" step="any"
+            <input aria-label={sizeModeDraft==='equity'?'Percent of equity':'Cash margin amount'} type="number"
+              min="0.000001" max={sizeModeDraft==='equity'?100:undefined} step="any"
               className="flex-1 min-w-0 h-10 rounded bg-[#0d1728] border border-[#526079] px-2 text-white"
-              value={equityDraft} onChange={e=>setEquityDraft(e.target.value)}/>
-            <span>%</span>
+              value={sizeDraft} onChange={e=>{setSizeDraft(e.target.value);setError('');}}/>
+            <span>{sizeModeDraft==='equity'?'%':accountCurrency}</span>
           </div>
         </label>
-        <div className="flex gap-1.5 mt-2">{[10,25,50,75,99,100].map(n=><button key={n} type="button"
-          onClick={()=>setEquityDraft(String(n))} className="flex-1 min-w-0 rounded border border-[#43516a] p-1.5">{n}</button>)}</div>
-        <p className="mt-2 text-[#93a4bd]">Equity {numeric(accountEquity,2)} {asset.currency}. Orders are capped by free margin and fees, and still require review and a verified quote.</p>
+        {sizeModeDraft==='equity'&&<div className="flex gap-1.5 mt-2">{[10,25,50,75,99,100].map(n=><button key={n} type="button"
+          onClick={()=>setSizeDraft(String(n))} className="flex-1 min-w-0 rounded border border-[#43516a] p-1.5">{n}</button>)}</div>}
+        <p className="mt-2 text-[#93a4bd]">
+          Available equity: {numeric(availableEquity,2)} {accountCurrency}.
+          {sizeModeDraft==='equity'?' Percent is calculated from current free funds, not original or total equity.':' This amount is allocated as entry margin, not leveraged notional.'}
+          Orders still require a verified quote and sufficient margin after commissions.
+        </p>
         <button type="button" className="mt-3 w-full rounded bg-[#2962ff] text-white p-2 font-semibold"
-          onClick={()=>{const n=Number(equityDraft);if(!Number.isFinite(n)||n<=0||n>100){setError('Enter a value greater than 0 and no more than 100%.');return;}onEquityPercent(n);close();}}>
+          onClick={()=>{
+            const n=Number(sizeDraft);
+            if(!sizeDraft.trim()||!Number.isFinite(n)||n<=0||
+              (sizeModeDraft==='equity'&&n>100)||(sizeModeDraft==='cash'&&n>availableEquity)){
+              setError(sizeModeDraft==='equity'?'Use a percentage above zero, up to 100%.':'Enter a positive cash amount no larger than available equity.');
+              return;
+            }
+            onQuickSize({mode:sizeModeDraft,value:n});close();
+          }}>
           Apply to Entry
         </button>
       </>:position&&selectedKind?<>
@@ -349,9 +380,33 @@ export const MobileTradingControls:React.FC<Props>=({
           {selectedKind==='tp'&&multiTargets?'Save Multiple TP Levels':selectedKind==='sl'&&dynamic?'Enable Dynamic ATR SL':selectedKind==='sl'&&trail?'Enable Trailing SL':'Save '+(selectedKind==='sl'?'Stop Loss':'Take Profit')}
         </button>
       </>:<>
-        <p className="text-[#b7c6da]">No open position for this exact market. Configure {panel==='sl'?'all stop-loss types, including trailing':'all take-profit target types and multiple levels'} in a reviewed entry ticket.</p>
+        <p className="text-[#b7c6da]">Prepare the {selectedKind==='sl'?'stop loss':'take profit'} for the next entry.
+          This saves order settings only. It does not open or close a trade.</p>
+        <label className="block mt-3 text-[#b7c8dc]">Level type
+          <select aria-label="Exit level type" value={mode}
+            onChange={e=>{setMode(e.target.value as PaperExitMode);setError('');}}
+            className="block w-full h-9 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2 text-white">
+            {methods.map(method=><option key={method.mode} value={method.mode}>{method.label}</option>)}
+          </select>
+        </label>
+        <label className="block mt-3 text-[#b7c8dc]">Value
+          <input aria-label="Exit level value" type="number" min="0" step="any" value={value}
+            onChange={e=>{setValue(e.target.value);setError('');}}
+            className="block w-full h-10 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2 text-white"/>
+        </label>
+        <button type="button" className="mt-3 w-full rounded bg-[#2962ff] text-white p-2.5 font-semibold"
+          onClick={()=>{
+            const number=Number(value);
+            if(!value.trim()||!Number.isFinite(number)||number<=0||
+              (mode==='percent'&&number>=100&&panel==='sl')){
+              setError('Enter a positive, valid distance or price.');return;
+            }
+            onPrepareExit(panel as ExitKind,{mode,value});close();
+          }}>Save {panel==='sl'?'SL':'TP'} setup</button>
         <button type="button" onClick={()=>{const focus=panel as ExitKind;close();onEnter(focus);}}
-          className="mt-3 w-full rounded bg-[#2962ff] text-white p-2.5">Open Entry Ticket · {panel.toUpperCase()}</button>
+          className="mt-2 w-full rounded border border-[#53627a] p-2 text-[#c7dbff]">
+          Open Entry Ticket · {panel.toUpperCase()} (review only)
+        </button>
       </>}
       {error&&<p role="alert" className="mt-2 text-[#ff9eac]">{error}</p>}
     </div>}
