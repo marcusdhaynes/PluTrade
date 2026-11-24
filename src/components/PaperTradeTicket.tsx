@@ -12,7 +12,9 @@ interface Props{
   onSubmit:(order:PaperOrderRequest)=>string|null;
   bids:OrderBookItem[];asks:OrderBookItem[];
   error:string;onOpenAccount:()=>void;
-  quickEquityPercent?:number;quickFocus?:'sl'|'tp';quickOpenSequence?:number;
+  quickSize?:{mode:'equity'|'cash';value:number};
+  preparedExits?:Partial<Record<'sl'|'tp',{mode:PaperExitMode;value:string}>>;
+  quickFocus?:'sl'|'tp';quickOpenSequence?:number;
 }
 const controls='w-full rounded-md border border-[#464646] bg-[#1b1b1d] px-2 py-1.5 outline-none focus:border-[#3977ff] text-[#e8eaf0] text-xs';
 const pct=(v:number)=>Number.isFinite(v)?v.toLocaleString('en-US',{maximumFractionDigits:5}):'—';
@@ -61,10 +63,10 @@ function ExitField({kind,entry,qty,balance,side,tick,enabled,setEnabled,mode,set
     {enabled&&<div className="text-right text-[10px] text-[#8b96ac]">Target: {target&&target>0?pct(target):'Invalid target'} · {pct(money)} at risk/reward</div>}
   </div>;
 }
-export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onSubmit,bids,asks,error,onOpenAccount,quickEquityPercent,quickFocus,quickOpenSequence})=>{
+export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onSubmit,bids,asks,error,onOpenAccount,quickSize,preparedExits,quickFocus,quickOpenSequence})=>{
   const [side,setSide]=useState<PaperOrderSide>('Long');
   const [kind,setKind]=useState<PaperOrderKind>('market');
-  const [sizeMode,setSizeMode]=useState<'equity'|'balance'|'units'|'notional'|'riskMoney'|'riskBalance'>('balance');
+  const [sizeMode,setSizeMode]=useState<'equity'|'cash'|'balance'|'units'|'notional'|'riskMoney'|'riskBalance'>('balance');
   const [sizeInput,setSizeInput]=useState('99');
   const [priceInput,setPriceInput]=useState('');
   const [limitPriceInput,setLimitPriceInput]=useState('');
@@ -97,10 +99,20 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   // A shortcut only opens the reviewed order form; it never submits an order.
   useEffect(()=>{
     if(!open||quickOpenSequence===undefined)return;
-    setSizeMode('equity');
-    setSizeInput(String(quickEquityPercent??99));
-    if(quickFocus==='sl')setSlEnabled(true);
-    if(quickFocus==='tp')setTpEnabled(true);
+    setSizeMode(quickSize?.mode||'equity');
+    setSizeInput(String(quickSize?.value??99));
+    // Saved SL and TP settings are independent. Opening the entry form never
+    // applies a stop, creates a position, or submits an order by itself.
+    if(preparedExits?.sl){
+      setSlEnabled(true);
+      setSlMode(preparedExits.sl.mode);
+      setSlValue(preparedExits.sl.value);
+    }else setSlEnabled(quickFocus==='sl');
+    if(preparedExits?.tp){
+      setTpEnabled(true);
+      setTpMode(preparedExits.tp.mode);
+      setTpValue(preparedExits.tp.value);
+    }else setTpEnabled(quickFocus==='tp');
     setExitsOpen(true);
     setDom(false);
     setReviewOpen(false);
@@ -137,16 +149,22 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
     if(!Number.isFinite(entry)||entry<=0)return 0;
     if(sizeMode==='balance')return estimatePaperQty(base,asset,fraction,entry,'balance');
     if(sizeMode==='equity'){
-      // % of equity, capped by free margin after reservations and commissions.
-      const spend=Math.min(base.account.availableFunds,Math.max(0,base.account.equity*fraction/100));
-      return estimatePaperQty(base,asset,base.account.availableFunds>0?
-        spend/base.account.availableFunds*100:0,entry,'available');
+      // Available equity is the currently unreserved free margin; it is NOT
+      // starting balance or total account equity. Keep exact fractional %.
+      if(fraction<=0||fraction>100)return 0;
+      return estimatePaperQty(base,asset,fraction,entry,'available');
+    }
+    if(sizeMode==='cash'){
+      // Cash is the requested margin/collateral budget in account currency.
+      // Reject excess, rather than silently sizing to a larger or smaller lot.
+      if(fraction<=0||fraction>base.account.availableFunds||base.account.availableFunds<=0)return 0;
+      return estimatePaperQty(base,asset,fraction/base.account.availableFunds*100,entry,'available');
     }
     if(sizeMode==='units')return Number(sizeInput)||0;
     if(sizeMode==='notional')return (Number(sizeInput)||0)/entry;
     const budget=sizeMode==='riskBalance'?base.account.balance*fraction/100:fraction;
     return sizingStop?paperRiskSizedQty(entry,sizingStop,budget):0;
-  },[base.account.availableFunds,base.account.balance,base.account.equity,portfolio.settings,asset.symbol,mark,entry,fraction,sizeMode,sizingStop]);
+  },[base.account.availableFunds,base.account.balance,portfolio.settings,asset.symbol,mark,entry,fraction,sizeMode,sizingStop]);
   const exposure=qty*entry;
   const margin=exposure/leverage;
   const fee=paperCommission(portfolio.settings,asset,qty,entry);
@@ -171,10 +189,11 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   const risk=protectiveStop&&qty?Math.abs(entry-protectiveStop)*qty:0;
   const rr=risk>0?reward/risk:0;
   const cash=portfolio.settings.currency;
-  const sizeLabels={equity:'% Equity',balance:'% Balance',units:'Units',notional:'Notional '+cash,
+  const sizeLabels={equity:'% Available Equity',cash:'Cash Margin '+cash,balance:'% Balance',units:'Units',notional:'Notional '+cash,
     riskMoney:'Risk '+cash,riskBalance:'Risk % Balance'};
   const chooseSizeMode=(mode:typeof sizeMode)=>{
-    if(mode==='equity')setSizeInput(String(pct(base.account.equity?margin/base.account.equity*100:0)));
+    if(mode==='equity')setSizeInput(String(pct(base.account.availableFunds?margin/base.account.availableFunds*100:0)));
+    else if(mode==='cash')setSizeInput(String(Number(margin.toPrecision(10))||0));
     else if(mode==='balance')setSizeInput(String(pct(base.account.balance?margin/base.account.balance*100:0)));
     else if(mode==='units')setSizeInput(String(Number(qty.toPrecision(10))||0));
     else if(mode==='notional')setSizeInput(String(Number(exposure.toPrecision(10))||0));
@@ -191,7 +210,9 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   };
   const validStopTrigger=(kind!=='stop'&&kind!=='stop-limit') ||
     (side==='Long'?triggerPrice>mark:triggerPrice<mark);
-  const canSubmit=live&&qty>0&&Number.isFinite(qty)&&entry>0&&validStopTrigger&&
+  const validQuickSizing=(sizeMode!=='equity'||fraction<=100)&&
+    (sizeMode!=='cash'||fraction<=base.account.availableFunds)&&fraction>0;
+  const canSubmit=live&&validQuickSizing&&qty>0&&Number.isFinite(qty)&&entry>0&&validStopTrigger&&
     (kind==='market'||(priceInput.trim()!==''&&Number.isFinite(triggerPrice)&&triggerPrice>0))&&
     (kind!=='stop-limit'||(Number(limitPriceInput)>0&&Number.isFinite(Number(limitPriceInput))))&&
     margin+fee<=base.account.availableFunds+1e-7&&
@@ -274,7 +295,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
             <button className="flex items-center gap-1 text-[11px] text-[#b8bfca]" onClick={()=>setSizeMenu(v=>!v)}>
               {sizeLabels[sizeMode]}<ChevronDown size={12}/></button>
             {sizeMenu&&<div className="absolute top-full left-0 z-[90] bg-[#252528] border border-[#44464b] rounded shadow-xl min-w-[144px]">
-              {(['equity','units','notional','balance','riskMoney','riskBalance'] as const).map(m=><button type="button" onClick={()=>chooseSizeMode(m)} key={m}
+              {(['equity','cash','units','notional','balance','riskMoney','riskBalance'] as const).map(m=><button type="button" onClick={()=>chooseSizeMode(m)} key={m}
                 className="block text-left w-full px-3 py-2 hover:bg-[#3c3e44] text-xs">{sizeLabels[m]}</button>)}</div>}
           </div>
           <div className="flex items-center gap-1 border rounded-md border-[#44464b] bg-[#191a1d] h-9 px-2">
@@ -292,8 +313,10 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
           </>}
           {(sizeMode==='riskMoney'||sizeMode==='riskBalance')&&!sizingStop&&<p role="alert" className="text-[10px] text-[#ff9a9a] mt-1">Select a fixed price/tick/% stop loss or enable a trailing stop to calculate risk-based units.</p>}
           <p className="text-[10px] text-[#a1a9b8] mt-2">
-            Available {pct(base.account.availableFunds)} {cash} · {leverage}× leverage · Margin {pct(margin)} {cash}
+            Available equity {pct(base.account.availableFunds)} {cash} · {leverage}× leverage · Margin {pct(margin)} {cash}
           </p>
+          {sizeMode==='cash'&&fraction>base.account.availableFunds&&
+            <p role="alert" className="text-[10px] text-[#ff9a9a]">Cash margin exceeds available equity.</p>}
         </div>
         <div className="mt-5" id="paper-ticket-exits">
           <button className="w-full flex items-center justify-between text-xs font-semibold mb-3" onClick={()=>setExitsOpen(v=>!v)}>
