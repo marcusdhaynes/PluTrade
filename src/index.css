@@ -664,7 +664,7 @@ html,body,#root {
     line-height:18px;
   }
   #mobile-chart-style-trigger {padding-left:2px !important;padding-right:2px !important;}
-  #plutrade-mobile-navbar #mobile-chart-style-favorites {max-height:20px;}
+  #plutrade-mobile-navbar #mobile-chart-style-favorites {max-height:22px;}
   /* Unlike Lightweight Charts minimumWidth, this strip is strictly fixed. */
   #plutrade-native-chart-canvas {
     box-sizing:border-box;
