@@ -940,3 +940,100 @@ test('visual mobile chart layout picker and single centered settings gear',async
   await gear.click();
   await expect(page.getByRole('dialog',{name:'Time scale settings'}).locator('#fit-chart-content-btn')).toBeVisible();
 });
+
+
+test('global sidebar dialogs escape the app stacking context and cover the top bar',async({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(size);
+    await page.goto('./');
+    const header=page.locator('#tradingview-top-navbar');
+    await expect(header).toBeVisible();
+    const dialogOnTop=async(selector:string)=>{
+      const modal=page.locator(selector);
+      await expect(modal).toBeVisible();
+      const result=await page.evaluate(selector=>{
+        const overlay=document.querySelector(selector)!;
+        const rect=overlay.getBoundingClientRect();
+        const navbar=document.getElementById('tradingview-top-navbar')!.getBoundingClientRect();
+        const x=Math.min(innerWidth-8,Math.max(8,navbar.left+navbar.width/2));
+        const y=navbar.top+navbar.height/2;
+        const hit=document.elementFromPoint(x,y);
+        return {portaled:!!overlay.closest('[data-plutrade-viewport-portal]'),
+          top:rect.top,left:rect.left,bottom:rect.bottom,right:rect.right,
+          visibleAtHeader:!!hit&&(overlay===hit||overlay.contains(hit))};
+      },selector);
+      expect(result.portaled,selector+' should escape chart and sidebar clipping').toBe(true);
+      expect(result.top).toBeGreaterThanOrEqual(-1);
+      expect(result.left).toBeGreaterThanOrEqual(-1);
+      expect(result.bottom).toBeLessThanOrEqual(size.height+1);
+      expect(result.right).toBeLessThanOrEqual(size.width+1);
+      expect(result.visibleAtHeader,selector+' should be in front of top navbar').toBe(true);
+    };
+    await page.locator('#right-tab-indicators').click();
+    await dialogOnTop('#indicators-modal-backdrop');
+    await page.locator('#close-indicators-modal-btn').click();
+    await page.locator('#right-tab-alerts').click();
+    await page.locator('#create-new-alert-plus-btn').click();
+    await dialogOnTop('#alerts-modal-backdrop');
+    await page.locator('#close-alerts-modal-btn').click();
+    await page.locator('#mobile-order-ticket-btn').click();
+    await dialogOnTop('[role="dialog"][aria-label="Paper Trading order entry"]');
+    await page.getByTitle('Close order panel').click();
+  }
+});
+
+test('watchlist menu and creation dialog remain visible above fixed header',async({page})=>{
+  await page.setViewportSize({width:320,height:568});
+  await page.goto('./');
+  await page.locator('#right-tab-watchlist').click();
+  await page.locator('#watchlist-selector-dropdown-btn').click();
+  const menu=page.locator('#watchlist-dropdown-menu');
+  await expect(menu).toBeVisible();
+  const menuGeometry=await menu.evaluate(node=>{
+    const b=node.getBoundingClientRect();
+    return {parentIsBody:node.parentElement===document.body,left:b.left,right:b.right,top:b.top,bottom:b.bottom};
+  });
+  expect(menuGeometry.parentIsBody).toBe(true);
+  expect(menuGeometry.left).toBeGreaterThanOrEqual(0);
+  expect(menuGeometry.top).toBeGreaterThanOrEqual(0);
+  expect(menuGeometry.right).toBeLessThanOrEqual(321);
+  expect(menuGeometry.bottom).toBeLessThanOrEqual(569);
+  await menu.getByRole('button',{name:/New Watchlist/}).click();
+  await expect(page.locator('#right-sidebar-content-pane')).toBeVisible();
+  const backdrop=page.locator('#watchlist-create-modal');
+  await expect(backdrop).toBeVisible();
+  const layering=await backdrop.evaluate(node=>{
+    const header=document.getElementById('tradingview-top-navbar')!.getBoundingClientRect();
+    const root=node.closest('[data-plutrade-viewport-portal]');
+    const hit=document.elementFromPoint(header.left+header.width/2,header.top+header.height/2);
+    return {portaled:!!root,coversHeader:node===hit||node.contains(hit)};
+  });
+  expect(layering.portaled).toBe(true);
+  expect(layering.coversHeader).toBe(true);
+  await backdrop.getByRole('button',{name:'Cancel'}).click();
+  await expect(backdrop).toHaveCount(0);
+  await expect(page.locator('#right-sidebar-content-pane')).toBeVisible();
+});
+
+test('left drawing flyouts stay inside the viewport instead of hiding behind navbar',async({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844}]){
+    await page.setViewportSize(size);
+    await page.goto('./');
+    await page.locator('#left-tool-line-group').click();
+    const flyout=page.locator('#tradingview-lines-flyout-menu');
+    await expect(flyout).toBeVisible();
+    const layout=await flyout.evaluate(node=>{
+      const b=node.getBoundingClientRect();
+      return {parentIsBody:node.parentElement===document.body,left:b.left,right:b.right,top:b.top,bottom:b.bottom,
+        zIndex:Number(getComputedStyle(node).zIndex)};
+    });
+    expect(layout.parentIsBody).toBe(true);
+    expect(layout.left).toBeGreaterThanOrEqual(0);
+    expect(layout.top).toBeGreaterThanOrEqual(0);
+    expect(layout.right).toBeLessThanOrEqual(size.width+1);
+    expect(layout.bottom).toBeLessThanOrEqual(size.height+1);
+    expect(layout.zIndex).toBeGreaterThan(1000);
+    await flyout.locator('#line-flyout-trendline').click();
+    await expect(flyout).toHaveCount(0);
+  }
+});
