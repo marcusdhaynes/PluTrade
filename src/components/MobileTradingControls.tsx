@@ -22,6 +22,7 @@ interface Props {
   onQuickSize:(size:{mode:'equity'|'cash';value:number})=>void;
   preparedExits:Partial<Record<ExitKind,{mode:PaperExitMode;value:string}>>;
   onPrepareExit:(kind:ExitKind,draft:{mode:PaperExitMode;value:string})=>void;
+  onClearPreparedExit:(kind:ExitKind)=>void;
   onEnter:(focus?:ExitKind)=>void;
   onOpenOrder:()=>void;
   onOpenPaperWorkspace?:()=>void;
@@ -43,7 +44,7 @@ const numeric=(n:number,digits=6)=>Number.isFinite(n)?n.toLocaleString(undefined
 export const MobileTradingControls:React.FC<Props>=({
   asset,position,accountEquity,availableEquity,accountBalance,activeAccountName,activeAccountId,
   availableAccounts=[],onSelectAccount,onManageAccounts,accountCurrency='USD',
-  accountUnrealizedPnl=0,quickSize,onQuickSize,preparedExits,onPrepareExit,
+  accountUnrealizedPnl=0,quickSize,onQuickSize,preparedExits,onPrepareExit,onClearPreparedExit,
   onEnter,onOpenOrder,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
 })=>{
   const [panel,setPanel]=useState<'equity'|ExitKind|null>(null);
@@ -403,6 +404,12 @@ export const MobileTradingControls:React.FC<Props>=({
             }
             onPrepareExit(panel as ExitKind,{mode,value});close();
           }}>Save {panel==='sl'?'SL':'TP'} setup</button>
+        {selectedKind&&preparedExits[selectedKind]&&
+          <button type="button" aria-label={'Clear '+selectedKind.toUpperCase()+' setup'}
+            className="mt-2 w-full rounded border border-[#6b4557] p-2 text-[#ffb4be]"
+            onClick={()=>{onClearPreparedExit(selectedKind);close();}}>
+            Clear {selectedKind.toUpperCase()} setup
+          </button>}
         <button type="button" onClick={()=>{const focus=panel as ExitKind;close();onEnter(focus);}}
           className="mt-2 w-full rounded border border-[#53627a] p-2 text-[#c7dbff]">
           Open Entry Ticket · {panel.toUpperCase()} (review only)
@@ -510,16 +517,17 @@ export const MobileTradingControls:React.FC<Props>=({
       {(['sl','tp'] as const).map(kind=><button key={kind} type="button"
         id={kind==='sl'?'mobile-stop-setup-btn':'mobile-target-setup-btn'}
         style={{flex:'0.5 1 0%'}}
-        className={baseButton+' '+(panel===kind?'border-[#709fff]':'')}
+        className={baseButton+' relative '+(panel===kind?'border-[#709fff]':'')}
         aria-label={kind==='sl'?'Stop loss; hold for all types':'Take profit; hold for all types'}
         title="Hold for all types"
         onContextMenu={e=>{e.preventDefault();clearHold();openExit(kind,true);}}
         onPointerDown={()=>startHold(kind)} onPointerUp={clearHold} onPointerCancel={clearHold} onPointerLeave={clearHold}
         onClick={()=>clickExit(kind)}>
-        {kind.toUpperCase()}{position&&(
+        {kind.toUpperCase()}{(position?(
           (kind==='sl'&&(!!position.sl||!!position.trailingPercent||!!position.dynamicTrailing))||
           (kind==='tp'&&(!!position.tp||!!position.tpLevels?.length))
-        )?<span className="pl-0.5 text-[9px]">●</span>:null}
+        ):!!preparedExits[kind])?<span aria-hidden="true"
+          className="absolute right-0 top-0 text-[6px] leading-[6px] text-[#7ddfc5]">●</span>:null}
       </button>)}
     </div>
   </div>;
