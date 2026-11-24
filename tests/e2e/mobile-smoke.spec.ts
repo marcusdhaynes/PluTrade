@@ -1089,3 +1089,82 @@ test('mobile right drawer header stays on top of timeframe row and is interactiv
     await expect(pane).toBeVisible();
   }
 });
+
+
+test('all right sidebar buttons share the same box, icon, radius, spacing and accessible structure',async({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(size);
+    await page.goto('./');
+    const rail=page.locator('#tradingview-right-icon-bar');
+    await expect(rail).toBeVisible();
+    const buttons=rail.locator('button[data-right-rail-button="true"]');
+    await expect(buttons).toHaveCount(14);
+    const geometry=await buttons.evaluateAll(elements=>elements.map(element=>{
+      const rect=element.getBoundingClientRect();
+      const icon=element.querySelector('[data-right-rail-icon]')!;
+      const iconRect=icon.getBoundingClientRect();
+      const svg=icon.querySelector('svg')!.getBoundingClientRect();
+      const css=getComputedStyle(element);
+      return {width:rect.width,height:rect.height,radius:css.borderTopLeftRadius,
+        iconWidth:iconRect.width,iconHeight:iconRect.height,
+        iconCenterX:iconRect.left+iconRect.width/2-(rect.left+rect.width/2),
+        iconCenterY:iconRect.top+iconRect.height/2-(rect.top+rect.height/2),
+        svgWidth:svg.width,svgHeight:svg.height,
+        label:element.getAttribute('aria-label'),
+        pressed:element.getAttribute('aria-pressed'),
+        border:css.borderTopWidth};
+    })));
+    expect(new Set(geometry.map(x=>x.width)).size).toBe(1);
+    expect(new Set(geometry.map(x=>x.height)).size).toBe(1);
+    expect(new Set(geometry.map(x=>x.radius)).size).toBe(1);
+    expect(new Set(geometry.map(x=>x.iconWidth)).size).toBe(1);
+    expect(new Set(geometry.map(x=>x.iconHeight)).size).toBe(1);
+    expect(geometry[0].width).toBe(22);
+    expect(geometry[0].height).toBe(22);
+    for(const item of geometry){
+      expect(item.label).toBeTruthy();
+      expect(item.pressed).not.toBeNull();
+      expect(item.border).toBe('0px');
+      expect(Math.abs(item.iconCenterX)).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(item.iconCenterY)).toBeLessThanOrEqual(0.5);
+      expect(item.svgWidth).toBeCloseTo(14,0);
+      expect(item.svgHeight).toBeCloseTo(14,0);
+    }
+    const top=rail.locator(':scope > div').first();
+    const gaps=await top.locator('button[data-right-rail-button]').evaluateAll(elements=>
+      elements.slice(1).map((item,i)=>
+        item.getBoundingClientRect().top-elements[i].getBoundingClientRect().bottom));
+    expect(gaps.every(gap=>Math.abs(gap-2)<1)).toBe(true);
+    for(const id of ['right-tab-indicators','right-tab-metrics','right-tab-strategies']){
+      await expect(page.locator('#'+id)).toBeAttached();
+      await expect(page.locator('#'+id+' [data-right-rail-icon]')).toHaveCount(1);
+    }
+    await expect(page.getByRole('button',{name:'Community Ideas unavailable'})).toBeDisabled();
+    await expect(page.getByRole('button',{name:'Public and Private Chats unavailable'})).toBeDisabled();
+  }
+});
+
+test('Indicators, Metrics and Strategies in uniform right rail open their actual tools',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  const indicators=page.locator('#right-tab-indicators');
+  const metrics=page.locator('#right-tab-metrics');
+  const strategies=page.locator('#right-tab-strategies');
+  await indicators.click();
+  await expect(page.locator('#indicators-modal-window')).toBeVisible();
+  await expect(indicators).toHaveAttribute('aria-pressed','true');
+  await page.locator('#close-indicators-modal-btn').click();
+  await expect(indicators).toHaveAttribute('aria-pressed','false');
+  await metrics.click();
+  await expect(page.locator('#technical-summary-panel')).toBeVisible();
+  await expect(metrics).toHaveAttribute('aria-pressed','true');
+  await metrics.click();
+  await expect(page.locator('#right-sidebar-content-pane')).toHaveCount(0);
+  await expect(metrics).toHaveAttribute('aria-pressed','false');
+  await expect(strategies).toBeEnabled();
+  await strategies.click();
+  await expect(page.locator('#paper-trading-open-panel')).toBeVisible();
+  await expect(page.locator('#plutrade-strategy-lab')).toBeVisible();
+  await expect(strategies).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#tradingview-right-icon-bar')).toBeVisible();
+});
