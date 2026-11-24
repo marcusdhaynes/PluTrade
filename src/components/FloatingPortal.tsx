@@ -1,7 +1,7 @@
 import React,{useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 
-type Placement='bottom-start'|'bottom-end'|'top-end';
+type Placement='bottom-start'|'bottom-end'|'top-end'|'right-start';
 interface FloatingPortalProps {
   anchor:React.RefObject<HTMLElement|null>;
   children:React.ReactNode;
@@ -33,13 +33,18 @@ export function FloatingPortal({
       const panelHeight=popup.current?.offsetHeight||300;
       const spaceBelow=vh-rect.bottom-pad*2;
       const spaceAbove=rect.top-pad*2;
-      const flip=placement==='top-end'||(spaceBelow<Math.min(panelHeight,300)&&spaceAbove>spaceBelow);
-      const availableHeight=Math.max(90,flip?spaceAbove:spaceBelow);
+      const flyout=placement==='right-start';
+      const flip=!flyout&&(placement==='top-end'||(spaceBelow<Math.min(panelHeight,300)&&spaceAbove>spaceBelow));
+      const availableHeight=Math.max(90,flyout?vh-pad*2:flip?spaceAbove:spaceBelow);
       const maxHeight=Math.min(vh-pad*2,availableHeight);
-      const top=flip?
-        Math.max(pad,rect.top-Math.min(panelHeight,maxHeight)-4):
-        Math.min(vh-pad,rect.bottom+4);
-      const desiredLeft=placement==='bottom-start'?rect.left:rect.right-actualWidth;
+      const top=flyout?
+        Math.max(pad,Math.min(rect.top,vh-Math.min(panelHeight,maxHeight)-pad)):
+        flip?
+          Math.max(pad,rect.top-Math.min(panelHeight,maxHeight)-4):
+          Math.min(vh-pad,rect.bottom+4);
+      const desiredLeft=flyout?
+        (vw-rect.right>=actualWidth+pad+4?rect.right+4:rect.left-actualWidth-4):
+        placement==='bottom-start'?rect.left:rect.right-actualWidth;
       const left=Math.max(pad,Math.min(desiredLeft,vw-actualWidth-pad));
       setPosition(prev=>prev.ready&&prev.top===top&&prev.left===left&&prev.maxHeight===maxHeight?
         prev:{top,left,maxHeight,ready:true});
