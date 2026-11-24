@@ -2168,6 +2168,10 @@ export default function App() {
           onOpenTradeJournal={() => setIsTradeJournalOpen(true)}
           onOpenHelp={()=>setShortcutHelpOpen(true)}
           onOpenIndicators={()=>setIsIndicatorsOpen(true)}
+          indicatorsOpen={isIndicatorsOpen}
+          tradeJournalOpen={isTradeJournalOpen}
+          onOpenStrategyLab={()=>{setIsRightSidebarOpen(false);requestBottomPanel('strategyLab');}}
+          strategyLabOpen={isBottomTradingOpen&&requestedDockTab?.tab==='strategyLab'}
           onOpenConditionalOrder={handleOpenCreateConditionalOrder}
         />
       </div>
