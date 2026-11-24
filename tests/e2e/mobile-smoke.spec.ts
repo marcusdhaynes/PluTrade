@@ -1113,7 +1113,7 @@ test('all right sidebar buttons share the same box, icon, radius, spacing and ac
         label:element.getAttribute('aria-label'),
         pressed:element.getAttribute('aria-pressed'),
         border:css.borderTopWidth};
-    })));
+    }));
     expect(new Set(geometry.map(x=>x.width)).size).toBe(1);
     expect(new Set(geometry.map(x=>x.height)).size).toBe(1);
     expect(new Set(geometry.map(x=>x.radius)).size).toBe(1);
