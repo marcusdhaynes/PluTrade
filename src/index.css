@@ -81,15 +81,6 @@ html,body,#root {
     margin-top:auto;
     flex-shrink:0;
   }
-  #tradingview-lines-flyout-menu {
-    position:fixed !important;
-    left:30px !important;
-    top:45px !important;
-    width:min(280px,calc(100vw - 36px)) !important;
-    max-height:calc(100dvh - 105px) !important;
-    overflow-y:auto;
-    z-index:120 !important;
-  }
   /* A permanently attached rail takes a fixed slice of the available
      chart workspace. Only an opened details pane overlaps the plot. */
   #tradingview-right-dock {
