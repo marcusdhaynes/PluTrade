@@ -35,13 +35,14 @@ export function FloatingPortal({
       const spaceAbove=rect.top-pad*2;
       const flyout=placement==='right-start';
       const flip=!flyout&&(placement==='top-end'||(spaceBelow<Math.min(panelHeight,300)&&spaceAbove>spaceBelow));
-      const availableHeight=Math.max(90,flyout?vh-pad*2:flip?spaceAbove:spaceBelow);
+      // Menus opening near the bottom slide upward, then scroll within the
+      // remaining viewport. Do not let maxHeight grow below the screen edge.
+      const flyoutTop=Math.max(pad,Math.min(rect.top,vh-pad-Math.min(120,Math.max(90,panelHeight))));
+      const availableHeight=Math.max(90,flyout?vh-flyoutTop-pad:flip?spaceAbove:spaceBelow);
       const maxHeight=Math.min(vh-pad*2,availableHeight);
-      const top=flyout?
-        Math.max(pad,Math.min(rect.top,vh-Math.min(panelHeight,maxHeight)-pad)):
-        flip?
-          Math.max(pad,rect.top-Math.min(panelHeight,maxHeight)-4):
-          Math.min(vh-pad,rect.bottom+4);
+      const top=flyout?flyoutTop:flip?
+        Math.max(pad,rect.top-Math.min(panelHeight,maxHeight)-4):
+        Math.min(vh-pad,rect.bottom+4);
       const desiredLeft=flyout?
         (vw-rect.right>=actualWidth+pad+4?rect.right+4:rect.left-actualWidth-4):
         placement==='bottom-start'?rect.left:rect.right-actualWidth;
@@ -54,10 +55,13 @@ export function FloatingPortal({
       raf=requestAnimationFrame(place);
     };
     place();
+    const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(reposition);
+    if(popup.current)observer?.observe(popup.current);
     window.addEventListener('resize',reposition);
     window.addEventListener('scroll',reposition,true);
     return ()=>{
       cancelAnimationFrame(raf);
+      observer?.disconnect();
       window.removeEventListener('resize',reposition);
       window.removeEventListener('scroll',reposition,true);
     };
