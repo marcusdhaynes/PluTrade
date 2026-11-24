@@ -39,6 +39,7 @@ import { BottomToolbar } from './components/BottomToolbar';
 import { BottomTradingPanel } from './components/BottomTradingPanel';
 import { PaperTradeTicket } from './components/PaperTradeTicket';
 import { MobileTradingControls } from './components/MobileTradingControls';
+import {ViewportPortal} from './components/FloatingPortal';
 import { PaperAccountModal } from './components/PaperAccountModal';
 import { SavedChartsModal } from './components/SavedChartsModal';
 import type { SavedChartIdea } from './services/savedCharts';
@@ -2115,7 +2116,8 @@ export default function App() {
           />
         </div>
 
-        {/* Live market order entry slides in from the right; none is open at startup. */}
+        {/* Tickets are viewport overlays, never descendants of clipped chart columns. */}
+        <ViewportPortal>
         <PaperTradeTicket open={isTradeTicketOpen} onClose={()=>setIsTradeTicketOpen(false)}
           asset={activeAsset} portfolio={paperPortfolio} bids={orderBook.bids} asks={orderBook.asks}
           onSubmit={handleSubmitTicketOrder} error={paperError}
@@ -2127,6 +2129,7 @@ export default function App() {
           proposedName={paperAccount.name}
           onClose={()=>setTradeTicketAccountSettings(false)}
           onSave={(name,settings)=>savePaperAccount(paperAccounts.activeId,name,settings)}/>}
+        </ViewportPortal>
         {/* Right Dock / Sidebar */}
         <RightSidebar
           assets={assets}
@@ -2169,6 +2172,7 @@ export default function App() {
         />
       </div>
 
+      <ViewportPortal>
       {closeReviewPosition&&<div className="fixed inset-0 z-[290] bg-black/70 flex items-center justify-center p-3"
         role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setCloseReviewId(null);}}>
         <section role="dialog" aria-modal="true" aria-label="Review paper position close"
@@ -2279,6 +2283,7 @@ export default function App() {
           currentSymbol={activeAsset.symbol}/>
       </React.Suspense>}
 
+      </ViewportPortal>
       <ChartPictureInPicture
         ref={pipRef}
         activeAsset={activeAsset}
@@ -2296,6 +2301,7 @@ export default function App() {
         }}
       />
 
+      <ViewportPortal>
       <ConditionalOrderModal
         isOpen={isConditionalOrderModalOpen}
         onClose={() => setIsConditionalOrderModalOpen(false)}
@@ -2321,6 +2327,7 @@ export default function App() {
         onSaveOrder={handleSaveConditionalOrder}
         onTestTrigger={handleTestTriggerConditionalOrder}
       />
+      </ViewportPortal>
     </div>
   );
 }
