@@ -2101,7 +2101,7 @@ export default function App() {
             preparedExits={mobileEntryExits}
             onPrepareExit={(kind,draft)=>setMobileEntryExits(prev=>({...prev,[kind]:draft}))}
             onEnter={openMobileEntry}
-            onOpenOrder={()=>setIsTradeTicketOpen(true)}
+            onOpenOrder={()=>openMobileEntry()}
             onOpenPaperWorkspace={()=>setIsBottomTradingOpen(open=>!open)}
             onExit={()=>{if(activePosition)handleClosePosition(activePosition.id);}}
             onEditStops={handleEditPaperStops}
