@@ -1039,3 +1039,53 @@ test('left drawing flyouts stay inside the viewport instead of hiding behind nav
     await expect(flyout).toHaveCount(0);
   }
 });
+
+
+test('mobile right drawer header stays on top of timeframe row and is interactive',async({page})=>{
+  for(const viewport of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(viewport);
+    await page.goto('./');
+    await page.locator('#right-tab-alerts').click();
+    const pane=page.locator('#right-sidebar-content-pane');
+    const alerts=page.locator('#tradingview-alerts-panel');
+    const alertHeader=alerts.locator(':scope > div').first();
+    await expect(alertHeader).toBeVisible();
+    const visual=await page.evaluate(()=>{
+      const rect=(id:string)=>document.getElementById(id)!.getBoundingClientRect();
+      const panel=document.getElementById('right-sidebar-content-pane')!;
+      const header=document.querySelector('#tradingview-alerts-panel > div:first-child')!;
+      const hr=header.getBoundingClientRect();
+      const nav=rect('tradingview-top-navbar');
+      const timeframe=rect('tradingview-bottom-bar');
+      const rail=rect('tradingview-right-icon-bar');
+      const pr=panel.getBoundingClientRect();
+      const atHeader=document.elementFromPoint(hr.left+Math.min(12,hr.width/2),hr.top+hr.height/2);
+      return {
+        parentIsBody:panel.parentElement===document.body,
+        paneTop:pr.top,paneLeft:pr.left,paneRight:pr.right,paneBottom:pr.bottom,
+        headerTop:hr.top,headerBottom:hr.bottom,headerVisible:header.contains(atHeader),
+        navbarBottom:nav.bottom,timeframeTop:timeframe.top,timeframeBottom:timeframe.bottom,
+        railLeft:rail.left,
+      };
+    });
+    expect(visual.parentIsBody,'Mobile right pane must escape chart workspace clipping').toBe(true);
+    expect(visual.headerVisible,'Timeframe controls must not cover the Alerts header').toBe(true);
+    expect(visual.headerTop).toBeGreaterThanOrEqual(visual.navbarBottom-2);
+    expect(visual.headerTop).toBeLessThanOrEqual(visual.timeframeBottom+1);
+    expect(visual.paneLeft).toBeGreaterThanOrEqual(0);
+    expect(visual.paneRight).toBeLessThanOrEqual(visual.railLeft+1);
+    expect(visual.paneBottom).toBeLessThanOrEqual(viewport.height+1);
+    // A real pointer click on a header control must work, not hit 1s/5s.
+    await alertHeader.getByRole('button',{name:/Log/}).click();
+    await expect(alertHeader.getByRole('button',{name:/Log/})).toHaveClass(/bg-\[#2a2e39\]/);
+    await alertHeader.getByRole('button',{name:'Alerts',exact:true}).click();
+    await expect(pane).toBeVisible();
+    await page.locator('#right-tab-watchlist').click();
+    await page.locator('#watchlist-selector-dropdown-btn').click();
+    await expect(page.locator('#watchlist-dropdown-menu')).toBeVisible();
+    await page.locator('#watchlist-dropdown-menu').getByRole('button',{name:/New Watchlist/}).click();
+    await expect(page.locator('#watchlist-create-modal')).toBeVisible();
+    await page.locator('#watchlist-create-modal').getByRole('button',{name:'Cancel'}).click();
+    await expect(pane).toBeVisible();
+  }
+});
