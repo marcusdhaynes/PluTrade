@@ -50,6 +50,7 @@ import {chartStarterMarket,type ChartLoadState} from './services/chartRecovery';
 import { cancelPaperOrder,amendPendingPaperOrder,evaluatePaperOrders,expirePaperOrders,submitPaperOrder,estimatePaperQty,withOrderReservations,type PaperOrderRequest,type PaperAmendRequest,type PaperExitMode } from './services/paperOrders';
 import { SymbolSearchModal } from './components/SymbolSearchModal';
 import { IndicatorsModal } from './components/IndicatorsModal';
+import { StrategyLabPanel } from './components/StrategyLabPanel';
 import { AlertsModal } from './components/AlertsModal';
 const TradeJournalModal=React.lazy(()=>import('./components/journal/TradeJournalModal')
   .then(mod=>({default:mod.TradeJournalModal})));
@@ -981,7 +982,7 @@ export default function App() {
    const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<RightSidebarTab>(() => {
     const saved = localStorage.getItem('tv_right_sidebar_tab');
-    return saved ? (saved as RightSidebarTab) : 'alerts';
+    return saved&&['alerts','watchlist','orderbook','technicals','news','calendar','notifications'].includes(saved) ? (saved as RightSidebarTab) : 'alerts';
   });
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(()=>{
@@ -2174,6 +2175,16 @@ export default function App() {
           tradeJournalOpen={isTradeJournalOpen}
           onOpenStrategyLab={()=>{setIsRightSidebarOpen(false);requestBottomPanel('strategyLab');}}
           strategyLabOpen={isBottomTradingOpen&&activeDockTab==='strategyLab'}
+          mobileToolContent={{
+            indicators:<IndicatorsModal embedded isOpen onClose={()=>setIsRightSidebarOpen(false)} indicators={indicators} setIndicators={setIndicators}/>,
+            strategies:<div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"><StrategyLabPanel asset={activeAsset} timeframe={activeTimeframe} markets={assets}/></div>,
+            journal:<React.Suspense fallback={<div role="status" className="p-2 text-xs">Opening Trading Journal…</div>}>
+              <TradeJournalModal embedded isOpen onClose={()=>setIsRightSidebarOpen(false)} currentSymbol={activeAsset.symbol}
+                onOpenReplay={()=>{setIsRightSidebarOpen(false);requestBottomPanel('replay');}}
+                onOpenRiskCenter={()=>{setIsRightSidebarOpen(false);requestBottomPanel('risk');}}/>
+            </React.Suspense>,
+            help:<KeyboardShortcutsDialog embedded onClose={()=>setIsRightSidebarOpen(false)}/>,
+          }}
           onOpenConditionalOrder={handleOpenCreateConditionalOrder}
         />
       </div>

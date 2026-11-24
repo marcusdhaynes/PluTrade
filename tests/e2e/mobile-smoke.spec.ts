@@ -532,7 +532,7 @@ test('right Indicators and Alerts are sole launchers; account, Order, UPL amount
   await page.getByTitle('Close order panel').click();
   await page.locator('#right-tab-indicators').click();
   await expect(page.locator('#indicators-modal-window')).toBeVisible();
-  await page.locator('#indicators-modal-backdrop').click({position:{x:3,y:3}});
+  await page.locator('#right-drawer-close').click();
   await page.locator('#right-tab-alerts').click();
   await expect(page.locator('#tradingview-alerts-panel')).toBeVisible();
 });
@@ -1170,4 +1170,29 @@ test('Indicators, Metrics and Strategies in uniform right rail open their actual
   await expect(page.locator('#plutrade-strategy-lab')).toBeVisible();
   await expect(strategies).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('#tradingview-right-icon-bar')).toBeVisible();
+});
+
+
+test('every enabled mobile right rail tool uses one identical viewport drawer',async({page})=>{
+  for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(size);await page.goto('./');
+    const pane=page.locator('#right-sidebar-content-pane');
+    let baseline:Awaited<ReturnType<typeof pane.boundingBox>>=null;
+    for(const tool of ['watchlist','alerts','indicators','metrics','strategies','news','orderbook','calendar','notifications','trade-journal','help']){
+      const button=page.locator('#right-tab-'+tool);await button.click();
+      await expect(pane).toBeVisible();await expect(pane).toHaveAttribute('data-viewport-drawer','true');
+      await expect(pane.locator('[data-right-drawer-header]')).toBeVisible();
+      await expect(button).toHaveAttribute('aria-expanded','true');
+      const rect=(await pane.boundingBox())!;const rail=(await page.locator('#tradingview-right-dock').boundingBox())!;
+      expect(Math.abs(rect.x+rect.width-rail.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(rect.y-rail.y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(rect.height-rail.height)).toBeLessThanOrEqual(1);
+      if(baseline)for(const key of ['x','y','width','height'] as const)expect(Math.abs(rect[key]-baseline[key])).toBeLessThanOrEqual(1);
+      else baseline=rect;
+      if(tool==='indicators'){await expect(pane.locator('#indicators-modal-window')).toBeVisible();await expect(page.locator('#indicators-modal-backdrop')).toHaveCount(0);}
+      if(tool==='strategies')await expect(pane.locator('#plutrade-strategy-lab')).toBeVisible();
+      if(tool==='trade-journal')await expect(pane.locator('#trade-journal-window-card')).toBeVisible();
+      await pane.locator('[data-right-drawer-header] button').click();await expect(pane).toHaveCount(0);
+    }
+  }
 });

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import {createPortal} from 'react-dom';
 import { JournalTrade, JournalTab } from '../../types';
 import {JOURNAL_KEY,isJournalRecoveryBlocked,loadJournalTrades,readJournalBackupRaw,
  persistJournalTrades} from '../../services/journalStorage';
@@ -47,6 +48,7 @@ import {
 
 interface TradeJournalModalProps {
   isOpen: boolean;
+  embedded?: boolean;
   onClose: () => void;
   currentSymbol?: string;
   startingBalance?: number;
@@ -56,6 +58,7 @@ interface TradeJournalModalProps {
 
 export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
   isOpen,
+  embedded=false,
   onClose,
   currentSymbol = '#BTCUSDT',
   onOpenReplay,
@@ -123,7 +126,8 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
   };
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<JournalTrade | null>(null);
-  const [isMaximized, setIsMaximized] = useState(true);
+  const [maximized, setIsMaximized] = useState(true);
+  const isMaximized=embedded||maximized;
   const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth()+1);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null);
@@ -474,7 +478,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
   return (
     <div
       id="trade-journal-root-modal"
-      className={`fixed inset-0 z-[1800] transition-colors duration-150 ${
+      className={embedded?'relative flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden bg-[#131722]':`fixed inset-0 z-[1800] transition-colors duration-150 ${
         isMaximized
           ? 'w-screen h-screen m-0 p-0 overflow-hidden bg-[#0f131c] flex flex-col'
           : 'pointer-events-none bg-black/15'
@@ -490,7 +494,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
               }`
         } ${isDragging || isResizing ? 'transition-none shadow-2xl' : 'transition-opacity duration-150'}`}
         style={
-          isMaximized
+          embedded ? {width:'100%',height:'100%',opacity:1} : isMaximized
             ? { width: '100vw', height: '100dvh', left: 0, top: 0, opacity: 1 }
             : {
                 width: `${windowPos.width}px`,
@@ -501,7 +505,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
               }
         }
       >
-        {isMaximized&&<button type="button" id="journal-global-close" onClick={onClose}
+        {!embedded&&isMaximized&&<button type="button" id="journal-global-close" onClick={onClose}
           aria-label="Close Trading Journal" title="Close Trading Journal"
           className="absolute right-[3px] top-[3px] z-[100] hidden h-[27px] w-[27px] shrink-0 items-center justify-center rounded bg-[#302332] text-[#ffbcc9] hover:bg-[#70323f] hover:text-white">
           <X size={17}/>
@@ -948,7 +952,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
                   onEditTrade={(trade) => {if(!journalRecoveryBlocked)setEditingTrade(trade);}}
                   onOpenSettings={() => setIsSettingsModalOpen(true)}
                   isMaximized={isMaximized}
-                  onToggleMaximize={() => setIsMaximized((prev) => !prev)}
+                  onToggleMaximize={embedded?undefined:() => setIsMaximized((prev) => !prev)}
                   onStartWindowDrag={handleStartDrag}
                   onClose={onClose}
                 />
@@ -975,7 +979,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
                   onOpenAddTrade={() => {if(!journalRecoveryBlocked)setIsAddModalOpen(true);}}
                   onOpenSettings={() => setIsSettingsModalOpen(true)}
                   isMaximized={isMaximized}
-                  onToggleMaximize={() => setIsMaximized((prev) => !prev)}
+                  onToggleMaximize={embedded?undefined:() => setIsMaximized((prev) => !prev)}
                   onClose={onClose}
                 />
               )}
@@ -999,7 +1003,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
                     setActiveTab('trades');
                   }}
                   isMaximized={isMaximized}
-                  onToggleMaximize={() => setIsMaximized((prev) => !prev)}
+                  onToggleMaximize={embedded?undefined:() => setIsMaximized((prev) => !prev)}
                   onClose={onClose}
                 />
               )}
@@ -1010,7 +1014,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
                   stats={stats}
                   layoutSettings={layoutSettings}
                   isMaximized={isMaximized}
-                  onToggleMaximize={() => setIsMaximized((prev) => !prev)}
+                  onToggleMaximize={embedded?undefined:() => setIsMaximized((prev) => !prev)}
                   onClose={onClose}
                 />
               )}
@@ -1021,7 +1025,7 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
                   stats={stats}
                   waveScore={waveScore}
                   isMaximized={isMaximized}
-                  onToggleMaximize={() => setIsMaximized((prev) => !prev)}
+                  onToggleMaximize={embedded?undefined:() => setIsMaximized((prev) => !prev)}
                   onClose={onClose}
                 />
               )}
@@ -1094,7 +1098,8 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
         )}
       </div>
 
-      {/* Add / Edit Trade Modal */}
+      {embedded ? ((isCsvImportOpen||isAddModalOpen||!!editingTrade||isSettingsModalOpen)&&createPortal(
+        <div data-right-drawer-child style={{position:'fixed',inset:0,zIndex:1950}}>
       {isCsvImportOpen&&<JournalCsvImportPanel onClose={()=>setIsCsvImportOpen(false)}
         onCommit={importCompletedTrades}/>}
       <AddTradeModal
@@ -1117,6 +1122,30 @@ export const TradeJournalModal: React.FC<TradeJournalModalProps> = ({
         onUpdateSettings={handleUpdateSettings}
         onResetSettings={handleResetSettings}
       />
+</div>,document.body)) : <>
+      {isCsvImportOpen&&<JournalCsvImportPanel onClose={()=>setIsCsvImportOpen(false)}
+        onCommit={importCompletedTrades}/>}
+      <AddTradeModal
+        isOpen={isAddModalOpen || !!editingTrade}
+        tradeToEdit={editingTrade}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingTrade(null);
+        }}
+        onAddTrade={handleAddTrade}
+        onUpdateTrade={handleUpdateTrade}
+        currentSymbol={currentSymbol}
+      />
+
+      {/* Settings Modal */}
+      <JournalGridSettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        settings={layoutSettings}
+        onUpdateSettings={handleUpdateSettings}
+        onResetSettings={handleResetSettings}
+      />
+</>}
     </div>
   );
 };

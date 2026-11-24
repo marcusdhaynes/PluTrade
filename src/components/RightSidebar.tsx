@@ -32,6 +32,7 @@ import {
   ChevronLeft,
   HelpCircle,
   BookOpen,
+  X,
 } from 'lucide-react';
 
 export type RightSidebarTab =
@@ -41,7 +42,11 @@ export type RightSidebarTab =
   | 'technicals'
   | 'news'
   | 'calendar'
-  | 'notifications';
+  | 'notifications'
+  | 'indicators' | 'strategies' | 'journal' | 'help';
+
+const mobileTitles:Record<RightSidebarTab,string>={watchlist:'Watchlist & Details',alerts:'Alerts',orderbook:'Order Book & Depth',technicals:'Metrics',news:'News',calendar:'Economic Calendar',notifications:'Notifications',indicators:'Indicators',strategies:'Strategies',journal:'Trading Journal',help:'Keyboard Shortcuts & Help'};
+const mobileOnlyTabs:RightSidebarTab[]=['indicators','strategies','journal','help'];
 
 interface RightSidebarProps {
   assets: Asset[];
@@ -79,6 +84,7 @@ interface RightSidebarProps {
   onOpenStrategyLab?:()=>void;
   strategyLabOpen?:boolean;
   onOpenConditionalOrder?: (dep: DependencyContext) => void;
+  mobileToolContent?:Partial<Record<RightSidebarTab,React.ReactNode>>;
 }
 
 
@@ -152,6 +158,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
   onOpenStrategyLab,
   strategyLabOpen=false,
   onOpenConditionalOrder,
+  mobileToolContent,
 }) => {
   const dockRef=useRef<HTMLDivElement>(null);
   const paneRef=useRef<HTMLDivElement>(null);
@@ -167,6 +174,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
     query.addEventListener('change',update);
     return ()=>query.removeEventListener('change',update);
   },[]);
+  useEffect(()=>{
+    if(!compactDock&&mobileOnlyTabs.includes(activeTab)){setIsOpen(false);setActiveTab('alerts');}
+  },[compactDock,activeTab,setActiveTab,setIsOpen]);
   // The expandable panel used to be an absolutely positioned child of the
   // chart workspace. That workspace clips overflow and its timeframe row
   // could sit on top of the panel's heading, intercepting every tap.
@@ -214,7 +224,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
       // tear down the very panel that owns its callback.
       if(dockRef.current?.contains(target as Node)||paneRef.current?.contains(target as Node))return;
       if(target instanceof Element&&target.closest(
-        '#watchlist-dropdown-menu, #watchlist-create-modal'))return;
+        '#watchlist-dropdown-menu, #watchlist-create-modal, #journal-mobile-filters-popover, [data-right-drawer-child], [data-plutrade-viewport-portal]'))return;
       setIsOpen(false);
     };
     const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setIsOpen(false);};
@@ -242,6 +252,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
           }:undefined}
           className="w-64 md:w-72 h-full bg-[#131722] border-l border-[#2a2e39] flex flex-col overflow-hidden"
         >
+          {compactDock&&<header data-right-drawer-header className="flex h-7 shrink-0 items-center justify-between gap-1 border-b border-[#2a2e39] bg-[#1e222d] px-2 text-[11px] font-semibold text-[#d1d4dc]">
+            <span className="min-w-0 truncate">{mobileTitles[activeTab]}</span>
+            <button type="button" id={activeTab==='journal'?'journal-global-close':'right-drawer-close'} aria-label={'Close '+mobileTitles[activeTab]} title={'Close '+mobileTitles[activeTab]} onClick={()=>setIsOpen(false)} className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-[#787b86] hover:bg-[#2a2e39] hover:text-white"><X size={14}/></button>
+          </header>}
+          <div data-right-drawer-body={compactDock?'true':undefined} className="flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col">
+          {compactDock&&mobileToolContent?.[activeTab]}
           {activeTab === 'alerts' && (
             <AlertsPanel
               alerts={detailedAlerts}
@@ -281,7 +297,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
           )}
 
           {activeTab === 'technicals' && (
-            <div className="h-full overflow-y-auto">
+            <div className="h-full min-h-0 overflow-y-auto">
               <TechnicalSummaryGauge asset={activeAsset} candles={candles} />
             </div>
           )}
@@ -339,6 +355,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
               </div> : <p className="text-[#787b86] text-[11px]">No current notifications. Alerts are evaluated only while PluTrade is running.</p>}
             </div>
           )}
+          </div>
         </div>
       ):null;
   return (
@@ -362,14 +379,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
             onClick={()=>activateTab('alerts')}/>
           <RightRailButton id="right-tab-indicators" label="Indicators"
             title="Indicators and studies" icon={<SlidersHorizontal className="h-3.5 w-3.5"/>}
-            active={indicatorsOpen} onClick={onOpenIndicators}/>
+            active={compactDock?isOpen&&activeTab==='indicators':indicatorsOpen} expanded={compactDock?isOpen&&activeTab==='indicators':undefined} onClick={compactDock?()=>activateTab('indicators'):onOpenIndicators}/>
           <RightRailButton id="right-tab-metrics" label="Metrics"
             title="Metrics · technical summary" icon={<Gauge className="h-3.5 w-3.5"/>}
             active={isOpen&&activeTab==='technicals'} expanded={isOpen&&activeTab==='technicals'}
             onClick={()=>activateTab('technicals')}/>
           <RightRailButton id="right-tab-strategies" label="Strategies"
             title="Strategies · strategy lab" icon={<FlaskConical className="h-3.5 w-3.5"/>}
-            active={strategyLabOpen} disabled={!onOpenStrategyLab} onClick={onOpenStrategyLab}/>
+            active={compactDock?isOpen&&activeTab==='strategies':strategyLabOpen} expanded={compactDock?isOpen&&activeTab==='strategies':undefined} disabled={!onOpenStrategyLab} onClick={compactDock?()=>activateTab('strategies'):onOpenStrategyLab}/>
           <RightRailButton id="right-tab-news" label="News"
             icon={<Newspaper className="h-3.5 w-3.5"/>}
             active={isOpen&&activeTab==='news'} expanded={isOpen&&activeTab==='news'}
@@ -396,10 +413,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
         <div className="flex w-full flex-col items-center gap-1">
           <RightRailButton id="right-tab-trade-journal" label="Trade Journal"
             title="Trade Journal" icon={<BookOpen className="h-3.5 w-3.5"/>}
-            active={tradeJournalOpen} onClick={onOpenTradeJournal}/>
+            active={compactDock?isOpen&&activeTab==='journal':tradeJournalOpen} expanded={compactDock?isOpen&&activeTab==='journal':undefined} onClick={compactDock?()=>activateTab('journal'):onOpenTradeJournal}/>
           <RightRailButton id="right-tab-help" label="Keyboard Shortcuts & Help"
             icon={<HelpCircle className="h-3.5 w-3.5"/>}
-            disabled={!onOpenHelp} onClick={onOpenHelp}/>
+            active={compactDock&&isOpen&&activeTab==='help'} expanded={compactDock?isOpen&&activeTab==='help':undefined} disabled={!onOpenHelp} onClick={compactDock?()=>activateTab('help'):onOpenHelp}/>
           <RightRailButton id="toggle-right-sidebar-btn"
             label={isOpen?'Collapse Panel':'Expand Panel'}
             icon={isOpen?<ChevronRight className="h-3.5 w-3.5"/>:<ChevronLeft className="h-3.5 w-3.5"/>}

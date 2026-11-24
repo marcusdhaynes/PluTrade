@@ -4,6 +4,7 @@ import { X, Search, Check, SlidersHorizontal, BarChart3, TrendingUp, Activity } 
 
 interface IndicatorsModalProps {
   isOpen: boolean;
+  embedded?: boolean;
   onClose: () => void;
   indicators: IndicatorSettings;
   setIndicators: React.Dispatch<React.SetStateAction<IndicatorSettings>>;
@@ -11,6 +12,7 @@ interface IndicatorsModalProps {
 
 export const IndicatorsModal: React.FC<IndicatorsModalProps> = ({
   isOpen,
+  embedded=false,
   onClose,
   indicators,
   setIndicators,
@@ -163,17 +165,17 @@ export const IndicatorsModal: React.FC<IndicatorsModalProps> = ({
 
   return (
     <div
-      id="indicators-modal-backdrop"
-      className="fixed inset-0 z-[1800] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
-      onClick={onClose}
+      id={embedded?undefined:'indicators-modal-backdrop'}
+      className={embedded?'flex flex-col flex-1 min-h-0 min-w-0':'fixed inset-0 z-[1800] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4'}
+      onClick={embedded?undefined:onClose}
     >
       <div
         id="indicators-modal-window"
-        className="bg-[#1e222d] border border-[#2a2e39] rounded-xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[85vh]"
+        className={embedded?'bg-[#131722] w-full min-h-0 flex-1 overflow-hidden flex flex-col':'bg-[#1e222d] border border-[#2a2e39] rounded-xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[85vh]'}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2a2e39]">
+        {!embedded&&<div className="flex items-center justify-between px-5 py-4 border-b border-[#2a2e39]">
           <div className="flex items-center gap-2.5">
             <SlidersHorizontal className="w-5 h-5 text-[#2962ff]" />
             <h2 className="text-base font-semibold text-[#d1d4dc]">Indicators, Metrics & Strategies</h2>
@@ -185,7 +187,7 @@ export const IndicatorsModal: React.FC<IndicatorsModalProps> = ({
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
+        </div>}
 
         {/* Search Bar */}
         <div className="p-4 border-b border-[#2a2e39] bg-[#131722]/50">
@@ -198,7 +200,7 @@ export const IndicatorsModal: React.FC<IndicatorsModalProps> = ({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-[#131722] border border-[#2a2e39] rounded-lg pl-9 pr-3 py-2 text-sm text-[#d1d4dc] placeholder-[#787b86] focus:outline-none focus:border-[#2962ff]"
-              autoFocus
+              autoFocus={!embedded}
             />
           </div>
 

@@ -835,3 +835,25 @@ html,body,#root {
     align-items:center;
   }
 }
+
+/* All compact right-rail tools share the same frame and content sizing. */
+#right-sidebar-content-pane[data-viewport-drawer=true] [data-right-drawer-body] {min-width:0;min-height:0;overflow:hidden;}
+#right-sidebar-content-pane [data-right-drawer-header] #journal-global-close {position:static;}
+#right-sidebar-content-pane #indicators-modal-window > div {min-width:0;}
+#right-sidebar-content-pane #indicators-modal-window > div:first-child {padding:8px;}
+#right-sidebar-content-pane #indicators-modal-window > div:first-child > div:last-child {gap:3px;flex-wrap:wrap;margin-top:6px;}
+#right-sidebar-content-pane #indicators-modal-window > div:first-child > div:last-child button {padding:3px 6px;font-size:10px;}
+#right-sidebar-content-pane #indicators-modal-window input {font-size:11px;}
+#right-sidebar-content-pane #indicators-modal-window [id^=indicator-row-] {padding:6px;gap:4px;}
+#right-sidebar-content-pane #indicators-modal-window [id^=indicator-row-] > div:first-child {min-width:0;gap:6px;}
+#right-sidebar-content-pane #indicators-modal-window [id^=indicator-row-] > div:first-child > div:last-child {min-width:0;overflow-wrap:anywhere;}
+#right-sidebar-content-pane #indicators-modal-window [id^=indicator-row-] .text-sm {font-size:11px;flex-wrap:wrap;gap:3px;}
+#right-sidebar-content-pane #indicators-modal-window [id^=indicator-row-] .text-xs {font-size:10px;}
+#right-sidebar-content-pane #indicators-modal-window > div:last-child {padding:8px;gap:4px;flex-wrap:wrap;font-size:10px;}
+#right-sidebar-content-pane #plutrade-strategy-lab {padding:8px;overflow-wrap:anywhere;}
+#right-sidebar-content-pane #plutrade-strategy-lab :is(input,select,textarea,svg,label) {max-width:100%;min-width:0;}
+#right-sidebar-content-pane #plutrade-strategy-lab .grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+#right-sidebar-content-pane #plutrade-strategy-lab .grid.grid-cols-1 {grid-template-columns:minmax(0,1fr);}
+#right-sidebar-content-pane #plutrade-strategy-lab .flex {flex-wrap:wrap;}
+#right-sidebar-content-pane #journal-account-import-strip {padding-right:3px;}
+#right-sidebar-content-pane #trade-journal-window-card aside {overflow-y:auto;scrollbar-width:none;}
