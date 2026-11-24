@@ -732,3 +732,77 @@ html,body,#root {
     max-width:calc(100% - var(--plutrade-mobile-bar-size) - 8px);
   }
 }
+
+/* Mobile icon controls share the RIGHT rail's precise 22x22 / 2px grid. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #plutrade-mobile-navbar button:not(#mobile-symbol-search-trigger),
+  #mobile-layout-anchor,
+  #mobile-layout-picker-btn,
+  #mobile-chart-style-trigger,
+  #mobile-chart-style-favorites > button,
+  #mobile-top-chart-actions > button,
+  #mobile-window-actions > button {
+    box-sizing:border-box;
+    width:22px !important;
+    min-width:22px !important;
+    max-width:22px !important;
+    height:22px !important;
+    min-height:22px !important;
+    max-height:22px !important;
+    flex:0 0 22px;
+    padding:0 !important;
+    border-radius:4px;
+  }
+  #plutrade-mobile-navbar #mobile-symbol-search-trigger {
+    height:22px !important;
+    min-height:22px !important;
+    max-height:22px !important;
+    padding-top:0 !important;
+    padding-bottom:0 !important;
+    line-height:20px;
+  }
+  #mobile-chart-style-anchor,
+  #mobile-chart-style-favorites,
+  #mobile-top-chart-actions,
+  #mobile-window-actions,
+  #plutrade-mobile-navbar {
+    gap:2px !important;
+  }
+  #tradingview-left-toolbar [data-toolbar-slot] > div > button,
+  #tradingview-left-toolbar #left-tool-line-group,
+  #tradingview-left-toolbar #left-toolbar-starred-tools > button {
+    box-sizing:border-box;
+    width:22px !important;
+    min-width:22px !important;
+    max-width:22px !important;
+    height:22px !important;
+    min-height:22px !important;
+    max-height:22px !important;
+    flex:0 0 22px;
+    padding:0 !important;
+  }
+  #tradingview-left-toolbar > div:first-child,
+  #tradingview-left-toolbar #left-toolbar-starred-tools {gap:2px !important;}
+  #chart-corner-controls {
+    box-sizing:border-box;
+    width:24px !important;
+    height:24px !important;
+    padding:0 !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:0 !important;
+  }
+  #time-scale-settings-btn {
+    display:flex !important;
+    width:22px !important;
+    min-width:22px !important;
+    height:22px !important;
+    min-height:22px !important;
+    flex:0 0 22px !important;
+    align-items:center !important;
+    justify-content:center !important;
+    margin:0 !important;
+    padding:0 !important;
+  }
+}
