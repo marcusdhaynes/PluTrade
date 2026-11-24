@@ -74,8 +74,47 @@ interface RightSidebarProps {
   onOpenTradeJournal?: () => void;
   onOpenHelp?:()=>void;
   onOpenIndicators:()=>void;
+  indicatorsOpen?:boolean;
+  tradeJournalOpen?:boolean;
+  onOpenStrategyLab?:()=>void;
+  strategyLabOpen?:boolean;
   onOpenConditionalOrder?: (dep: DependencyContext) => void;
 }
+
+
+type RightRailButtonProps={
+  id?:string;
+  label:string;
+  title?:string;
+  icon:React.ReactNode;
+  onClick?:()=>void;
+  active?:boolean;
+  disabled?:boolean;
+  expanded?:boolean;
+  badge?:React.ReactNode;
+};
+/** Every rail control is the same 24px button / centered 14px icon shape.
+ * The responsive rail CSS scales every button to the same 22px grid. */
+const RightRailButton:React.FC<RightRailButtonProps>=({
+  id,label,title,icon,onClick,active=false,disabled=false,expanded,badge
+})=><button type="button" id={id} data-right-rail-button="true"
+  aria-label={label} title={title??label} aria-pressed={active}
+  aria-expanded={expanded} disabled={disabled} onClick={onClick}
+  className={[
+    'relative flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-md',
+    'border-0 p-0 transition-colors duration-100',
+    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8bb5ff]',
+    active?'bg-[#2962ff] text-white':'bg-transparent text-[#787b86] hover:bg-[#1e222d] hover:text-[#d1d4dc]',
+    disabled?'cursor-not-allowed opacity-50':'cursor-pointer'
+  ].join(' ')}>
+  <span data-right-rail-icon="true" className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+    {icon}
+  </span>
+  {badge&&<span data-right-rail-badge="true"
+    className="absolute -right-0.5 -top-0.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-[#f23645] px-0.5 text-[8px] font-bold leading-none text-white">
+    {badge}
+  </span>}
+</button>;
 
 export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
   assets,
@@ -108,6 +147,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
   onOpenTradeJournal,
   onOpenHelp,
   onOpenIndicators,
+  indicatorsOpen=false,
+  tradeJournalOpen=false,
+  onOpenStrategyLab,
+  strategyLabOpen=false,
   onOpenConditionalOrder,
 }) => {
   const dockRef=useRef<HTMLDivElement>(null);
@@ -182,6 +225,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
       window.removeEventListener('keydown',escape);
     };
   },[isOpen,setIsOpen]);
+  const activateTab=(tab:RightSidebarTab)=>{
+    if(isOpen&&activeTab===tab)setIsOpen(false);
+    else{setActiveTab(tab);setIsOpen(true);}
+  };
   const pane=isOpen?(
         <div
           ref={paneRef}
@@ -300,194 +347,63 @@ export const RightSidebar: React.FC<RightSidebarProps> = React.memo(({
           Desktop keeps its existing in-flow split layout. */}
       {compactDock&&typeof document!=='undefined'?createPortal(pane,document.body):pane}
 
-      {/* Rightmost Vertical Icon Tab Bar */}
-      <div
-        id="tradingview-right-icon-bar"
-        className="flex w-[32px] bg-[#131722] border-l border-[#2a2e39] py-1 flex-col items-center justify-between shrink-0"
-      >
-        <div className="flex flex-col items-center gap-1 w-full">
-          {/* Watchlist with red badge 1 */}
-          <button
-            id="right-tab-watchlist"
-            onClick={() => {
-              if (isOpen && activeTab === 'watchlist') setIsOpen(false);
-              else {
-                setActiveTab('watchlist');
-                setIsOpen(true);
-              }
-            }}
-            className={`w-[24px] h-[24px] rounded-md flex items-center justify-center transition relative ${
-              isOpen && activeTab === 'watchlist'
-                ? 'bg-[#2962ff] text-white'
-                : 'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'
-            }`}
-            title="Watchlist and Details"
-          >
-            <List className="w-3.5 h-3.5" />
-            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#f23645] text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-              1
-            </span>
-          </button>
-
-          {/* Alerts (active in screenshot) */}
-          <button
-            id="right-tab-alerts"
-            onClick={() => {
-              if (isOpen && activeTab === 'alerts') setIsOpen(false);
-              else {
-                setActiveTab('alerts');
-                setIsOpen(true);
-              }
-            }}
-            className={`w-[24px] h-[24px] rounded-md flex items-center justify-center transition relative ${
-              isOpen && activeTab === 'alerts'
-                ? 'bg-[#2a2e39] text-white'
-                : 'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'
-            }`}
-            title="Alerts"
-          >
-            <BellRing className="w-3.5 h-3.5" />
-          </button>
-
-          {/* The only Indicators entry is on this permanently attached rail. */}
-          <button type="button" id="right-tab-indicators" aria-label="Indicators"
-            title="Indicators and studies" onClick={onOpenIndicators}
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#93abd0] hover:text-white hover:bg-[#2d4264] transition">
-            <SlidersHorizontal className="w-3.5 h-3.5"/>
-          </button>
-
-          {/* News */}
-          <button
-            id="right-tab-news"
-            onClick={() => {
-              if (isOpen && activeTab === 'news') setIsOpen(false);
-              else {
-                setActiveTab('news');
-                setIsOpen(true);
-              }
-            }}
-            className={`w-[24px] h-[24px] rounded-md flex items-center justify-center transition ${
-              isOpen && activeTab === 'news'
-                ? 'bg-[#2962ff] text-white'
-                : 'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'
-            }`}
-            title="News"
-          >
-            <Newspaper className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Order Book / DOM */}
-          <button
-            id="right-tab-orderbook"
-            onClick={() => {
-              if (isOpen && activeTab === 'orderbook') setIsOpen(false);
-              else {
-                setActiveTab('orderbook');
-                setIsOpen(true);
-              }
-            }}
-            className={`w-[24px] h-[24px] rounded-md flex items-center justify-center transition ${
-              isOpen && activeTab === 'orderbook'
-                ? 'bg-[#2962ff] text-white'
-                : 'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'
-            }`}
-            title="Order Book & Depth"
-          >
-            <Layers className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Technical Summary Gauge */}
-          <button
-            id="right-tab-technicals"
-            onClick={() => {
-              if (isOpen && activeTab === 'technicals') setIsOpen(false);
-              else {
-                setActiveTab('technicals');
-                setIsOpen(true);
-              }
-            }}
-            className={`w-[24px] h-[24px] rounded-md flex items-center justify-center transition ${
-              isOpen && activeTab === 'technicals'
-                ? 'bg-[#2962ff] text-white'
-                : 'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'
-            }`}
-            title="Technicals"
-          >
-            <Gauge className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Calendar */}
-          <button
-            type="button" id="right-tab-calendar"
-            onClick={()=>{if(isOpen&&activeTab==='calendar')setIsOpen(false);else{setActiveTab('calendar');setIsOpen(true);}}}
-            className={`w-[24px] h-[24px] rounded-md flex items-center justify-center transition ${isOpen&&activeTab==='calendar'?'bg-[#2962ff] text-white':'text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d]'}`}
-            title="Economic Calendar (feed not connected)"
-          >
-            <Calendar className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Community Ideas */}
-          <button type="button" disabled aria-label="Community Ideas unavailable"
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#586071] cursor-not-allowed opacity-60"
+      {/* Every right tool shares an identical structure, icon box,
+          spacing, active state and keyboard focus treatment. */}
+      <div id="tradingview-right-icon-bar"
+        className="flex w-[32px] shrink-0 select-none flex-col items-center justify-between border-l border-[#2a2e39] bg-[#131722] py-1">
+        <div className="flex w-full flex-col items-center gap-1">
+          <RightRailButton id="right-tab-watchlist" label="Watchlist and Details"
+            icon={<List className="h-3.5 w-3.5"/>}
+            active={isOpen&&activeTab==='watchlist'} expanded={isOpen&&activeTab==='watchlist'}
+            onClick={()=>activateTab('watchlist')}/>
+          <RightRailButton id="right-tab-alerts" label="Alerts"
+            icon={<BellRing className="h-3.5 w-3.5"/>}
+            active={isOpen&&activeTab==='alerts'} expanded={isOpen&&activeTab==='alerts'}
+            onClick={()=>activateTab('alerts')}/>
+          <RightRailButton id="right-tab-indicators" label="Indicators"
+            title="Indicators and studies" icon={<SlidersHorizontal className="h-3.5 w-3.5"/>}
+            active={indicatorsOpen} onClick={onOpenIndicators}/>
+          <RightRailButton id="right-tab-metrics" label="Metrics"
+            title="Metrics · technical summary" icon={<Gauge className="h-3.5 w-3.5"/>}
+            active={isOpen&&activeTab==='technicals'} expanded={isOpen&&activeTab==='technicals'}
+            onClick={()=>activateTab('technicals')}/>
+          <RightRailButton id="right-tab-strategies" label="Strategies"
+            title="Strategies · strategy lab" icon={<Lightbulb className="h-3.5 w-3.5"/>}
+            active={strategyLabOpen} disabled={!onOpenStrategyLab} onClick={onOpenStrategyLab}/>
+          <RightRailButton id="right-tab-news" label="News"
+            icon={<Newspaper className="h-3.5 w-3.5"/>}
+            active={isOpen&&activeTab==='news'} expanded={isOpen&&activeTab==='news'}
+            onClick={()=>activateTab('news')}/>
+          <RightRailButton id="right-tab-orderbook" label="Order Book & Depth"
+            icon={<Layers className="h-3.5 w-3.5"/>}
+            active={isOpen&&activeTab==='orderbook'} expanded={isOpen&&activeTab==='orderbook'}
+            onClick={()=>activateTab('orderbook')}/>
+          <RightRailButton id="right-tab-calendar" label="Economic Calendar"
+            title="Economic Calendar (feed not connected)" icon={<Calendar className="h-3.5 w-3.5"/>}
+            active={isOpen&&activeTab==='calendar'} expanded={isOpen&&activeTab==='calendar'}
+            onClick={()=>activateTab('calendar')}/>
+          <RightRailButton label="Community Ideas unavailable"
             title="Community Ideas requires a moderated backend and is not connected"
-          >
-            <Lightbulb className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Chats */}
-          <button type="button" disabled aria-label="Public and Private Chats unavailable"
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#586071] cursor-not-allowed opacity-60"
+            icon={<Bookmark className="h-3.5 w-3.5"/>} disabled/>
+          <RightRailButton label="Public and Private Chats unavailable"
             title="Chats require authenticated messaging and moderation and are not connected"
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Notifications with red badge 99+ */}
-          <button
-            id="right-tab-notifications"
-            onClick={() => {
-              if (isOpen && activeTab === 'notifications') setIsOpen(false);
-              else {
-                setActiveTab('notifications');
-                setIsOpen(true);
-              }
-            }}
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition relative"
-            title="Notifications"
-          >
-            <Bell className="w-3.5 h-3.5" />
-            {notification && <span className="absolute -top-0.5 -right-1 px-0.5 py-0 bg-[#f23645] text-white text-[7.5px] font-bold rounded-full flex items-center justify-center">1</span>}
-          </button>
+            icon={<MessageSquare className="h-3.5 w-3.5"/>} disabled/>
+          <RightRailButton id="right-tab-notifications" label="Notifications"
+            icon={<Bell className="h-3.5 w-3.5"/>} badge={notification?'1':undefined}
+            active={isOpen&&activeTab==='notifications'} expanded={isOpen&&activeTab==='notifications'}
+            onClick={()=>activateTab('notifications')}/>
         </div>
-
-        {/* Bottom icons: Journal, Help & Toggle Collapse */}
-        <div className="flex flex-col items-center gap-1">
-          {/* Trade Journal (TradeZella & TraderSync) */}
-          <button
-            id="right-tab-trade-journal"
-            onClick={onOpenTradeJournal}
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#2962ff] hover:text-white hover:bg-[#2962ff] transition relative group"
-            title="Trade Journal (TradeZella & TraderSync)"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-[#00ffa3] rounded-full ring-1 ring-[#131722]" />
-          </button>
-
-          <button type="button" onClick={onOpenHelp} disabled={!onOpenHelp}
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition"
-            title="Keyboard Shortcuts & Help"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            id="toggle-right-sidebar-btn"
-            onClick={() => setIsOpen(!isOpen)}
-            className="w-[24px] h-[24px] rounded-md flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] transition"
-            title={isOpen ? 'Collapse Panel' : 'Expand Panel'}
-          >
-            {isOpen ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-          </button>
+        <div className="flex w-full flex-col items-center gap-1">
+          <RightRailButton id="right-tab-trade-journal" label="Trade Journal"
+            title="Trade Journal" icon={<BookOpen className="h-3.5 w-3.5"/>}
+            active={tradeJournalOpen} onClick={onOpenTradeJournal}/>
+          <RightRailButton id="right-tab-help" label="Keyboard Shortcuts & Help"
+            icon={<HelpCircle className="h-3.5 w-3.5"/>}
+            disabled={!onOpenHelp} onClick={onOpenHelp}/>
+          <RightRailButton id="toggle-right-sidebar-btn"
+            label={isOpen?'Collapse Panel':'Expand Panel'}
+            icon={isOpen?<ChevronRight className="h-3.5 w-3.5"/>:<ChevronLeft className="h-3.5 w-3.5"/>}
+            active={isOpen} expanded={isOpen} onClick={()=>setIsOpen(!isOpen)}/>
         </div>
       </div>
     </div>
