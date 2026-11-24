@@ -875,6 +875,12 @@ test('quick cash sizing, precise available-equity percent and independent SL TP 
   await expect(ticket.getByRole('switch',{name:'Enable take profit'})).toHaveAttribute('aria-checked','true');
   await expect(ticket.getByRole('spinbutton',{name:'Stop-loss value'})).toHaveValue('1.25');
   await expect(ticket.getByRole('spinbutton',{name:'Take-profit value'})).toHaveValue('2.5');
+  await ticket.getByTitle('Close order panel').click();
+  await page.locator('#mobile-stop-setup-btn').click();
+  await sl.getByRole('button',{name:'Clear SL setup'}).click();
+  await page.getByRole('button',{name:'Enter',exact:true}).click();
+  await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','false');
+  await expect(ticket.getByRole('switch',{name:'Enable take profit'})).toHaveAttribute('aria-checked','true');
 });
 
 test('mobile toolbar icon geometry matches right rail and bottom button width ratios',async({page})=>{
