@@ -500,8 +500,11 @@ export const MobileTradingControls:React.FC<Props>=({
         onClick={()=>onEnter()}>Enter</button>
       <button type="button" className={baseButton+' '+(position?'border-[#ad4851] bg-[#49272f] text-white':'opacity-40')}
         disabled={!position} aria-label="Exit paper position" onClick={onExit}>Exit</button>
-      <button type="button" className={baseButton} onClick={()=>{setEquityDraft(String(equityPercent));setError('');setPanel('equity');}}>
-        {numeric(equityPercent,1)}% <span className="text-[9px] font-normal">Eq</span>
+      <button id="mobile-order-amount-btn" type="button"
+        className={baseButton+' flex-[2_1_0%] truncate'}
+        title={quickSize.mode==='equity'? `${quickSize.value}% of available equity`:`Cash margin ${moneyLabel(quickSize.value)}`}
+        onClick={()=>{setSizeModeDraft(quickSize.mode);setSizeDraft(String(quickSize.value));setError('');setPanel('equity');}}>
+        {quickSize.mode==='equity'?`${Math.round(quickSize.value)}% Equity`:moneyLabel(quickSize.value)}
       </button>
       {(['sl','tp'] as const).map(kind=><button key={kind} type="button"
         className={baseButton+' '+(panel===kind?'border-[#709fff]':'')}
