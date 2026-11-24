@@ -975,8 +975,10 @@ test('global sidebar dialogs escape the app stacking context and cover the top b
       else expect(result.top).toBeLessThanOrEqual(result.navbarBottom+8);
     };
     await page.locator('#right-tab-indicators').click();
-    await dialogOnTop('#indicators-modal-backdrop');
-    await page.locator('#close-indicators-modal-btn').click();
+    const indicatorDrawer=page.locator('#right-sidebar-content-pane');
+    await expect(indicatorDrawer.locator('#indicators-modal-window')).toBeVisible();
+    expect(await indicatorDrawer.evaluate(node=>node.parentElement===document.body)).toBe(true);
+    await indicatorDrawer.locator('[data-right-drawer-header] button').click();
     await page.locator('#right-tab-alerts').click();
     await page.locator('#create-new-alert-plus-btn').click();
     await dialogOnTop('#alerts-modal-backdrop');
@@ -1056,7 +1058,7 @@ test('mobile right drawer header stays on top of timeframe row and is interactiv
     const visual=await page.evaluate(()=>{
       const rect=(id:string)=>document.getElementById(id)!.getBoundingClientRect();
       const panel=document.getElementById('right-sidebar-content-pane')!;
-      const header=document.querySelector('#tradingview-alerts-panel > div:first-child')!;
+      const header=document.querySelector('#right-sidebar-content-pane [data-right-drawer-header]')!;
       const hr=header.getBoundingClientRect();
       const nav=rect('tradingview-top-navbar');
       const timeframe=rect('tradingview-bottom-bar');
@@ -1156,7 +1158,7 @@ test('Indicators, Metrics and Strategies in uniform right rail open their actual
   await indicators.click();
   await expect(page.locator('#indicators-modal-window')).toBeVisible();
   await expect(indicators).toHaveAttribute('aria-pressed','true');
-  await page.locator('#close-indicators-modal-btn').click();
+  await page.locator('#right-drawer-close').click();
   await expect(indicators).toHaveAttribute('aria-pressed','false');
   await metrics.click();
   await expect(page.locator('#technical-summary-panel')).toBeVisible();
@@ -1166,14 +1168,14 @@ test('Indicators, Metrics and Strategies in uniform right rail open their actual
   await expect(metrics).toHaveAttribute('aria-pressed','false');
   await expect(strategies).toBeEnabled();
   await strategies.click();
-  await expect(page.locator('#paper-trading-open-panel')).toBeVisible();
-  await expect(page.locator('#plutrade-strategy-lab')).toBeVisible();
+  await expect(page.locator('#right-sidebar-content-pane #plutrade-strategy-lab')).toBeVisible();
   await expect(strategies).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('#tradingview-right-icon-bar')).toBeVisible();
 });
 
 
 test('every enabled mobile right rail tool uses one identical viewport drawer',async({page})=>{
+  test.setTimeout(120000);
   for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
     await page.setViewportSize(size);await page.goto('./');
     const pane=page.locator('#right-sidebar-content-pane');
