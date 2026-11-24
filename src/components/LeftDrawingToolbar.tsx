@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import {FloatingPortal} from './FloatingPortal';
 import { DrawingToolType } from '../types';
 import {
   Crosshair,
@@ -365,7 +366,6 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
     setEditingToolbar(false);
   };
   const colorPickerRef=useRef<HTMLDivElement>(null);
-  const lineMenuRef = useRef<HTMLDivElement>(null);
   const lineBtnRef = useRef<HTMLDivElement>(null);
 
   // Remember active tool selected within the line group
@@ -401,9 +401,11 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
   useEffect(() => {
     const handleOutside = (event:PointerEvent) => {
       const target=event.target as Node;
-      if(isLineMenuOpen&&!lineMenuRef.current?.contains(target)&&!lineBtnRef.current?.contains(target))
+      if(isLineMenuOpen&&!lineBtnRef.current?.contains(target)&&
+         !(event.target instanceof Element&&event.target.closest('#tradingview-lines-flyout-menu')))
         setIsLineMenuOpen(false);
-      if(isColorPickerOpen&&!colorPickerRef.current?.contains(target))
+      if(isColorPickerOpen&&!colorPickerRef.current?.contains(target)&&
+         !(event.target instanceof Element&&event.target.closest('#drawing-color-menu')))
         setIsColorPickerOpen(false);
     };
     const handleEscape=(event:KeyboardEvent)=>{
@@ -529,10 +531,9 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
 
           {/* TRADINGVIEW FLYOUT DROPDOWN MENU - Visible box matching image.png */}
           {isLineMenuOpen && (
-            <div
-              ref={lineMenuRef}
-              id="tradingview-lines-flyout-menu"
-              className="absolute left-[30px] top-[-4px] bg-[#1e222d] border border-[#2a2e39] rounded shadow-2xl py-1.5 w-[260px] max-h-[calc(100vh-60px)] overflow-y-auto text-[#d1d4dc] text-xs z-50 select-none divide-y divide-[#2a2e39]/80 scrollbar-thin"
+            <FloatingPortal anchor={lineBtnRef} placement="right-start" width={260} zIndex={1650}
+              id="tradingview-lines-flyout-menu" ariaLabel="Drawing line tools"
+              className="bg-[#1e222d] border border-[#2a2e39] rounded shadow-2xl py-1.5 text-[#d1d4dc] text-xs select-none divide-y divide-[#2a2e39]/80 scrollbar-thin"
             >
               
               
@@ -697,7 +698,7 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
                   );
                 })}
               </div>
-            </div>
+            </FloatingPortal>
           )}
         </div>
 
@@ -871,7 +872,9 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
             />
           </button>
           {isColorPickerOpen && (
-            <div className="absolute left-full ml-2 top-0 bg-[#1e222d] border border-[#2a2e39] rounded-lg p-1.5 shadow-2xl flex flex-col gap-1 z-50">
+            <FloatingPortal anchor={colorPickerRef} placement="right-start" width={38} zIndex={1650}
+              id="drawing-color-menu" ariaLabel="Drawing colors"
+              className="bg-[#1e222d] border border-[#2a2e39] rounded-lg p-1.5 shadow-2xl flex flex-col items-center gap-1">
               {colors.map((c) => (
                 <button
                   key={c}
@@ -879,11 +882,12 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
                     setCurrentColor(c);
                     setIsColorPickerOpen(false);
                   }}
+                  aria-label={'Drawing color '+c}
                   className="w-4 h-4 rounded-full border border-[#2a2e39] transition hover:scale-125 cursor-pointer"
                   style={{ backgroundColor: c }}
                 />
               ))}
-            </div>
+            </FloatingPortal>
           )}
         </div>
         </React.Fragment>)}
