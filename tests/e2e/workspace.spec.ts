@@ -18,6 +18,7 @@ test('workspace renders without uncaught errors and chart-scale controls respond
     await button.click();
     await expect.poll(()=>button.getAttribute('class')).toBe(before);
   }
+  await page.locator('#time-scale-settings-btn').click();
   await page.locator('#fit-chart-content-btn').click();
   expect(errors,'Unexpected client-side exceptions').toEqual([]);
 });
