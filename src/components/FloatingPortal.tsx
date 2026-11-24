@@ -67,3 +67,17 @@ export function FloatingPortal({
     {children}
   </div>,document.body);
 }
+
+/** Top-level viewport overlay host for popups and dialogs that must escape
+ * clipped chart/toolbar containers and their independent stacking contexts.
+ * The wrapper is intentionally not positioned: fixed descendants resolve
+ * against the viewport, and no invisible layer intercepts chart interactions. */
+export function ViewportPortal({children}:{children:React.ReactNode}){
+  if(typeof document==='undefined')return null;
+  return createPortal(
+    <div data-plutrade-viewport-portal="" className="font-sans text-[#d1d4dc]">
+      {children}
+    </div>,
+    document.body
+  );
+}
