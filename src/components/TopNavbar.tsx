@@ -33,10 +33,10 @@ import {
   FlaskConical,
   Play,
 } from 'lucide-react';
-import { LAYOUT_TEMPLATES } from '../data/layoutTemplates';
+import { LAYOUT_TEMPLATES,ROW_CATEGORIES,getLayoutTemplateById } from '../data/layoutTemplates';
 import {FloatingPortal} from './FloatingPortal';
 import { LayoutTemplate, LayoutSyncSettings, SavedChartLayout } from '../types/layout';
-import { LayoutDropdown } from './layout/LayoutDropdown';
+import { LayoutDropdown, LayoutPreviewIcon } from './layout/LayoutDropdown';
 import { LayoutManagerDropdown } from './layout/LayoutManagerDropdown';
 
 interface TopNavbarProps {
@@ -139,6 +139,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
 }) => {
   const [isChartTypeOpen, setIsChartTypeOpen] = useState(false);
   const [isMobileChartStyleOpen,setIsMobileChartStyleOpen]=useState(false);
+  const [isMobileLayoutOpen,setIsMobileLayoutOpen]=useState(false);
+  const mobileLayoutRef=useRef<HTMLDivElement>(null);
   const mobileChartStyleRef=useRef<HTMLDivElement>(null);
   const desktopChartStyleRef=useRef<HTMLDivElement>(null);
   const [showQuickDrawingTools,setShowQuickDrawingTools]=useState<boolean>(()=>{
@@ -152,12 +154,16 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
       if(isMobileChartStyleOpen&&!mobileChartStyleRef.current?.contains(node)&&
          !(node instanceof Element&&node.closest('#mobile-chart-type-dropdown-menu')))
         setIsMobileChartStyleOpen(false);
+      if(isMobileLayoutOpen&&!mobileLayoutRef.current?.contains(node)&&
+         !(node instanceof Element&&node.closest('#mobile-layout-popover')))
+        setIsMobileLayoutOpen(false);
       if(isChartTypeOpen&&!desktopChartStyleRef.current?.contains(node))
         setIsChartTypeOpen(false);
     };
     const escape=(event:KeyboardEvent)=>{
       if(event.key==='Escape'){
         setIsMobileChartStyleOpen(false);
+        setIsMobileLayoutOpen(false);
         setIsChartTypeOpen(false);
       }
     };
@@ -167,7 +173,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
       window.removeEventListener('pointerdown',dismiss,true);
       window.removeEventListener('keydown',escape);
     };
-  },[isMobileChartStyleOpen,isChartTypeOpen]);
+  },[isMobileChartStyleOpen,isMobileLayoutOpen,isChartTypeOpen]);
 
   const chartTypes: { id: ChartType; label: string; group: string; icon: React.ReactNode }[] = [
     {
@@ -409,9 +415,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           <button type="button" id="mobile-chart-style-trigger" aria-label="Choose visual chart style"
             aria-expanded={isMobileChartStyleOpen} title={'Chart type: '+(chartTypes.find(t=>t.id===chartType)?.label||chartType)}
             onClick={()=>setIsMobileChartStyleOpen(open=>!open)}
-            className="flex h-7 items-center gap-0.5 rounded border border-[#435371] bg-[#1d2b40] px-1.5 text-[#c9ddff]">
-            {chartTypes.find(t=>t.id===chartType)?.icon||<CandlestickChart size={15}/>}
-            <ChevronDown size={11}/>
+            className="relative flex h-[22px] w-[22px] items-center justify-center rounded text-[#c9ddff]">
+            {chartTypes.find(t=>t.id===chartType)?.icon||<CandlestickChart size={14}/>}
+            <ChevronDown size={8} className="absolute -bottom-0.5 -right-0.5"/>
           </button>
           <div id="mobile-chart-style-favorites" className="flex min-w-0 max-w-[70px] gap-0.5 overflow-x-auto scrollbar-none">
             {chartTypes.filter(item=>favoriteChartTypes.includes(item.id)).map(item=>
@@ -447,17 +453,53 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
           </FloatingPortal>}
         </div>
         <div id="mobile-top-chart-actions" className="flex min-w-0 shrink-0 items-center gap-0.5">
-          <label id="mobile-layout-anchor" title="Chart window layout"
-            className="relative flex h-7 w-6 shrink-0 items-center justify-center rounded border border-[#3b475a] bg-[#202b3b] text-[#c8d5e8]">
-            <LayoutGrid size={15}/>
-            <select aria-label="Mobile chart layout" value={currentTemplateId}
-              onChange={event=>{
-                const template=LAYOUT_TEMPLATES.find(item=>item.id===event.target.value);
-                if(template)onSelectTemplate(template);
-              }} className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
-              {LAYOUT_TEMPLATES.map(template=><option key={template.id} value={template.id}>{template.name}</option>)}
-            </select>
-          </label>
+          <div id="mobile-layout-anchor" ref={mobileLayoutRef}
+            className="relative flex w-[22px] h-[22px] shrink-0 items-center justify-center text-[#c8d5e8]">
+            <button type="button" id="mobile-layout-picker-btn"
+              aria-label="Mobile chart layout" aria-expanded={isMobileLayoutOpen}
+              title={`Chart windows: ${getLayoutTemplateById(currentTemplateId).name}`}
+              className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded hover:bg-[#2b3d57]"
+              onClick={()=>{setIsMobileChartStyleOpen(false);setIsMobileLayoutOpen(v=>!v);}}>
+              <LayoutPreviewIcon template={getLayoutTemplateById(currentTemplateId)} size={18}/>
+            </button>
+            {isMobileLayoutOpen&&<FloatingPortal anchor={mobileLayoutRef} placement="bottom-start"
+              id="mobile-layout-popover" ariaLabel="Choose chart window layout" width={298} zIndex={2100}
+              className="rounded-lg border border-[#49566f] bg-[#182235] p-2 shadow-2xl text-[#c4d2e5]">
+              <div className="mb-1 text-[11px] font-bold">Chart window layouts</div>
+              <div className="text-[9px] text-[#899db9] mb-2">Tap a visual arrangement to switch charts.</div>
+              <div className="space-y-1.5">
+                {ROW_CATEGORIES.map(category=>{
+                  const templates=LAYOUT_TEMPLATES.filter(x=>x.rowCategory===category);
+                  if(templates.length===0)return null;
+                  return <div key={category} className="flex items-start gap-2 border-t border-[#314057] pt-1.5">
+                    <span className="w-4 shrink-0 text-[10px] font-mono text-[#8a9aaf] pt-1">{category}</span>
+                    <div className="flex flex-wrap gap-1">
+                      {templates.map(template=><button type="button" key={template.id}
+                        aria-label={template.name} title={template.name}
+                        aria-pressed={currentTemplateId===template.id}
+                        onClick={()=>{onSelectTemplate(template);setIsMobileLayoutOpen(false);}}
+                        className={'grid h-8 w-8 shrink-0 place-items-center rounded border '+(
+                          currentTemplateId===template.id?'border-[#a9c4f0] bg-[#294b7d] text-white':
+                          'border-[#384862] text-[#9eafca] hover:bg-[#2d3e59] hover:text-white')}>
+                        <LayoutPreviewIcon template={template} isSelected={currentTemplateId===template.id} size={23}/>
+                      </button>)}
+                      <button type="button" aria-label={`Custom ${category}-chart grid`}
+                        title={`Custom ${category}-chart grid`}
+                        aria-pressed={currentTemplateId===`custom-${category}`}
+                        onClick={()=>{
+                          onSelectTemplate(getLayoutTemplateById(`custom-${category}`));
+                          setIsMobileLayoutOpen(false);
+                        }}
+                        className={'grid h-8 w-8 place-items-center rounded border text-xs '+(
+                          currentTemplateId===`custom-${category}`?'border-[#a9c4f0] bg-[#294b7d]':'border-[#384862] hover:bg-[#2d3e59]')}>
+                        ?
+                      </button>
+                    </div>
+                  </div>;
+                })}
+              </div>
+            </FloatingPortal>}
+          </div>
           <button type="button" id="mobile-save-chart-btn" aria-label="Save Chart"
             title="Save and restore charts" onClick={onOpenSavedCharts}
             className="flex h-7 w-6 shrink-0 items-center justify-center rounded text-[#b6c6df] hover:bg-[#2b3d57]">
