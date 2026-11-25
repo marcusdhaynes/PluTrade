@@ -390,13 +390,14 @@ export function subscribePublicFeed(a: Asset, timeframe: Timeframe, cb: PublicCa
       ws.onopen = () => {
         if (stopped) return;
         retry = 0;
-        if (source.startsWith('kraken') && isKrakenDerivative(a)) ws?.send(JSON.stringify({
-          event: 'subscribe', feed: 'ticker', product_ids: [futureSymbol(symbol)] }));
+        if (source.startsWith('kraken') && isKrakenDerivative(a)) {
+          for(const feed of ['ticker','trade'])ws?.send(JSON.stringify({event:'subscribe',feed,product_ids:[futureSymbol(symbol)]}));
+        }
         else if (source.startsWith('kraken')) {
           // Kraken WS v2 uses canonical BASE/QUOTE names.
           const m = symbol.match(/^(.+?)(USDT|USD|EUR|BTC|ETH)$/);
-          if (m) ws?.send(JSON.stringify({ method: 'subscribe', params: {
-            channel: 'ticker', symbol: [m[1].replace(/^XXBT$/, 'BTC').replace(/^XBT$/, 'BTC') + '/' + m[2]] }}));
+          if (m) for(const channel of ['ticker','trade'])ws?.send(JSON.stringify({ method: 'subscribe', params: {
+            channel, snapshot:channel==='ticker', symbol: [m[1].replace(/^XXBT$/, 'BTC').replace(/^XBT$/, 'BTC') + '/' + m[2]] }}));
         } else if (source === 'coinbase') ws?.send(JSON.stringify({
           type: 'subscribe', product_ids: [coinbaseSymbol(symbol)], channels: ['ticker','matches','level2'] }));
         else if (source === 'okx') ws?.send(JSON.stringify({ op: 'subscribe', args: [{ channel: 'tickers', instId: symbol }] }));
@@ -411,9 +412,13 @@ export function subscribePublicFeed(a: Asset, timeframe: Timeframe, cb: PublicCa
           if (source.startsWith('kraken') && isKrakenDerivative(a)) {
             if (raw.feed === 'ticker' && raw.product_id === futureSymbol(symbol))
               tick(Number(raw.last),0,'buy',true,'ticker');
+            if(raw.feed==='trade'&&raw.product_id===futureSymbol(symbol)&&raw.type==='fill'&&typeof raw.uid==='string'&&raw.uid&&['buy','sell'].includes(raw.side)&&Number(raw.qty)>0&&Number.isFinite(Number(raw.qty))&&Math.abs(Date.now()-Number(raw.time))<30000)
+              tick(Number(raw.price),Number(raw.qty),raw.side,true,'trade',{tradeId:'kraken-futures:'+raw.uid,exchangeAt:Number(raw.time)});
           } else if (source.startsWith('kraken')) {
             if (raw.channel === 'ticker' && Array.isArray(d) && d[0]?.last)
               tick(Number(d[0].last),0,'buy',true,'ticker');
+            const m=symbol.match(/^(.+?)(USDT|USD|EUR|BTC|ETH)$/);const pair=m?m[1].replace(/^XXBT$/, 'BTC').replace(/^XBT$/, 'BTC')+'/'+m[2]:'';
+            if(raw.channel==='trade'&&raw.type==='update'&&Array.isArray(d))for(const t of d){const at=Date.parse(t.timestamp);if(t.symbol===pair&&Number.isSafeInteger(t.trade_id)&&t.trade_id>=0&&['buy','sell'].includes(t.side)&&Number(t.qty)>0&&Number.isFinite(Number(t.qty))&&Math.abs(Date.now()-at)<30000)tick(Number(t.price),Number(t.qty),t.side,true,'trade',{tradeId:'kraken-spot:'+t.trade_id,exchangeAt:at});}
           } else if (source === 'coinbase') {
             const product=coinbaseSymbol(symbol);
             if ((raw.type === 'snapshot' || raw.type === 'l2update') &&
@@ -467,6 +472,7 @@ export function subscribePublicFeed(a: Asset, timeframe: Timeframe, cb: PublicCa
   const poll = async () => {
     if (stopped || Date.now() - lastTick < 12000) return;
     const q = await fetchPublicQuote(a);
+    if(stopped||Date.now()-lastTick<12000)return;
     if (!stopped && q && typeof q.price === 'number') {
       tick(q.price,0,'buy',false);
       status(true,'public REST polling (not streaming)');

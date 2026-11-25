@@ -359,6 +359,9 @@ export default function App() {
     catch{}
   },[showMobileChartLegend]);
 
+  const [showCurrentPriceLabel,setShowCurrentPriceLabel]=useState(()=>{try{return localStorage.getItem('plutrade_current_price_label_v1')==='true';}catch{return false;}});
+  useEffect(()=>{try{localStorage.setItem('plutrade_current_price_label_v1',String(showCurrentPriceLabel));}catch{}},[showCurrentPriceLabel]);
+
   // State: Indicators
   const [indicators, setIndicators] = useState<IndicatorSettings>(() => {
     const saved = localStorage.getItem('tv_indicators');
@@ -942,7 +945,7 @@ export default function App() {
     setMobileQuickTicket(prev=>({focus,seq:(prev?.seq||0)+1}));
     setIsTradeTicketOpen(true);
   };
-  const [tradeTicketAccountSettings,setTradeTicketAccountSettings]=useState(false);
+  const [tradeTicketAccountSettings,setTradeTicketAccountSettings]=useState<boolean|string>(false);
   const [isBottomTradingExpanded, setIsBottomTradingExpanded] = useState(false);
 
   // State: Order Book & Trades
@@ -1481,18 +1484,16 @@ export default function App() {
     fetchRealTicker24h(activeAsset).then((ticker) => {
       if (!isCancelled && ticker) {
         setActiveAsset(prev=>{
-          const keepLive=prev.quoteStatus==='live'&&!!prev.quoteUpdatedAt&&
-            Date.now()-prev.quoteUpdatedAt<30000&&ticker.quoteStatus!=='live';
+          const keepLive=!!prev.quoteUpdatedAt&&Date.now()-prev.quoteUpdatedAt<30000&&(prev.quoteOrigin==='ticker'||prev.quoteStatus==='live')&&ticker.quoteStatus!=='live';
           return {...prev,...ticker,...(keepLive?{price:prev.price,quoteStatus:prev.quoteStatus,
-            quoteUpdatedAt:prev.quoteUpdatedAt}:{})};
+            quoteUpdatedAt:prev.quoteUpdatedAt,quoteOrigin:prev.quoteOrigin}:{})};
         });
         setAssets((prev) =>
           prev.map((a) => {
             if(assetIdentity(a)!==assetIdentity(activeAsset))return a;
-            const keepLive=a.quoteStatus==='live'&&!!a.quoteUpdatedAt&&
-              Date.now()-a.quoteUpdatedAt<30000&&ticker.quoteStatus!=='live';
+            const keepLive=!!a.quoteUpdatedAt&&Date.now()-a.quoteUpdatedAt<30000&&(a.quoteOrigin==='ticker'||a.quoteStatus==='live')&&ticker.quoteStatus!=='live';
             return {...a,...ticker,...(keepLive?{price:a.price,quoteStatus:a.quoteStatus,
-              quoteUpdatedAt:a.quoteUpdatedAt}:{})};
+              quoteUpdatedAt:a.quoteUpdatedAt,quoteOrigin:a.quoteOrigin}:{})};
           })
         );
       }
@@ -1520,6 +1521,7 @@ export default function App() {
         const renderNow=origin!=='stream'||now-lastPriceRenderRef.current>=120;
         if(renderNow)lastPriceRenderRef.current=now;
         if(renderNow)setActiveAsset((prev) => {
+          if(origin!=='stream'&&isFreshPaperQuote(prev,now))return prev;
           const priceDelta = newPrice - prev.price;
           if (priceDelta !== 0 && now - lastFlashTimeRef.current > 350) {
             lastFlashTimeRef.current = now;
@@ -1547,6 +1549,7 @@ export default function App() {
             quoteStatus: origin==='stream'&&!activeAsset.pairAddress ? 'live' : 'delayed',
             quoteUpdatedAt: now,
             streamConnected:origin==='stream',
+            quoteOrigin:origin,
           };
         });
 
@@ -1561,7 +1564,7 @@ export default function App() {
           // Update in assets array
           setAssets((prev) =>
             prev.map((a) =>
-              assetIdentity(a) === assetIdentity(activeAsset)
+              assetIdentity(a) === assetIdentity(activeAsset)&&!(origin!=='stream'&&isFreshPaperQuote(a,now))
                 ? {
                     ...a,
                     price: newPrice,
@@ -1570,6 +1573,7 @@ export default function App() {
                     quoteStatus: origin==='stream'&&!activeAsset.pairAddress ? 'live' : 'delayed',
                     quoteUpdatedAt: now,
                     streamConnected:origin==='stream',
+            quoteOrigin:origin,
                   }
                 : a
             )
@@ -1602,12 +1606,12 @@ export default function App() {
         setMarketStatus(status);
         // A REST endpoint can be reachable while the real trade stream is
         // disconnected. Never allow the previous live tick to authorize an order.
-        const realStream=status.connected&&status.provider.includes('live WebSocket');
+        const realStream=status.connected&&(status.provider.includes('live WebSocket')||status.provider.includes('ticker-only WebSocket'));
         if(!realStream){
           setActiveAsset(prev=>({...prev,streamConnected:false,
-            quoteStatus:prev.quoteStatus==='live'?'delayed':prev.quoteStatus}));
+            quoteStatus:prev.quoteStatus==='live'?'delayed':prev.quoteStatus,quoteOrigin:prev.quoteOrigin?'snapshot':undefined}));
           setAssets(prev=>prev.map(asset=>assetIdentity(asset)===assetIdentity(activeAsset)?
-            {...asset,streamConnected:false,quoteStatus:asset.quoteStatus==='live'?'delayed':asset.quoteStatus}:asset));
+            {...asset,streamConnected:false,quoteStatus:asset.quoteStatus==='live'?'delayed':asset.quoteStatus,quoteOrigin:asset.quoteOrigin?'snapshot':undefined}:asset));
         }
       },
     });
@@ -1987,6 +1991,7 @@ export default function App() {
             onGoToDate={date=>chartRef.current?.goToUtcDate(date)??false}
             showMobileChartLegend={showMobileChartLegend}
             onShowMobileChartLegend={setShowMobileChartLegend}
+            showCurrentPriceLabel={showCurrentPriceLabel} onShowCurrentPriceLabel={setShowCurrentPriceLabel}
             onApplyTimeScaleSettings={({barSpacing,rightOffset})=>{
               const chart=chartRef.current?.getChart();
               if(!chart)return false;
@@ -1994,7 +1999,7 @@ export default function App() {
               catch{return false;}
             }}
           />
-          <div className="flex-1 min-h-0 w-full relative" id="chart-workspace-viewport">
+          <div className="flex-1 min-h-0 w-full relative isolate" id="chart-workspace-viewport">
           <MultiChartWorkspace
             ref={chartRef}
             template={currentTemplate}
@@ -2009,6 +2014,7 @@ export default function App() {
             onReloadPrimary={()=>setChartRetry(n=>n+1)}
             sessionVwapEnabled={sessionVwapEnabled}
             showMobileChartLegend={showMobileChartLegend}
+            showCurrentPriceLabel={showCurrentPriceLabel}
             areDrawingsLocked={areDrawingsLocked}
             stayInDrawingMode={stayInDrawingMode}
             onOpenSymbolSearch={()=>{setAddingWatchlistSymbol(false);setIsSymbolSearchOpen(true);}}
@@ -2100,7 +2106,8 @@ export default function App() {
               id:record.id,name:record.portfolio.account.name,currency:record.portfolio.settings.currency
             }))}
             onSelectAccount={selectPaperAccount}
-            onManageAccounts={()=>setIsBottomTradingOpen(true)}
+            onManageAccounts={()=>requestBottomPanel('positions')}
+            onEditAccount={id=>{setTradeTicketAccountSettings(id);}}
             quickSize={mobileQuickSize} onQuickSize={setMobileQuickSize}
             preparedExits={mobileEntryExits}
             onPrepareExit={(kind,draft)=>setMobileEntryExits(prev=>({...prev,[kind]:draft}))}
@@ -2128,10 +2135,10 @@ export default function App() {
           preparedExits={mobileEntryExits}
           quickFocus={mobileQuickTicket?.focus} quickOpenSequence={mobileQuickTicket?.seq}
           onOpenAccount={()=>setTradeTicketAccountSettings(true)}/>
-        {tradeTicketAccountSettings&&<PaperAccountModal existing={activePaperRecord}
+        {tradeTicketAccountSettings&&<PaperAccountModal key={String(tradeTicketAccountSettings)} existing={paperAccounts.accounts.find(a=>a.id===(typeof tradeTicketAccountSettings==='string'?tradeTicketAccountSettings:paperAccounts.activeId))}
           proposedName={paperAccount.name}
           onClose={()=>setTradeTicketAccountSettings(false)}
-          onSave={(name,settings)=>savePaperAccount(paperAccounts.activeId,name,settings)}/>}
+          onSave={(name,settings)=>savePaperAccount(typeof tradeTicketAccountSettings==='string'?tradeTicketAccountSettings:paperAccounts.activeId,name,settings)}/>}
         </ViewportPortal>
         {/* Right Dock / Sidebar */}
         <RightSidebar

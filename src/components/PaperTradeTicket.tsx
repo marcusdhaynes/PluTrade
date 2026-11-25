@@ -264,7 +264,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
           {(['Short','Long'] as const).map(s=><button key={s} onClick={()=>{setSide(s);setReviewOpen(false);}}
             className={`rounded-md py-1.5 px-2 flex flex-col ${side===s?s==='Long'?'bg-[#1744a3]':'bg-[#702a30]':'hover:bg-[#343539]'}`}>
             <span className="text-[10px]">{s==='Long'?'Buy':'Sell'}</span>
-            <span className="text-sm font-mono">{live?pct(mark):'—'}</span>
+            <span className="text-sm font-mono">{asset.quoteStatus!=='unavailable'&&asset.quoteUpdatedAt&&Number.isFinite(mark)&&mark>0?pct(mark):'—'}</span>
           </button>)}
         </div>
         <p className="text-right text-[10px] text-[#959aa5] mt-1">Simulated entry at verified last trade, not guaranteed bid/ask</p>
@@ -463,7 +463,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
         {(errorLocal||error)&&<p role="alert" className="mt-2 p-2 bg-[#431e29] rounded text-[11px] text-[#ffbbc5]">{errorLocal||error}</p>}
         {asset.currency!==cash&&<p className="text-[11px] text-[#efb578] mt-2">
           This market is quoted in {asset.currency}; account uses {cash}. Switch to a matching paper account.</p>}
-        {!live&&<p className="text-[11px] text-[#e1b06f] mt-2">A current exchange quote is required before submitting this order.</p>}
+        {!live&&<p className="text-[11px] text-[#e1b06f] mt-2">A verified recent exchange trade is required before submitting this order. Ticker and snapshot prices are display-only.</p>}
         <label className="mt-3 flex items-center justify-between text-[11px] text-[#b9bec8] cursor-pointer">
           <span>One-click paper execution</span>
           <input type="checkbox" aria-label="One-click paper trading" checked={oneClick}

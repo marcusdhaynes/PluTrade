@@ -714,7 +714,7 @@ html,body,#root {
   /* Keep the current-price badge just inside the plot, not over the
      separate 24px price axis; it must also clear the native time axis. */
   #chart-current-price-label {
-    z-index:90;
+    z-index:10;
     border-radius:2px;
     box-shadow:0 1px 3px #0008;
     font-size:8px;
@@ -857,3 +857,37 @@ html,body,#root {
 #right-sidebar-content-pane #plutrade-strategy-lab .flex {flex-wrap:wrap;}
 #right-sidebar-content-pane #journal-account-import-strip {padding-right:3px;}
 #right-sidebar-content-pane #trade-journal-window-card aside {overflow-y:auto;scrollbar-width:none;}
+
+/* Account manager uses the full chart column; overlays never compete with the price marker. */
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #paper-trading-open-panel {position:absolute;inset:0 0 24px;height:auto;max-height:none;min-width:0;width:100%;z-index:110;overflow-y:auto;overflow-x:hidden;display:block;}
+  #paper-account-header {position:sticky;top:0;z-index:3;display:flex;gap:4px;padding:5px;flex-wrap:wrap;}
+  #paper-account-header > strong {font-size:10px;}
+  #paper-account-selector {flex:1 1 0;min-width:0;}
+  #paper-account-selector > button {max-width:100%;overflow:hidden;white-space:nowrap;font-size:10px;}
+  #paper-account-window-actions {order:0;flex:0 0 auto;margin-left:auto;gap:4px;}
+  #paper-account-window-actions button {display:grid;place-items:center;width:22px;height:22px;}
+  #paper-account-balance {order:1;width:100%;font-size:10px;}
+  #paper-account-summary-row {order:2;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;width:100%;min-width:0;}
+  #paper-account-summary-row > span {min-width:0;text-align:center;font-size:9px;line-height:1.2;overflow-wrap:anywhere;}
+  #paper-account-summary-row b {display:block;font-size:9px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+  #paper-account-dropdown {top:100%;bottom:auto;left:0;max-width:calc(100vw - 90px);z-index:10;max-height:45dvh;}
+  #paper-account-dropdown button {touch-action:pan-y;user-select:none;}
+  #paper-account-dropdown button[title] {opacity:1;}
+  #paper-account-market-row {padding:5px;gap:4px;min-width:0;font-size:10px;}
+  #paper-account-market-row > * {max-width:100%;overflow-wrap:anywhere;}
+  #paper-account-tabs {flex-wrap:wrap;overflow:visible;gap:2px;padding:3px;}
+  #paper-account-tabs button {font-size:9px;padding:3px 4px;white-space:normal;}
+  #paper-account-workspace-body {overflow:visible;min-width:0;}
+  #paper-account-workspace-body table {width:100%;table-layout:fixed;font-size:9px;overflow-wrap:anywhere;}
+  #paper-account-workspace-body :is(td,th) {padding:2px;white-space:normal;overflow-wrap:anywhere;}
+  #paper-account-workspace-body :is(input,select,textarea,svg) {max-width:100%;min-width:0;}
+  #paper-account-editor-backdrop {padding:0;align-items:center;}
+  #paper-account-editor {width:calc(100vw - 55px);max-width:none;max-height:calc(100dvh - 48px);border-radius:4px;}
+  #paper-account-editor > header {height:34px;padding:0 8px;}
+  #paper-account-editor > div {padding:8px;}
+  #paper-account-editor > footer {padding:5px;gap:3px;flex-wrap:wrap;}
+  #paper-account-editor label {min-width:0;overflow-wrap:anywhere;}
+  #paper-account-editor .grid {gap:5px;grid-template-columns:repeat(2,minmax(0,1fr));}
+  #paper-account-editor .grid input {padding:0 4px;}
+}

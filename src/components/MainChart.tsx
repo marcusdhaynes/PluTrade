@@ -89,6 +89,7 @@ interface MainChartProps {
   onTryOneMinute?:()=>void;
   sessionVwapEnabled?:boolean;
   showMobileChartLegend?:boolean;
+  showCurrentPriceLabel?:boolean;
   areDrawingsLocked?:boolean;
   stayInDrawingMode?:boolean;
   onOpenSymbolSearch?:()=>void;
@@ -172,6 +173,7 @@ export const MainChart = React.memo(
       onTryOneMinute,
       sessionVwapEnabled=false,
       showMobileChartLegend=false,
+      showCurrentPriceLabel=false,
       areDrawingsLocked=false,
       stayInDrawingMode=false,
       onOpenSymbolSearch,
@@ -1201,10 +1203,10 @@ export const MainChart = React.memo(
           });
           setExitLinePositions(prev=>JSON.stringify(prev)===JSON.stringify(exits)?prev:exits);
 
-          const currY = mainSeriesRef.current.priceToCoordinate(asset.price);
+          const currY = showCurrentPriceLabel&&asset.price>0?mainSeriesRef.current.priceToCoordinate(asset.price):null;
           if (currY !== null) {
             setCurrentPriceY((prev) => (prev === null || Math.abs(prev - currY) >= 1 ? Math.round(currY) : prev));
-          }
+          } else setCurrentPriceY(null);
         } catch {
           // Ignore
         }
@@ -1227,7 +1229,7 @@ export const MainChart = React.memo(
         if (rafId !== null) cancelAnimationFrame(rafId);
         chart.timeScale().unsubscribeVisibleLogicalRangeChange(scheduledUpdate);
       };
-    }, [openPosition?.entryPrice,exitSignature,asset.price,asset.symbol,chartType]);
+    }, [openPosition?.entryPrice,exitSignature,asset.price,asset.symbol,chartType,showCurrentPriceLabel]);
 
     return (
       <div ref={chartGestureRef} data-testid="chart-pinch-surface" className="relative flex-1 w-full h-full min-h-0 overflow-hidden bg-[#131722] select-none" style={{touchAction:'none'}}>
@@ -1497,10 +1499,10 @@ export const MainChart = React.memo(
         {/* Current price tag lives entirely inside the plotting area, never on
             the fixed mobile price rail or the time axis. Its blue is identical
             to the chart's blue line/price-line stroke. */}
-        {currentPriceY !== null && Number.isFinite(currentPriceY) && (
+        {showCurrentPriceLabel && currentPriceY !== null && Number.isFinite(currentPriceY) && (
           <div id="chart-current-price-label"
             role="status" aria-label={`Current price ${asset.price.toFixed(asset.digits)}`}
-            className="absolute z-[90] pointer-events-none -translate-y-1/2 max-w-[calc(100%-36px)] truncate whitespace-nowrap rounded-[2px] bg-[#2962ff] px-1 py-[1px] font-mono text-[9px] font-bold leading-[12px] text-white shadow-sm"
+            className="absolute z-10 pointer-events-none -translate-y-1/2 max-w-[calc(100%-36px)] truncate whitespace-nowrap rounded-[2px] bg-[#2962ff] px-1 py-[1px] font-mono text-[9px] font-bold leading-[12px] text-white shadow-sm"
             style={{
               right: compactMobileAxes ? MOBILE_ORDER_RAIL_PX + 2 : 2,
               top: Math.max(9,Math.min(currentPriceY,

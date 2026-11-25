@@ -16,6 +16,7 @@ interface Props {
   availableAccounts?:Array<{id:string;name:string;currency:string}>;
   onSelectAccount?:(id:string)=>void;
   onManageAccounts?:()=>void;
+  onEditAccount?:(id:string)=>void;
   accountCurrency?:string;
   accountUnrealizedPnl?:number;
   quickSize:{mode:'equity'|'cash';value:number};
@@ -43,7 +44,7 @@ const numeric=(n:number,digits=6)=>Number.isFinite(n)?n.toLocaleString(undefined
  * supported exit types without making a tap on a small screen execute a trade. */
 export const MobileTradingControls:React.FC<Props>=({
   asset,position,accountEquity,availableEquity,accountBalance,activeAccountName,activeAccountId,
-  availableAccounts=[],onSelectAccount,onManageAccounts,accountCurrency='USD',
+  availableAccounts=[],onSelectAccount,onManageAccounts,onEditAccount,accountCurrency='USD',
   accountUnrealizedPnl=0,quickSize,onQuickSize,preparedExits,onPrepareExit,onClearPreparedExit,
   onEnter,onOpenOrder,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
 })=>{
@@ -61,6 +62,11 @@ export const MobileTradingControls:React.FC<Props>=({
   const [sizeDraft,setSizeDraft]=useState(String(quickSize.value));
   const [error,setError]=useState('');
   const [accountMenuOpen,setAccountMenuOpen]=useState(false);
+  const accountHoldTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const accountHeld=useRef(false);
+  const accountHoldPoint=useRef({x:0,y:0});
+  const cancelAccountHold=()=>{if(accountHoldTimer.current!==null){clearTimeout(accountHoldTimer.current);accountHoldTimer.current=null;}};
+  useEffect(()=>()=>{if(accountHoldTimer.current!==null)clearTimeout(accountHoldTimer.current);},[]);
   const [pnlMenu,setPnlMenu]=useState<'cash'|'percent'|null>(null);
   const [pnlScope,setPnlScope]=useState<'account'|'position'>(()=>{
     try{return localStorage.getItem('plutrade_mobile_unrealized_scope_v1')==='position'?'position':'account';}
@@ -425,13 +431,17 @@ export const MobileTradingControls:React.FC<Props>=({
         {availableAccounts.map(account=><button type="button" key={account.id}
           aria-label={'Use account '+account.name} aria-pressed={account.id===activeAccountId}
           className={'flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left hover:bg-[#344763] '+(account.id===activeAccountId?'bg-[#263e60]':'')}
-          onClick={()=>{onSelectAccount?.(account.id);setAccountMenuOpen(false);}}>
+          onPointerDown={e=>{if(e.button!==0||!onEditAccount)return;accountHeld.current=false;accountHoldPoint.current={x:e.clientX,y:e.clientY};cancelAccountHold();accountHoldTimer.current=setTimeout(()=>{accountHeld.current=true;setAccountMenuOpen(false);onEditAccount(account.id);},450);}}
+          onPointerMove={e=>{if(Math.hypot(e.clientX-accountHoldPoint.current.x,e.clientY-accountHoldPoint.current.y)>10)cancelAccountHold();}}
+          onPointerUp={cancelAccountHold} onPointerCancel={cancelAccountHold} onPointerLeave={cancelAccountHold}
+          onContextMenu={e=>{if(!onEditAccount)return;e.preventDefault();cancelAccountHold();accountHeld.current=true;setAccountMenuOpen(false);onEditAccount(account.id);}}
+          onClick={()=>{if(accountHeld.current){accountHeld.current=false;return;}onSelectAccount?.(account.id);setAccountMenuOpen(false);}}>
           <span className="min-w-0 flex-1 truncate">{account.name}</span>
           <span className="shrink-0 text-[9px] text-[#9cacc2]">{account.currency}</span>
         </button>)}
         {onManageAccounts&&<button type="button" onClick={()=>{setAccountMenuOpen(false);onManageAccounts();}}
           className="mt-1 w-full rounded border border-[#506383] px-2 py-1.5 text-center text-[#b3ccf2]">
-          Manage accounts
+          Manage Accounts
         </button>}
       </section>}
       {pnlMenu&&<section id="mobile-unrealized-options" role="dialog" aria-label="Unrealized P/L display options"

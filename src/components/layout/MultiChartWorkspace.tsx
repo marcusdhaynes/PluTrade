@@ -37,6 +37,7 @@ interface MultiChartWorkspaceProps {
   onReloadPrimary:()=>void;
   sessionVwapEnabled:boolean;
   showMobileChartLegend:boolean;
+  showCurrentPriceLabel?:boolean;
   areDrawingsLocked:boolean;
   stayInDrawingMode:boolean;
   onOpenSymbolSearch:()=>void;
@@ -181,6 +182,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
       onReloadPrimary,
       sessionVwapEnabled,
       showMobileChartLegend,
+      showCurrentPriceLabel=false,
       areDrawingsLocked,
       stayInDrawingMode,
       onOpenSymbolSearch,
@@ -723,6 +725,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
               }}
               sessionVwapEnabled={sessionVwapEnabled}
               showMobileChartLegend={showMobileChartLegend}
+              showCurrentPriceLabel={showCurrentPriceLabel}
               areDrawingsLocked={areDrawingsLocked}
               stayInDrawingMode={stayInDrawingMode}
               onOpenSymbolSearch={onOpenSymbolSearch}

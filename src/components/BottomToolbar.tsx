@@ -18,6 +18,8 @@ interface BottomToolbarProps {
   onGoToDate:(utcDate:string)=>boolean;
   onApplyTimeScaleSettings:(settings:{barSpacing:number;rightOffset:number})=>boolean;
   showMobileChartLegend:boolean;
+  showCurrentPriceLabel?:boolean;
+  onShowCurrentPriceLabel?:(visible:boolean)=>void;
   onShowMobileChartLegend:(visible:boolean)=>void;
 }
 
@@ -27,7 +29,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   onFitContent,
   onGoToDate,
   onApplyTimeScaleSettings,
-  showMobileChartLegend,onShowMobileChartLegend,
+  showMobileChartLegend,onShowMobileChartLegend,showCurrentPriceLabel=false,onShowCurrentPriceLabel,
 }) => {
   const [chartCornerHost,setChartCornerHost]=useState<HTMLElement|null>(null);
   useEffect(()=>{setChartCornerHost(document.getElementById('chart-workspace-viewport'));},[]);
@@ -146,12 +148,16 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         </label>
         {scaleError&&<p role="alert" className="text-[#ffacb3]">{scaleError}</p>}
         <div className="border-t border-[#3e4a61] pt-2">
-          <strong className="block mb-1">Mobile chart display</strong>
+          <strong className="block mb-1">Chart Display</strong>
           <label className="flex items-center gap-2 cursor-pointer">
             <input id="mobile-chart-legend-setting" type="checkbox"
               checked={showMobileChartLegend}
               onChange={event=>onShowMobileChartLegend(event.target.checked)}/>
-            Show chart legend
+            Show Chart Legend
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input id="current-price-label-setting" type="checkbox" checked={showCurrentPriceLabel} onChange={e=>onShowCurrentPriceLabel?.(e.target.checked)}/>
+            Show Current Price Label
           </label>
         </div>
         <p className="border-t border-[#3e4a61] pt-2 text-[10px] text-[#99abc3]">

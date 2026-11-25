@@ -1,5 +1,5 @@
 import {DEFAULT_DYNAMIC_TRAIL,validDynamicTrail,type DynamicTrailingSettings} from '../services/dynamicTrailing';
-import React, {useState,useEffect} from 'react';
+import React, {useState,useEffect,useRef} from 'react';
 import {createPortal} from 'react-dom';
 import {ChevronDown, Maximize2, Minimize2, Minus, X, Download, Edit2, Zap, Plus, Settings2, Check} from 'lucide-react';
 import type {Asset, PaperAccount, PaperPosition} from '../types';
@@ -61,9 +61,9 @@ export interface BottomTradingPanelProps {
 }
 type Tab='positions'|'orders'|'orderHistory'|'balanceHistory'|'activityLog'|'tradeHistory'|'analytics'|'risk'|'screener'|'dataHealth'|'replay'|'strategyLab'|'cloud';
 const tabs:[Tab,string][]=[
-  ['positions','Positions'],['orders','Orders'],['orderHistory','Order history'],
-  ['balanceHistory','Balance history'],['activityLog','Activity log'],
-  ['tradeHistory','Trade history'],['analytics','Analytics'],['risk','Risk Center'],['screener','Screener'],['dataHealth','Data Health'],['replay','Replay & Backtest'],['strategyLab','Strategy Lab'],['cloud','Cloud Sync'],
+  ['positions','Positions'],['orders','Orders'],['orderHistory','Order History'],
+  ['balanceHistory','Balance History'],['activityLog','Activity Log'],
+  ['tradeHistory','Trade History'],['analytics','Analytics'],['risk','Risk Center'],['screener','Screener'],['dataHealth','Data Health'],['replay','Replay & Backtest'],['strategyLab','Strategy Lab'],['cloud','Cloud Sync'],
 ];
 const cash=(n:number)=>Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
 const amount=(n:number)=>Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:9}):'—';
@@ -81,6 +81,11 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
   useEffect(()=>{onActiveTabChange?.(tab);},[tab,onActiveTabChange]);
   const [quantity,setQuantity]=useState('1');
   const [accountListOpen,setAccountListOpen]=useState(false);
+  const accountHold=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const heldAccount=useRef(false);
+  const holdStart=useRef({x:0,y:0});
+  const cancelAccountHold=()=>{if(accountHold.current!==null){clearTimeout(accountHold.current);accountHold.current=null;}};
+  useEffect(()=>()=>{if(accountHold.current!==null)clearTimeout(accountHold.current);},[]);
   // undefined = dialog closed; null = new account; string = edit existing account
   const [accountDialog,setAccountDialog]=useState<string|null|undefined>(undefined);
   const portfolioSummary=summarizePaperAccounts(paperAccounts);
@@ -91,7 +96,7 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
     if(derivative&&paperSettings.futuresOptions.enabled)
       return paperSettings.futuresOptions.perContract.toString()+' '+paperSettings.currency+' per contract / fill';
     const c=paperSettings.commission;
-    return c.enabled?(c.mode==='percent'?c.amount+'% of notional':c.amount+' '+paperSettings.currency+' fixed')+' per fill':'No commissions';
+    return c.enabled?(c.mode==='percent'?c.amount+'% of notional':c.amount+' '+paperSettings.currency+' fixed')+' per fill':'No Commissions';
   })();
   const [tp,setTp]=useState('');
   const [sl,setSl]=useState('');
@@ -107,7 +112,13 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
   const [editTrailingPercent,setEditTrailingPercent]=useState('0.50');
   const [editDynamicEnabled,setEditDynamicEnabled]=useState(false);
   const [editDynamicSettings,setEditDynamicSettings]=useState<DynamicTrailingSettings>({...DEFAULT_DYNAMIC_TRAIL});
+  const [quoteClock,setQuoteClock]=useState(Date.now);
+  useEffect(()=>{if(!isOpen)return;const id=setInterval(()=>setQuoteClock(Date.now()),1000);return()=>clearInterval(id);},[isOpen]);
+  const quoteAge=Math.max(0,Math.max(quoteClock,Date.now())-(activeAsset.quoteUpdatedAt||0));
   const live=isFreshPaperQuote(activeAsset);
+  const observed=activeAsset.quoteStatus!=='unavailable'&&!!activeAsset.quoteUpdatedAt&&Number.isFinite(activeAsset.price)&&activeAsset.price>0;
+  const liveDisplay=live||(observed&&activeAsset.quoteOrigin==='ticker'&&quoteAge<30000);
+  const priceText=observed?`${liveDisplay?'Live Price':quoteAge<30000?'Last Observed Price':'Last Known Price'}: ${amount(activeAsset.price)} ${activeAsset.currency}`:'Live Price Unavailable';
   // Settled cash balance history is reconstructed from execution ledger entries,
   // never from fabricated equity snapshots.
   let runningBalance=paperSettings.startingBalance;
@@ -146,19 +157,23 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
     anchor.click();URL.revokeObjectURL(url);
   };
   return <section id="paper-trading-open-panel" className={`border-t border-[#2a2e39] bg-[#131722] flex flex-col text-[#d1d4dc] z-20 ${isExpanded?'h-[min(45vh,450px)]':'h-[min(32vh,295px)]'} shrink-0`}>
-    <header className="flex items-center gap-3 px-3 py-1.5 border-b border-[#2a2e39] text-[11px] bg-[#171b25] flex-wrap">
+    <header id="paper-account-header" className="flex items-center gap-3 px-3 py-1.5 border-b border-[#2a2e39] text-[11px] bg-[#171b25] flex-wrap">
       <strong>Paper Trading</strong>
-      <div className="relative">
+      <div className="relative min-w-0" id="paper-account-selector">
         <button type="button" aria-expanded={accountListOpen} aria-label="Select Paper Trading account"
           onClick={()=>setAccountListOpen(v=>!v)}
           className="inline-flex items-center gap-1 rounded px-2 py-1 border border-[#3c414c] hover:bg-[#323844] text-[#e4e6ec]">
           {account.name} <span className="text-[9px] text-[#babdc7]">{paperSettings.currency}</span><ChevronDown size={13}/>
         </button>
-        {accountListOpen&&<div className="absolute left-0 bottom-[calc(100%+4px)] w-[280px] max-h-[310px] overflow-y-auto rounded-lg border border-[#383c44] bg-[#1e2024] shadow-[0_12px_35px_#000a] z-[100] py-1">
-          <p className="text-[10px] uppercase tracking-widest px-3 py-2 text-[#999da9]">Paper Trading Accounts</p>
+        {accountListOpen&&<div id="paper-account-dropdown" className="absolute left-0 bottom-[calc(100%+4px)] w-[280px] max-h-[310px] overflow-y-auto rounded-lg border border-[#383c44] bg-[#1e2024] shadow-[0_12px_35px_#000a] z-[100] py-1">
+          <p className="text-[10px] tracking-wide px-3 py-2 text-[#999da9]">Paper Trading Accounts</p>
           {paperAccounts.map(record=><div key={record.id} className={`group flex items-center gap-1 px-1.5 hover:bg-[#30343d] ${record.id===activePaperAccountId?'bg-[#e5e6e9] text-[#16191f]':'text-[#e7e8ea]'}`}>
             <button type="button" className="flex-1 min-w-0 flex gap-2 items-center px-2 py-2 text-left"
-              onClick={()=>{onSelectPaperAccount(record.id);setAccountListOpen(false);}}>
+              onPointerDown={e=>{if(e.button!==0)return;heldAccount.current=false;holdStart.current={x:e.clientX,y:e.clientY};cancelAccountHold();accountHold.current=setTimeout(()=>{heldAccount.current=true;setAccountDialog(record.id);setAccountListOpen(false);},450);}}
+              onPointerMove={e=>{if(Math.hypot(e.clientX-holdStart.current.x,e.clientY-holdStart.current.y)>10)cancelAccountHold();}}
+              onPointerUp={cancelAccountHold} onPointerCancel={cancelAccountHold} onPointerLeave={cancelAccountHold}
+              onContextMenu={e=>{e.preventDefault();cancelAccountHold();heldAccount.current=true;setAccountDialog(record.id);setAccountListOpen(false);}}
+              onClick={()=>{if(heldAccount.current){heldAccount.current=false;return;}onSelectPaperAccount(record.id);setAccountListOpen(false);}}>
               <span className="truncate">{record.portfolio.account.name}</span>
               <span className="text-[9px] opacity-70">{record.portfolio.settings.currency}</span>
               {record.id===activePaperAccountId&&<Check size={13} className="ml-auto"/>}
@@ -175,28 +190,30 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
           </div>
         </div>}
       </div>
-      <span>Balance <b>{cash(account.balance)}</b></span>
+      <span id="paper-account-balance">Balance <b>{cash(account.balance)}</b></span>
+      <div id="paper-account-summary-row" className="contents">
       <span>Equity <b>{cash(account.equity)}</b></span>
       <span>Realized <b className={account.realizedPnL>=0?'text-[#089981]':'text-[#f23645]'}>{cash(account.realizedPnL)}</b></span>
       <span>Unrealized <b className={account.unrealizedPnL>=0?'text-[#089981]':'text-[#f23645]'}>{cash(account.unrealizedPnL)}</b></span>
       <span>Margin <b>{cash(account.accountMargin)}</b></span>
       <span>Available <b>{cash(account.availableFunds)}</b></span>
-      <div className="ml-auto flex items-center gap-2">
+      </div>
+      <div id="paper-account-window-actions" className="ml-auto flex items-center gap-2">
         <button type="button" onClick={()=>setIsExpanded(v=>!v)} title="Resize paper panel">{isExpanded?<Minimize2 size={13}/>:<Maximize2 size={13}/>}</button>
-        <button type="button" onClick={()=>setIsOpen(false)} title="Close paper panel"><Minus size={14}/></button>
+        <button type="button" onClick={()=>setIsOpen(false)} title="Close paper panel" aria-label="Close Account Window"><X size={16}/></button>
       </div>
     </header>
-    <div className="flex items-center gap-2 flex-wrap bg-[#1b202d] border-b border-[#303645] px-3 py-2 text-[11px]">
+    <div id="paper-account-market-row" className="flex items-center gap-2 flex-wrap bg-[#1b202d] border-b border-[#303645] px-3 py-2 text-[11px]">
       <strong>{activeAsset.symbol}</strong>
-      <span className={live?'text-[#089981]':'text-[#f4b77c]'}>{live?'Live reference '+amount(activeAsset.price)+' '+activeAsset.currency:'Live price unavailable'}</span>
-      <span className="text-[#aeb7ca]">{activeCategory} · {activeLeverage}×</span>
+      <span id="paper-account-live-price" className={liveDisplay?'text-[#089981]':'text-[#f4b77c]'}>{priceText}</span>
+      <span className="text-[#aeb7ca] capitalize">{activeCategory} · {activeLeverage}×</span>
       <span className="text-[#9299aa]">{feeDescription}</span>
       <span className="text-[#9299aa]" title="Assumptions, not observed market liquidity">
         Execution: {paperSettings.execution.spreadBps} bps spread / {paperSettings.execution.slippageBps} bps slippage (modeled)
       </span>
-      <button type="button" disabled={paperTradingBlocked} title={paperTradingBlocked?'Trading locked until storage recovery':'Create simulated order'} onClick={onOpenTicket} className="disabled:opacity-40 disabled:cursor-not-allowed rounded bg-[#2862fb] px-3 py-1.5 font-semibold text-white hover:bg-[#477bf9]">Create order</button>
+      <button type="button" disabled={paperTradingBlocked} title={paperTradingBlocked?'Trading locked until storage recovery':'Create simulated order'} onClick={onOpenTicket} className="disabled:opacity-40 disabled:cursor-not-allowed rounded bg-[#2862fb] px-3 py-1.5 font-semibold text-white hover:bg-[#477bf9]">Create Order</button>
       <button type="button" className="ml-auto px-2 py-1 border border-[#5e5460] rounded hover:bg-[#393342]"
-        onClick={()=>{if(window.confirm('Reset '+account.name+' and erase all its positions, pending orders, fills and conditional rules?'))onResetPaper();}}>Reset account</button>
+        onClick={()=>{if(window.confirm('Reset '+account.name+' and erase all its positions, pending orders, fills and conditional rules?'))onResetPaper();}}>Reset Account</button>
     </div>
     {corruptBackup&&isPaperStorageBlocked()&&<div role="alert" className="px-3 py-1.5 text-[11px] text-[#ffd1a5] bg-[#3a2a22]">
       An old unreadable paper ledger was preserved. It cannot be loaded safely. <button type="button" className="underline font-semibold" onClick={exportRecoveredLedger}>Export recovery backup</button>
@@ -204,14 +221,14 @@ export const BottomTradingPanel:React.FC<BottomTradingPanelProps>=({
     </div>}
     {paperTradingBlocked&&<div role="alert" className="px-3 py-1.5 text-[11px] font-semibold text-[#ffd1a5] bg-[#3a2a22]">Paper execution, updates, and conditional orders are locked until the saved ledger is recoverable.</div>}
     {paperError&&<div role="alert" className="px-3 py-1 text-[11px] text-[#ffc5c5] bg-[#51202b]">{paperError}</div>}
-    <nav aria-label="Paper trading workspace tabs" className="flex flex-nowrap overflow-x-auto items-center gap-1 border-b border-[#2a2e39] px-2 py-1 text-[11px]">
+    <nav id="paper-account-tabs" aria-label="Paper trading workspace tabs" className="flex flex-nowrap overflow-x-auto items-center gap-1 border-b border-[#2a2e39] px-2 py-1 text-[11px]">
       {tabs.map(([id,name])=><button type="button" key={id} onClick={()=>setTab(id)}
         className={`rounded px-2 py-1 shrink-0 whitespace-nowrap ${tab===id?'bg-[#2a3142] text-white':'text-[#9197a5] hover:bg-[#212633]'}`}>
         {name}{id==='positions'?` (${positions.length})`:id==='orders'?` (${conditionalOrders.length+pendingOrders.length})`:''}
       </button>)}
       <button type="button" className="ml-auto px-2 text-[#a5aabc]" title="Export settled paper executions as CSV" onClick={exportCsv}><Download size={15}/></button>
     </nav>
-    <div className="flex-1 min-h-0 overflow-y-auto text-[11px]">
+    <div id="paper-account-workspace-body" className="flex-1 min-h-0 overflow-y-auto text-[11px]">
       {tab==='positions'&&<table className="w-full text-left">
         <thead className="sticky top-0 bg-[#131722] text-[#9aa1b2]"><tr>
           {['Market','Side','Qty','Entry','Last','Leverage','Margin','Unrealized','TP / SL','Actions'].map(x=><th key={x} className="px-2 py-1.5 font-medium">{x}</th>)}

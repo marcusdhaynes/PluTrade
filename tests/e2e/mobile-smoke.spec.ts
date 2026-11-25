@@ -386,7 +386,7 @@ test('paper account imports starting capital and percent fees without silently c
     buffer:Buffer.from('setting,value\nstartingBalance,35000\ncurrency,USD\nfeePercent,0.125\nspreadBps,2\nslippageBps,1'),
   });
   await expect(dialog.getByRole('status')).toContainText('Settings imported for review');
-  await expect(dialog.getByLabel('Starting balance')).toHaveValue('35000');
+  await expect(dialog.getByLabel('Starting Balance')).toHaveValue('35000');
   await expect(dialog.getByLabel('Commission percent')).toHaveValue('0.125');
   await expect(dialog.getByLabel('Commission type')).toHaveValue('percent');
   await dialog.getByRole('button',{name:'Create',exact:true}).click();
@@ -812,6 +812,10 @@ test('mobile price marker stays compact and above chart overlays without coverin
   await page.goto('./');
   const label=page.locator('#chart-current-price-label').first();
   const axis=page.locator('#plutrade-mobile-price-axis').first();
+  await expect(label).toHaveCount(0);
+  await page.locator('#time-scale-settings-btn').click();
+  await page.locator('#current-price-label-setting').check();
+  await page.locator('#chart-time-scale-popup').getByRole('button',{name:'Close',exact:true}).click();
   await expect(label).toBeVisible();
   await expect(axis).toBeVisible();
   const geometry=await page.evaluate(()=>{
@@ -832,7 +836,7 @@ test('mobile price marker stays compact and above chart overlays without coverin
   expect(geometry.badge.bottom).toBeLessThanOrEqual(geometry.timeAxisTop+1);
   expect(geometry.badge.top).toBeGreaterThanOrEqual(geometry.plotTop-1);
   expect(geometry.background).toBe('rgb(41, 98, 255)');
-  expect(geometry.zIndex).toBeGreaterThan(50);
+  expect(geometry.zIndex).toBeLessThan(20);
 });
 
 
@@ -1197,4 +1201,24 @@ test('every enabled mobile right rail tool uses one identical viewport drawer',a
       await pane.locator('[data-right-drawer-header] button').click();await expect(pane).toHaveCount(0);
     }
   }
+});
+
+
+test('mobile account manager fits chart and supports hold-to-edit, custom leverage and commissions',async({page})=>{
+  await page.setViewportSize({width:320,height:568});await page.goto('./');
+  await page.locator('#mobile-active-account-btn').click();await page.getByRole('button',{name:'Manage Accounts'}).click();
+  const panel=page.locator('#paper-trading-open-panel');await expect(panel).toBeVisible();
+  const chart=page.locator('#chart-workspace-viewport');const a=(await panel.boundingBox())!,b=(await chart.boundingBox())!;
+  expect(Math.abs(a.x-b.x)).toBeLessThanOrEqual(1);expect(Math.abs(a.width-b.width)).toBeLessThanOrEqual(1);
+  const cells=panel.locator('#paper-account-summary-row > span');await expect(cells).toHaveCount(5);
+  expect(new Set(await cells.evaluateAll(nodes=>nodes.map(n=>Math.round(n.getBoundingClientRect().top)))).size).toBe(1);
+  await expect(panel.getByRole('button',{name:'Close Account Window'})).toBeVisible();
+  await panel.getByRole('button',{name:'Select Paper Trading account'}).click();
+  const first=panel.locator('#paper-account-dropdown button').first();await first.dispatchEvent('pointerdown',{button:0,pointerType:'touch',clientX:80,clientY:80});
+  await page.waitForTimeout(500);const editor=page.locator('#paper-account-editor');await expect(editor).toBeVisible();
+  await expect(editor.getByTitle('Close account dialog')).toBeVisible();
+  const margin=editor.getByLabel('Margin Control');if(!await margin.isChecked())await margin.check();
+  await editor.getByLabel('Crypto Leverage',{exact:true}).fill('17');
+  await expect(editor.getByLabel('Crypto Leverage',{exact:true})).toHaveValue('17');
+  await editor.getByTitle('Close account dialog').click();await panel.getByRole('button',{name:'Close Account Window'}).click();await expect(panel).toHaveCount(0);
 });
