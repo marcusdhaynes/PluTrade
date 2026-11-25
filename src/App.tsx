@@ -925,7 +925,7 @@ export default function App() {
     try{
       const saved=JSON.parse(localStorage.getItem('plutrade_mobile_quick_size_v2')||'null');
       if(saved&&(saved.mode==='equity'||saved.mode==='cash')&&Number.isFinite(saved.value)&&
-        saved.value>0&&(saved.mode==='cash'||saved.value<=100))return saved;
+        saved.value>=0&&(saved.mode==='cash'||saved.value<=100))return saved;
       const old=Number(localStorage.getItem('plutrade_mobile_equity_percent_v1'));
       return {mode:'equity',value:Number.isFinite(old)&&old>0&&old<=100?old:99};
     }catch{return {mode:'equity',value:99};}

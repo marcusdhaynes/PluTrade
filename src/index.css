@@ -973,3 +973,10 @@ html,body,#root {
   #compact-quick-window button[aria-pressed=true] {background:#2962ff;color:white;}
   #plutrade-mobile-trade-controls button[aria-pressed=true] {box-shadow:inset 0 0 0 1px #8ab4ff;}
 }
+
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #plutrade-mobile-trade-controls button[aria-expanded=true] {box-shadow:inset 0 0 0 1px #8ab4ff;background-color:#2962ff !important;}
+  #paper-order-body button[aria-pressed=true] {border-color:#709fff;}
+  #paper-order-body button[aria-pressed=true][role=switch] {background:#2962ff;}
+  #paper-order-body :is(button,select,input):focus-visible,#paper-account-editor :is(button,select,input):focus-visible {outline:1px solid #8ab4ff;outline-offset:1px;}
+}

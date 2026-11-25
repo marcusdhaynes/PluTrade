@@ -93,6 +93,10 @@ export const MobileTradingControls:React.FC<Props>=({
   const held=useRef(false);
   const orderHoldTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const orderHeld=useRef(false);
+  const sizeHoldTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const sizeHeld=useRef(false);
+  const clearSizeHold=()=>{if(sizeHoldTimer.current!==null){clearTimeout(sizeHoldTimer.current);sizeHoldTimer.current=null;}};
+  useEffect(()=>()=>clearSizeHold(),[]);
   const clearOrderHold=()=>{
     if(orderHoldTimer.current){clearTimeout(orderHoldTimer.current);orderHoldTimer.current=null;}
   };
@@ -423,7 +427,7 @@ export const MobileTradingControls:React.FC<Props>=({
           <button type="button" aria-label={'Clear '+selectedKind.toUpperCase()+' setup'}
             className="mt-2 w-full rounded border border-[#6b4557] p-2 text-[#ffb4be]"
             onClick={()=>{onClearPreparedExit(selectedKind);close();}}>
-            Clear {selectedKind.toUpperCase()} setup
+            Clear {selectedKind.toUpperCase()} Setup
           </button>}
 
       </>}
@@ -527,8 +531,12 @@ export const MobileTradingControls:React.FC<Props>=({
         style={{flex:'2 1 0%'}}
         className={baseButton+' truncate '+(panel==='equity'?'bg-[#2962ff] border-[#709fff]':'')}
         title={quickSize.mode==='equity'? `${quickSize.value}% of available equity`:`Cash margin ${moneyLabel(quickSize.value)}`}
-        onClick={()=>{setSizeModeDraft(quickSize.mode);setSizeDraft(String(quickSize.value));setError('');setPanel('equity');}}>
-        {quickSize.mode==='equity'?`${Math.round(quickSize.value)}% Equity`:moneyLabel(quickSize.value)}
+        aria-pressed={panel==='equity'}
+        onPointerDown={()=>{clearSizeHold();sizeHeld.current=false;sizeHoldTimer.current=setTimeout(()=>{sizeHeld.current=true;onQuickSize({...quickSize,value:0});setPanel(null);},450);}}
+        onPointerUp={clearSizeHold} onPointerCancel={clearSizeHold} onPointerLeave={clearSizeHold}
+        onContextMenu={e=>{e.preventDefault();clearSizeHold();sizeHeld.current=true;onQuickSize({...quickSize,value:0});setPanel(null);}}
+        onClick={()=>{if(sizeHeld.current){sizeHeld.current=false;return;}setSizeModeDraft(quickSize.mode);setSizeDraft(quickSize.value===0?'':String(quickSize.value));setError('');setPanel('equity');}}>
+        {quickSize.value===0?'Amount':quickSize.mode==='equity'?`${Math.round(quickSize.value)}% Equity`:moneyLabel(quickSize.value)}
       </button>
       {(['sl','tp'] as const).map(kind=><button key={kind} type="button"
         id={kind==='sl'?'mobile-stop-setup-btn':'mobile-target-setup-btn'}

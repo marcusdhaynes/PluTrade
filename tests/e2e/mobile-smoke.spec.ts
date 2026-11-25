@@ -52,18 +52,18 @@ test('mobile keeps one account/UPL/order/execution row and preloads equity sizin
   expect(errors).toEqual([]);
 });
 
-test('holding TP reveals the advanced entry path without placing an order',async ({page})=>{
+test('holding TP clears saved entry protection without placing an order',async ({page})=>{
   await page.goto('./');
-  const button=page.locator('#plutrade-mobile-trade-controls div[aria-label="Mobile trading controls"] > button').nth(8);
+  const button=page.locator('#mobile-target-setup-btn');
+  await button.click();
+  await page.getByRole('dialog',{name:'Take profit options'}).getByRole('button',{name:'Save',exact:true}).click();
+  await expect(button).toHaveAttribute('aria-pressed','true');
   await button.dispatchEvent('pointerdown',{pointerType:'touch'});
   await page.waitForTimeout(510);
   await button.dispatchEvent('pointerup',{pointerType:'touch'});
-  await expect(page.getByRole('dialog',{name:'Take profit options'})).toBeVisible();
-  await page.getByRole('dialog',{name:/Stop loss options|Take profit options/}).getByRole('button',{name:'Save',exact:true}).click();
-  await page.getByRole('button',{name:'Enter',exact:true}).click();
-  const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
-  await expect(ticket.getByRole('switch',{name:'Enable take profit'})).toHaveAttribute('aria-checked','true');
-  await expect(page.locator('#plutrade-mobile-trade-controls')).toBeVisible();
+  await expect(button).toHaveAttribute('aria-pressed','false');
+  await expect(page.getByRole('dialog',{name:'Take profit options'})).toHaveCount(0);
+  await expect(page.getByRole('dialog',{name:'Paper Trading order entry'})).toHaveCount(0);
 });
 
 
@@ -887,7 +887,7 @@ test('quick cash sizing, precise available-equity percent and independent SL TP 
   await expect(ticket.getByRole('spinbutton',{name:'Take-profit value'})).toHaveValue('2.5');
   await ticket.getByTitle('Close order panel').click();
   await page.locator('#mobile-stop-setup-btn').click();
-  await sl.getByRole('button',{name:'Clear SL setup'}).click();
+  await sl.getByRole('button',{name:'Clear SL Setup'}).click();
   await page.getByRole('button',{name:'Enter',exact:true}).click();
   await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','false');
   await expect(ticket.getByRole('switch',{name:'Enable take profit'})).toHaveAttribute('aria-checked','true');
@@ -979,7 +979,7 @@ test('global sidebar dialogs escape the app stacking context and cover the top b
       expect(result.bottom).toBeLessThanOrEqual(size.height+1);
       expect(result.right).toBeLessThanOrEqual(size.width+1);
       if(fullBackdrop)expect(result.visibleAtHeader,selector+' should be in front of top navbar').toBe(true);
-      else expect(result.top).toBeLessThanOrEqual(result.navbarBottom+8);
+      else {expect(result.top).toBeGreaterThanOrEqual(result.navbarBottom-1);expect(result.bottom-result.top).toBeLessThanOrEqual(440);}
     };
     await page.locator('#right-tab-indicators').click();
     const indicatorDrawer=page.locator('#right-sidebar-content-pane');

@@ -99,6 +99,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   const savedQuick=useRef('');
   const quickKey=JSON.stringify([quickSize,preparedExits]);
   useEffect(()=>{savedSetup.current=null;onSetupCleared?.();},[setupScope,asset.symbol,venue]);
+  useEffect(()=>{if(savedSetup.current&&savedQuick.current!==quickKey){savedSetup.current=null;onSetupCleared?.();}},[quickKey]);
   useEffect(()=>{if(resetSetupSequence===undefined)return;savedSetup.current=null;setKind('market');setSide('Long');setPriceInput('');setLimitPriceInput('');setTpEnabled(false);setSlEnabled(false);setTrailingEnabled(false);setDynamicEnabled(false);setExtraTps([]);setReviewOpen(false);setSizeInput(String(quickSize?.value??99));setSizeMode(quickSize?.mode||'equity');setTif('Week');setPriceMode('price');setErrorLocal('');},[resetSetupSequence]);
   useEffect(()=>{setPriceInput('');setLimitPriceInput('');setErrorLocal('');setKind('market');setDom(false);setExtraTps([]);setReviewOpen(false);},[asset.symbol,venue]);
   // Mobile shortcuts prefill an equity-based size and reveal all SL/TP modes.
@@ -496,7 +497,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
         </button>
       </>}
     </div>
-    {onSaveSetup&&!dom&&<footer id="compact-order-actions" className="hidden"><button type="button" onClick={saveSetup}>Save</button><button type="button" disabled={!canSubmit} onClick={submit}>{side==='Long'?'Buy':'Sell'}</button></footer>}
+    {onSaveSetup&&!dom&&<footer id="compact-order-actions" className="hidden"><button type="button" onClick={saveSetup}>Save</button><button type="button" aria-label={side==='Long'?'Submit Buy Order':'Submit Sell Order'} disabled={!canSubmit} onClick={submit}>{side==='Long'?'Buy':'Sell'}</button></footer>}
     {reviewOpen&&<div className="absolute inset-0 z-50 flex flex-col bg-[#191b20] border-l border-[#4a4e58] text-[#edf0f7]">
       <header className="flex items-center justify-between px-4 h-14 border-b border-[#383c44]">
         <strong className="text-sm">Review Simulated {side==='Long'?'Buy':'Sell'} Order</strong>
