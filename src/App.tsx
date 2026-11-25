@@ -2135,7 +2135,7 @@ export default function App() {
           preparedExits={mobileEntryExits}
           quickFocus={mobileQuickTicket?.focus} quickOpenSequence={mobileQuickTicket?.seq}
           onOpenAccount={()=>setTradeTicketAccountSettings(true)}/>
-        {tradeTicketAccountSettings&&<PaperAccountModal key={String(tradeTicketAccountSettings)} existing={paperAccounts.accounts.find(a=>a.id===(typeof tradeTicketAccountSettings==='string'?tradeTicketAccountSettings:paperAccounts.activeId))}
+        {tradeTicketAccountSettings&&<PaperAccountModal existing={paperAccounts.accounts.find(a=>a.id===(typeof tradeTicketAccountSettings==='string'?tradeTicketAccountSettings:paperAccounts.activeId))}
           proposedName={paperAccount.name}
           onClose={()=>setTradeTicketAccountSettings(false)}
           onSave={(name,settings)=>savePaperAccount(typeof tradeTicketAccountSettings==='string'?tradeTicketAccountSettings:paperAccounts.activeId,name,settings)}/>}

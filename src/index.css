@@ -891,3 +891,12 @@ html,body,#root {
   #paper-account-editor .grid {gap:5px;grid-template-columns:repeat(2,minmax(0,1fr));}
   #paper-account-editor .grid input {padding:0 4px;}
 }
+
+@media (max-width:767px), (hover:none) and (pointer:coarse) {
+  #paper-account-selector {position:static;}
+  #paper-account-dropdown {left:4px;right:4px;top:100%;width:auto;max-width:none;}
+  #paper-account-header > strong {flex-shrink:0;}
+  #paper-account-window-actions {flex-shrink:0;}
+  #paper-account-header > #paper-account-balance {flex:0 0 100%;}
+  #paper-account-summary-row {flex:0 0 100%;}
+}
