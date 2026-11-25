@@ -26,6 +26,8 @@ interface Props {
   onClearPreparedExit:(kind:ExitKind)=>void;
   onEnter:(focus?:ExitKind)=>void;
   onOpenOrder:()=>void;
+  orderSetupSaved?:boolean; orderWindowOpen?:boolean; onResetOrderSetup?:()=>void;
+  onResetPositionExit?:(id:string,kind:ExitKind)=>void;
   onOpenPaperWorkspace?:()=>void;
   onExit:()=>void;
   onEditStops:(id:string,tp?:number,sl?:number,trailing?:number|null,dynamic?:DynamicTrailingSettings|null)=>void;
@@ -34,9 +36,9 @@ interface Props {
   editRequest?:{id:string;kind:ExitKind;seq:number}|null;
 }
 const methods:{mode:PaperExitMode;label:string}[]=[
-  {mode:'price',label:'Exact price'},{mode:'ticks',label:'Price ticks'},
-  {mode:'percent',label:'Distance %'},{mode:'money',label:'Account currency amount'},
-  {mode:'balance',label:'% of account balance'},
+  {mode:'price',label:'Exact Price'},{mode:'ticks',label:'Price Ticks'},
+  {mode:'percent',label:'Distance %'},{mode:'money',label:'Account Currency Amount'},
+  {mode:'balance',label:'% of Account Balance'},
 ];
 const numeric=(n:number,digits=6)=>Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:digits}):'—';
 
@@ -46,7 +48,7 @@ export const MobileTradingControls:React.FC<Props>=({
   asset,position,accountEquity,availableEquity,accountBalance,activeAccountName,activeAccountId,
   availableAccounts=[],onSelectAccount,onManageAccounts,onEditAccount,accountCurrency='USD',
   accountUnrealizedPnl=0,quickSize,onQuickSize,preparedExits,onPrepareExit,onClearPreparedExit,
-  onEnter,onOpenOrder,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
+  onEnter,onOpenOrder,orderSetupSaved=false,orderWindowOpen=false,onResetOrderSetup,onResetPositionExit,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
 })=>{
   const [panel,setPanel]=useState<'equity'|ExitKind|null>(null);
   const [advanced,setAdvanced]=useState(false);
@@ -132,9 +134,16 @@ export const MobileTradingControls:React.FC<Props>=({
     }
   },[position?.id]);
   useEffect(()=>()=>clearHold(),[]);
+  const resetExit=(kind:ExitKind)=>{
+    if(position){
+      const has=kind==='sl'?(position.sl!==undefined||!!position.trailingPercent||!!position.dynamicTrailing):(position.tp!==undefined||!!position.tpLevels?.length);
+      if(has&&window.confirm('Remove the '+(kind==='sl'?'Stop Loss':'Take Profit')+' from this open paper position?'))onResetPositionExit?.(position.id,kind);
+    }else onClearPreparedExit(kind);
+    setPanel(null);setError('');
+  };
   const startHold=(kind:ExitKind)=>{
     clearHold();held.current=false;
-    holdTimer.current=setTimeout(()=>{held.current=true;openExit(kind,true);},450);
+    holdTimer.current=setTimeout(()=>{held.current=true;resetExit(kind);},450);
   };
   const clickExit=(kind:ExitKind)=>{
     clearHold();
@@ -233,10 +242,10 @@ export const MobileTradingControls:React.FC<Props>=({
   },[panel,accountMenuOpen,pnlMenu]);
   return <div ref={orderControlsRef} id="plutrade-mobile-trade-controls"
     className="relative md:hidden shrink-0 w-full h-[24px] border-t border-[#3f4d62] bg-[#151d2b] px-1 py-px z-40">
-    {panel&&<div ref={quickPanelRef} role="dialog" aria-label={panel==='equity'?'Equity allocation':panel==='sl'?'Stop loss options':'Take profit options'}
+    {panel&&<div ref={quickPanelRef} role="dialog" id="compact-quick-window" aria-label={panel==='equity'?'Equity allocation':panel==='sl'?'Stop loss options':'Take profit options'}
       className="absolute bottom-full left-0 right-0 z-50 max-h-[min(67dvh,440px)] overflow-y-auto rounded-t-xl border border-[#48556a] bg-[#182233] p-3 shadow-[0_-10px_45px_#000a] text-xs">
       <div className="flex items-center justify-between mb-3">
-        <strong>{panel==='equity'?'Entry size · available equity':panel==='sl'?'Stop loss':'Take profit'} <span className="font-normal text-[#8da0bd]">· Paper</span></strong>
+        <strong>{panel==='equity'?'Entry Size · Available Equity':panel==='sl'?'Stop Loss':'Take Profit'} <span className="font-normal text-[#8da0bd]">· Paper</span></strong>
         <button type="button" onClick={close} aria-label="Close quick options" className="p-1 rounded hover:bg-[#35435b]">✕</button>
       </div>
       {panel==='equity'?<>
@@ -252,9 +261,9 @@ export const MobileTradingControls:React.FC<Props>=({
             Cash Amount
           </button>
         </div>
-        <label className="block mt-3 text-[#a9bbd0]">{sizeModeDraft==='equity'?'Percent of available equity':'Cash margin amount ('+accountCurrency+')'}
+        <label className="block mt-3 text-[#a9bbd0]">{sizeModeDraft==='equity'?'Percent of Available Equity':'Cash Margin Amount ('+accountCurrency+')'}
           <div className="flex items-center gap-2 mt-1">
-            <input aria-label={sizeModeDraft==='equity'?'Percent of equity':'Cash margin amount'} type="number"
+            <input aria-label={sizeModeDraft==='equity'?'Percent of equity':'Cash Margin Amount'} type="number"
               min="0.000001" max={sizeModeDraft==='equity'?100:undefined} step="any"
               className="flex-1 min-w-0 h-10 rounded bg-[#0d1728] border border-[#526079] px-2 text-white"
               value={sizeDraft} onChange={e=>{setSizeDraft(e.target.value);setError('');}}/>
@@ -278,12 +287,12 @@ export const MobileTradingControls:React.FC<Props>=({
             }
             onQuickSize({mode:sizeModeDraft,value:n});close();
           }}>
-          Apply to Entry
+          Save
         </button>
       </>:position&&selectedKind?<>
         <p className="mb-2 text-[#96abc3]">{position.side} · {position.symbol} · Entry {numeric(position.entryPrice,asset.digits)} · {numeric(position.qty)} units</p>
         <div className="flex items-center justify-between gap-2">
-          <label className="flex-1 text-[#b7c8dc]">Level type
+          <label className="flex-1 text-[#b7c8dc]">Level Type
             <select aria-label="Exit level type" value={mode} onChange={e=>changeMethod(e.target.value as PaperExitMode)}
               className="block w-full h-9 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2 text-white">
               {methods.map(method=><option key={method.mode} value={method.mode}>{method.label}</option>)}
@@ -298,7 +307,7 @@ export const MobileTradingControls:React.FC<Props>=({
               onChange={e=>{setValue(e.target.value);setError('');}}
               className="block w-full h-10 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2 text-white"/>
           </label>
-          <p className="text-[#93a8c4] mt-1">Price level: {validTarget?numeric(target!,asset.digits):'Invalid'} {asset.currency}</p>
+          <p className="text-[#93a8c4] mt-1">Price Level: {validTarget?numeric(target!,asset.digits):'Invalid'} {asset.currency}</p>
         </>}
         {selectedKind==='sl'&&advanced&&<div className="mt-3 border-t border-[#39495f] pt-3">
           <label className="flex items-center gap-2"><input type="checkbox" checked={trail}
@@ -377,19 +386,19 @@ export const MobileTradingControls:React.FC<Props>=({
               className="mt-2 rounded border border-[#53627a] px-2 py-1.5 text-[#a7c5ff]"
               onClick={()=>setTargetDrafts(prev=>[...prev,{
                 id:Math.max(0,...prev.map(x=>x.id))+1,price:'',share:'',
-              }])}>+ Add TP level</button>}
+              }])}>+ Add TP Level</button>}
           </>}
         </div>}
         {advanced&&<button type="button" onClick={()=>{close();onAdvancedConditional();}}
-          className="mt-2 text-[#9cc2ff] underline">Advanced conditional price/drawing rule</button>}
+          className="mt-2 text-[#9cc2ff] underline">Advanced Conditional Price/Drawing Rule</button>}
         <button type="button" onClick={saveExit}
           className="mt-3 w-full rounded bg-[#2962ff] text-white p-2.5 font-semibold">
-          {selectedKind==='tp'&&multiTargets?'Save Multiple TP Levels':selectedKind==='sl'&&dynamic?'Enable Dynamic ATR SL':selectedKind==='sl'&&trail?'Enable Trailing SL':'Save '+(selectedKind==='sl'?'Stop Loss':'Take Profit')}
+          Save
         </button>
       </>:<>
         <p className="text-[#b7c6da]">Prepare the {selectedKind==='sl'?'stop loss':'take profit'} for the next entry.
           This saves order settings only. It does not open or close a trade.</p>
-        <label className="block mt-3 text-[#b7c8dc]">Level type
+        <label className="block mt-3 text-[#b7c8dc]">Level Type
           <select aria-label="Exit level type" value={mode}
             onChange={e=>{setMode(e.target.value as PaperExitMode);setError('');}}
             className="block w-full h-9 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2 text-white">
@@ -409,24 +418,21 @@ export const MobileTradingControls:React.FC<Props>=({
               setError('Enter a positive, valid distance or price.');return;
             }
             onPrepareExit(panel as ExitKind,{mode,value});close();
-          }}>Save {panel==='sl'?'SL':'TP'} setup</button>
+          }}>Save</button>
         {selectedKind&&preparedExits[selectedKind]&&
           <button type="button" aria-label={'Clear '+selectedKind.toUpperCase()+' setup'}
             className="mt-2 w-full rounded border border-[#6b4557] p-2 text-[#ffb4be]"
             onClick={()=>{onClearPreparedExit(selectedKind);close();}}>
             Clear {selectedKind.toUpperCase()} setup
           </button>}
-        <button type="button" onClick={()=>{const focus=panel as ExitKind;close();onEnter(focus);}}
-          className="mt-2 w-full rounded border border-[#53627a] p-2 text-[#c7dbff]">
-          Open Entry Ticket · {panel.toUpperCase()} (review only)
-        </button>
+
       </>}
       {error&&<p role="alert" className="mt-2 text-[#ff9eac]">{error}</p>}
     </div>}
     <div ref={scopeMenuRef} className="absolute bottom-full left-0 right-0 z-[80] text-[11px]">
       {accountMenuOpen&&<section id="mobile-account-picker" role="dialog" aria-label="Choose trading account"
         className="mb-1 max-h-[min(50dvh,320px)] overflow-y-auto rounded border border-[#425574] bg-[#172538] p-2 text-[#e2ebfb] shadow-2xl">
-        <div className="mb-1 text-[11px] font-bold">Active trading account</div>
+        <div className="mb-1 text-[11px] font-bold">Active Trading Account</div>
         {availableAccounts.length===0&&<p className="text-[#94a6c0]">No account loaded</p>}
         {availableAccounts.map(account=><button type="button" key={account.id}
           aria-label={'Use account '+account.name} aria-pressed={account.id===activeAccountId}
@@ -450,10 +456,10 @@ export const MobileTradingControls:React.FC<Props>=({
         <p className="pb-2 text-[9px] text-[#9caecc]">From your simulated account ledger, not an editable profit amount.</p>
         <div className="flex gap-1.5">
           <button type="button" aria-pressed={pnlScope==='account'} onClick={()=>setPnlScope('account')}
-            className={'flex-1 rounded border px-2 py-1.5 '+(pnlScope==='account'?'border-[#72a5fa] bg-[#264a77]':'border-[#41516a]')}>Whole account</button>
+            className={'flex-1 rounded border px-2 py-1.5 '+(pnlScope==='account'?'border-[#72a5fa] bg-[#264a77]':'border-[#41516a]')}>Whole Account</button>
           <button type="button" disabled={!hasPosition} aria-pressed={pnlScope==='position'}
             onClick={()=>setPnlScope('position')}
-            className={'flex-1 rounded border px-2 py-1.5 disabled:opacity-40 '+(pnlScope==='position'?'border-[#72a5fa] bg-[#264a77]':'border-[#41516a]')}>Active position</button>
+            className={'flex-1 rounded border px-2 py-1.5 disabled:opacity-40 '+(pnlScope==='position'?'border-[#72a5fa] bg-[#264a77]':'border-[#41516a]')}>Active Position</button>
         </div>
         {pnlMenu==='cash'?<label className="mt-2 flex items-center gap-2">
           <input type="checkbox" checked={pnlCompact} onChange={e=>setPnlCompact(e.target.checked)}/>
@@ -479,17 +485,17 @@ export const MobileTradingControls:React.FC<Props>=({
       </button>
 
       <button type="button" id="mobile-order-ticket-btn"
-        aria-label="Order" title="Open order ticket; hold for Paper Trading workspace"
-        className={baseButton+' border-[#4d6994] bg-[#253651] text-white'}
+        aria-label="Order" aria-pressed={orderSetupSaved||orderWindowOpen} title="Order Setup · Hold to Reset Saved Setup"
+        className={baseButton+' '+(orderSetupSaved||orderWindowOpen?'border-[#709fff] bg-[#2962ff] text-white':'border-[#4d6994] bg-[#253651] text-white')}
         onPointerDown={()=>{
           orderHeld.current=false;
           clearOrderHold();
           if(onOpenPaperWorkspace)orderHoldTimer.current=setTimeout(()=>{
-            orderHeld.current=true;onOpenPaperWorkspace();
+            orderHeld.current=true;if(orderSetupSaved||orderWindowOpen)onResetOrderSetup?.();else onOpenPaperWorkspace();
           },550);
         }}
         onPointerUp={clearOrderHold} onPointerCancel={clearOrderHold} onPointerLeave={clearOrderHold}
-        onContextMenu={e=>{e.preventDefault();clearOrderHold();orderHeld.current=true;onOpenPaperWorkspace?.();}}
+        onContextMenu={e=>{e.preventDefault();clearOrderHold();orderHeld.current=true;if(orderSetupSaved||orderWindowOpen)onResetOrderSetup?.();else onOpenPaperWorkspace?.();}}
         onClick={()=>{if(!orderHeld.current)onOpenOrder();orderHeld.current=false;}}>
         Order
       </button>
@@ -519,7 +525,7 @@ export const MobileTradingControls:React.FC<Props>=({
         disabled={!position} aria-label="Exit paper position" onClick={onExit}>Exit</button>
       <button id="mobile-order-amount-btn" type="button"
         style={{flex:'2 1 0%'}}
-        className={baseButton+' truncate'}
+        className={baseButton+' truncate '+(panel==='equity'?'bg-[#2962ff] border-[#709fff]':'')}
         title={quickSize.mode==='equity'? `${quickSize.value}% of available equity`:`Cash margin ${moneyLabel(quickSize.value)}`}
         onClick={()=>{setSizeModeDraft(quickSize.mode);setSizeDraft(String(quickSize.value));setError('');setPanel('equity');}}>
         {quickSize.mode==='equity'?`${Math.round(quickSize.value)}% Equity`:moneyLabel(quickSize.value)}
@@ -527,10 +533,11 @@ export const MobileTradingControls:React.FC<Props>=({
       {(['sl','tp'] as const).map(kind=><button key={kind} type="button"
         id={kind==='sl'?'mobile-stop-setup-btn':'mobile-target-setup-btn'}
         style={{flex:'0.5 1 0%'}}
-        className={baseButton+' relative '+(panel===kind?'border-[#709fff]':'')}
-        aria-label={kind==='sl'?'Stop loss; hold for all types':'Take profit; hold for all types'}
-        title="Hold for all types"
-        onContextMenu={e=>{e.preventDefault();clearHold();openExit(kind,true);}}
+        className={baseButton+' relative '+((panel===kind||(position?(kind==='sl'?!!(position.sl||position.trailingPercent||position.dynamicTrailing):!!(position.tp||position.tpLevels?.length)):!!preparedExits[kind]))?'!bg-[#2962ff] !border-[#709fff] text-white':'')}
+        aria-pressed={position?(kind==='sl'?!!(position.sl||position.trailingPercent||position.dynamicTrailing):!!(position.tp||position.tpLevels?.length)):!!preparedExits[kind]}
+        aria-label={kind==='sl'?'Stop loss; hold to reset':'Take profit; hold to reset'}
+        title="Hold to Reset"
+        onContextMenu={e=>{e.preventDefault();clearHold();held.current=true;resetExit(kind);}}
         onPointerDown={()=>startHold(kind)} onPointerUp={clearHold} onPointerCancel={clearHold} onPointerLeave={clearHold}
         onClick={()=>clickExit(kind)}>
         {kind.toUpperCase()}{(position?(

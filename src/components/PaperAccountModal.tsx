@@ -26,6 +26,7 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
   const [settings,setSettings]=useState<PaperSettings>(()=>normalizePaperSettings(existing?.portfolio.settings||DEFAULT_PAPER_SETTINGS));
   const [error,setError]=useState('');
   const [importNotice,setImportNotice]=useState('');
+  const [compactSection,setCompactSection]=useState<'account'|'leverage'|'fees'>('account');
   const importSettings=async(event:React.ChangeEvent<HTMLInputElement>)=>{
     const file=event.target.files?.[0];
     event.target.value='';
@@ -70,10 +71,11 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
         <h2 className="font-semibold text-base">{existing?'Account Settings':'Create Account'}</h2>
         <button type="button" title="Close account dialog" onClick={onClose} className="text-[#9fa2a8] hover:text-white"><X size={20}/></button>
       </header>
-      <div className="px-5 py-4 space-y-4 min-h-0 overflow-y-auto overflow-x-hidden flex-1">
-        <label className="block"><span className={label}>Account Name</span>
+      <nav id="compact-account-tabs" className="hidden" aria-label="Account Settings Sections">{(['account','leverage','fees'] as const).map(section=><button type="button" key={section} aria-pressed={compactSection===section} onClick={()=>setCompactSection(section)}>{section==='account'?'Account':section==='leverage'?'Leverage':'Fees'}</button>)}</nav>
+      <div className="px-5 py-4 space-y-4 min-h-0 overflow-y-auto overflow-x-hidden flex-1" id="paper-account-editor-body" data-section={compactSection}>
+        <label data-account-section="account" className="block"><span className={label}>Account Name</span>
           <input className={cls} maxLength={80} value={name} onChange={e=>setName(e.target.value)}/></label>
-        <div className="rounded border border-[#3c4659] bg-[#1b2635] p-2.5 space-y-2">
+        <div data-account-section="account" id="account-import-presets" className="rounded border border-[#3c4659] bg-[#1b2635] p-2.5 space-y-2">
           <strong className="block text-[11px] text-[#deebff]">Import Account Starting Capital & Fees</strong>
           <p className="text-[10px] leading-snug text-[#a6b9d2]">
             Import a CSV or JSON settings preset: startingBalance, currency, feePercent,
@@ -97,7 +99,7 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
             Import those values into a new account instead.
           </p>}
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div data-account-section="account" className="grid grid-cols-2 gap-3">
           <label><span className={label}>Starting Balance</span>
             <input aria-label="Starting Balance" type="number" min="0" step="any" className={cls} disabled={locked}
               value={settings.startingBalance} onChange={e=>change({startingBalance:Number(e.target.value)})}/></label>
@@ -106,8 +108,8 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
               onChange={e=>change({currency:e.target.value})}>
               {currencyOptions.map(c=><option value={c} key={c}>{c}</option>)}</select></label>
         </div>
-        {locked&&<p className="text-[11px] text-[#aab0bb]">Balance and currency are locked after the first trade. Other settings can still be edited.</p>}
-        <div className="border-t border-[#33363a] pt-3">
+        {locked&&<p data-account-section="account" className="text-[11px] text-[#aab0bb]">Balance and currency are locked after the first trade. Other settings can still be edited.</p>}
+        <div data-account-section="leverage" className="border-t border-[#33363a] pt-3">
           <div className="tracking-wide text-[10px] text-[#bab9b7] mb-3">Leverage</div>
           <label className="flex items-center gap-2 text-[12px] cursor-pointer mb-3">
             <input type="checkbox" checked={settings.marginControl} onChange={e=>change({marginControl:e.target.checked})}
@@ -124,7 +126,7 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
             </label>)}
           </div>
         </div>
-        <div className="border-t border-[#33363a] pt-3">
+        <div data-account-section="fees" className="border-t border-[#33363a] pt-3">
           <div className="tracking-wide text-[10px] text-[#bab9b7] mb-3">Commission (Optional)</div>
           <label className="flex gap-2 items-center text-[12px] cursor-pointer">
             <input type="checkbox" className="accent-[#91aadc] h-4 w-4" checked={settings.futuresOptions.enabled}
@@ -148,18 +150,18 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
                 aria-label={settings.commission.mode==='percent'?'Commission percent':'Fixed commission per execution'}
                 value={settings.commission.amount}
                 onChange={e=>change({commission:{...settings.commission,amount:Number(e.target.value)}})}/></label>
-            <label><span className={label}>Commission type</span>
+            <label><span className={label}>Commission Type</span>
               <select className={cls} disabled={!settings.commission.enabled}
                 value={settings.commission.mode}
                 onChange={e=>change({commission:{...settings.commission,mode:e.target.value as 'fixed'|'percent'}})}>
-                <option value="fixed">Fixed per execution</option><option value="percent">Percent of notional</option>
+                <option value="fixed">Fixed Per Execution</option><option value="percent">Percent of Notional</option>
               </select></label>
           </div>
           <p className="text-[11px] text-[#a9adb7] mt-2">
             Fees are zero unless enabled. Percentage commission uses the notional value of each execution: 0.04 means 0.04% (not 4%). Opening, closing and partial fills each incur their own charge. For futures/options, enabled per-contract fees take precedence.
           </p>
         </div>
-        <div className="border-t border-[#33363a] pt-3 space-y-2">
+        <div data-account-section="fees" className="border-t border-[#33363a] pt-3 space-y-2">
           <div className="tracking-wide text-[10px] text-[#bab9b7]">Paper Execution Assumptions (Optional)</div>
           <p className="text-[11px] text-[#a9adb7]">These are hypothetical costs, not observed bid/ask or actual venue liquidity. Zero preserves earlier results. Half the spread plus adverse slippage applies to each fill.</p>
           <div className="grid grid-cols-2 gap-3">
@@ -180,7 +182,7 @@ export function PaperAccountModal({existing,proposedName,onClose,onSave,onDelete
           onClick={()=>{if(window.confirm('Permanently delete this simulated account and its trade history?')){onDelete();onClose();}}}>Delete</button>}
         <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg border border-[#62676f] text-xs hover:bg-[#33363a]">Cancel</button>
         <button type="button" onClick={save} className="px-3 py-2 rounded-lg text-xs font-semibold bg-[#f0f1f4] text-[#191b1f] hover:bg-white">
-          {existing?'Save Changes':'Create'}
+          {existing?'Save':'Create'}
         </button>
       </footer>
     </section>

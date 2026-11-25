@@ -35,7 +35,7 @@ test('mobile keeps one account/UPL/order/execution row and preloads equity sizin
   const equity=page.getByRole('dialog',{name:'Equity allocation'});
   await expect(equity).toBeVisible();
   await equity.getByRole('spinbutton',{name:'Percent of equity'}).fill('50');
-  await equity.getByRole('button',{name:'Apply to Entry'}).click();
+  await equity.getByRole('button',{name:'Save'}).click();
   await expect(actions.nth(6)).toContainText('50%');
   await expect(actions.nth(1)).toContainText('Order');
   await actions.nth(4).click();
@@ -46,7 +46,8 @@ test('mobile keeps one account/UPL/order/execution row and preloads equity sizin
   await ticket.getByTitle('Close order panel').click();
   await actions.nth(7).click();
   await expect(page.getByRole('dialog',{name:'Stop loss options'})).toBeVisible();
-  await page.getByRole('button',{name:/Open Entry Ticket/}).click();
+  await page.getByRole('dialog',{name:/Stop loss options|Take profit options/}).getByRole('button',{name:'Save',exact:true}).click();
+  await page.getByRole('button',{name:'Enter',exact:true}).click();
   await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','true');
   expect(errors).toEqual([]);
 });
@@ -58,7 +59,8 @@ test('holding TP reveals the advanced entry path without placing an order',async
   await page.waitForTimeout(510);
   await button.dispatchEvent('pointerup',{pointerType:'touch'});
   await expect(page.getByRole('dialog',{name:'Take profit options'})).toBeVisible();
-  await page.getByRole('button',{name:/Open Entry Ticket/}).click();
+  await page.getByRole('dialog',{name:/Stop loss options|Take profit options/}).getByRole('button',{name:'Save',exact:true}).click();
+  await page.getByRole('button',{name:'Enter',exact:true}).click();
   const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
   await expect(ticket.getByRole('switch',{name:'Enable take profit'})).toHaveAttribute('aria-checked','true');
   await expect(page.locator('#plutrade-mobile-trade-controls')).toBeVisible();
@@ -387,8 +389,9 @@ test('paper account imports starting capital and percent fees without silently c
   });
   await expect(dialog.getByRole('status')).toContainText('Settings imported for review');
   await expect(dialog.getByLabel('Starting Balance')).toHaveValue('35000');
+  await dialog.getByRole('button',{name:'Fees',exact:true}).click();
   await expect(dialog.getByLabel('Commission percent')).toHaveValue('0.125');
-  await expect(dialog.getByLabel('Commission type')).toHaveValue('percent');
+  await expect(dialog.getByLabel('Commission Type')).toHaveValue('percent');
   await dialog.getByRole('button',{name:'Create',exact:true}).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Select Paper Trading account'})).toContainText('Primary');
@@ -849,7 +852,7 @@ test('quick cash sizing, precise available-equity percent and independent SL TP 
   await expect(quick.getByText('Available equity:')).toBeVisible();
   await quick.getByRole('group',{name:'Order size basis'}).getByRole('button',{name:'Cash Amount'}).click();
   await quick.getByRole('spinbutton',{name:'Cash margin amount'}).fill('125.43');
-  await quick.getByRole('button',{name:'Apply to Entry'}).click();
+  await quick.getByRole('button',{name:'Save'}).click();
   await expect(amount).toContainText('$125.43');
   await page.locator('#mobile-order-ticket-btn').click();
   const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
@@ -860,7 +863,7 @@ test('quick cash sizing, precise available-equity percent and independent SL TP 
   await amount.click();
   await quick.getByRole('group',{name:'Order size basis'}).getByRole('button',{name:'% Available Equity'}).click();
   await quick.getByRole('spinbutton',{name:'Percent of equity'}).fill('12.345678');
-  await quick.getByRole('button',{name:'Apply to Entry'}).click();
+  await quick.getByRole('button',{name:'Save'}).click();
   await expect(amount).toContainText('12% Equity');
   await page.getByRole('button',{name:'Enter',exact:true}).click();
   await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('12.345678');
@@ -870,12 +873,12 @@ test('quick cash sizing, precise available-equity percent and independent SL TP 
   await page.locator('#mobile-stop-setup-btn').click();
   const sl=page.getByRole('dialog',{name:'Stop loss options'});
   await sl.getByRole('spinbutton',{name:'Exit level value'}).fill('1.25');
-  await sl.getByRole('button',{name:'Save SL setup'}).click();
+  await sl.getByRole('button',{name:'Save'}).click();
   await expect(ticket).toHaveCount(0);
   await page.locator('#mobile-target-setup-btn').click();
   const tp=page.getByRole('dialog',{name:'Take profit options'});
   await tp.getByRole('spinbutton',{name:'Exit level value'}).fill('2.5');
-  await tp.getByRole('button',{name:'Save TP setup'}).click();
+  await tp.getByRole('button',{name:'Save'}).click();
   await expect(ticket).toHaveCount(0);
   await page.getByRole('button',{name:'Enter',exact:true}).click();
   await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','true');
@@ -1217,8 +1220,20 @@ test('mobile account manager fits chart and supports hold-to-edit, custom levera
   const first=panel.locator('#paper-account-dropdown button').first();await first.dispatchEvent('pointerdown',{button:0,pointerType:'touch',clientX:80,clientY:80});
   await page.waitForTimeout(500);const editor=page.locator('#paper-account-editor');await expect(editor).toBeVisible();
   await expect(editor.getByTitle('Close account dialog')).toBeVisible();
+  await editor.getByRole('button',{name:'Leverage',exact:true}).click();
   const margin=editor.getByLabel('Margin Control');if(!await margin.isChecked())await margin.check();
   await editor.getByLabel('Crypto Leverage',{exact:true}).fill('17');
   await expect(editor.getByLabel('Crypto Leverage',{exact:true})).toHaveValue('17');
   await editor.getByTitle('Close account dialog').click();await panel.getByRole('button',{name:'Close Account Window'}).click();await expect(panel).toHaveCount(0);
+});
+
+
+test('compact order save highlights without execution and hold clears setup',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await page.goto('./');
+  const order=page.locator('#mobile-order-ticket-btn');await order.click();
+  const ticket=page.locator('#paper-order-window');await expect(ticket).toBeVisible();
+  const rect=(await ticket.boundingBox())!;expect(rect.width).toBeLessThanOrEqual(310);expect(rect.height).toBeLessThanOrEqual(440);
+  await ticket.getByRole('button',{name:'Save',exact:true}).click();await expect(ticket).toHaveCount(0);await expect(order).toHaveAttribute('aria-pressed','true');
+  await order.dispatchEvent('pointerdown',{button:0,pointerType:'touch'});await page.waitForTimeout(600);await order.dispatchEvent('pointerup',{pointerType:'touch'});await expect(order).toHaveAttribute('aria-pressed','false');
+  const sl=page.locator('#mobile-stop-setup-btn');await sl.click();await page.getByRole('dialog',{name:'Stop loss options'}).getByRole('button',{name:'Save',exact:true}).click();await expect(sl).toHaveAttribute('aria-pressed','true');await sl.dispatchEvent('pointerdown',{button:0,pointerType:'touch'});await page.waitForTimeout(500);await sl.dispatchEvent('pointerup',{pointerType:'touch'});await expect(sl).toHaveAttribute('aria-pressed','false');
 });

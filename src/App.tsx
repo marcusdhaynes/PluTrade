@@ -917,6 +917,8 @@ export default function App() {
   },[persistPaperNow]);
   const [isBottomTradingOpen, setIsBottomTradingOpen] = useState(false);
   const [isTradeTicketOpen,setIsTradeTicketOpen]=useState(false);
+  const [mobileOrderSetupSaved,setMobileOrderSetupSaved]=useState(false);
+  const [mobileOrderResetSeq,setMobileOrderResetSeq]=useState(0);
   // Mobile quick-entry sizing is explicit: % of currently AVAILABLE funds or
   // an exact amount of available account-currency margin (not total equity).
   const [mobileQuickSize,setMobileQuickSize]=useState<{mode:'equity'|'cash';value:number}>(()=>{
@@ -2116,6 +2118,9 @@ export default function App() {
             })}
             onEnter={openMobileEntry}
             onOpenOrder={()=>openMobileEntry()}
+            orderSetupSaved={mobileOrderSetupSaved} orderWindowOpen={isTradeTicketOpen}
+            onResetOrderSetup={()=>{setMobileOrderSetupSaved(false);setMobileOrderResetSeq(n=>n+1);setIsTradeTicketOpen(false);}}
+            onResetPositionExit={(id,kind)=>setPaperPortfolio(prev=>({...prev,positions:prev.positions.map(position=>position.id!==id?position:kind==='sl'?{...position,sl:undefined,trailingPercent:undefined,trailingAnchor:undefined,dynamicTrailing:undefined}:{...position,tp:undefined,tpLevels:undefined})}))}
             onOpenPaperWorkspace={()=>setIsBottomTradingOpen(open=>!open)}
             onExit={()=>{if(activePosition)handleClosePosition(activePosition.id);}}
             onEditStops={handleEditPaperStops}
@@ -2134,7 +2139,9 @@ export default function App() {
           quickSize={mobileQuickSize}
           preparedExits={mobileEntryExits}
           quickFocus={mobileQuickTicket?.focus} quickOpenSequence={mobileQuickTicket?.seq}
-          onOpenAccount={()=>setTradeTicketAccountSettings(true)}/>
+          onOpenAccount={()=>setTradeTicketAccountSettings(true)}
+          onSaveSetup={()=>setMobileOrderSetupSaved(true)} onSetupCleared={()=>setMobileOrderSetupSaved(false)}
+          setupScope={paperAccounts.activeId} resetSetupSequence={mobileOrderResetSeq}/>
         {tradeTicketAccountSettings&&<PaperAccountModal existing={paperAccounts.accounts.find(a=>a.id===(typeof tradeTicketAccountSettings==='string'?tradeTicketAccountSettings:paperAccounts.activeId))}
           proposedName={paperAccount.name}
           onClose={()=>setTradeTicketAccountSettings(false)}
