@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback, useImperativeHandle, forwardRef } from 'react';
+import {useExclusiveWindow} from '../services/exclusiveWindow';
 import {
   createChart,
   ColorType,
@@ -185,8 +186,8 @@ export const MainChart = React.memo(
     const chartGestureRef=useRef<HTMLDivElement>(null);
     const [pinchAxis,setPinchAxis]=useState<PinchAxis|null>(null);
     const [priceVisible,setPriceVisible]=useState(true);
-    const [moreOpen,setMoreOpen]=useState(false);
-    const [currencyMenuOpen,setCurrencyMenuOpen]=useState(false);
+    const [moreOpen,setMoreOpen]=useExclusiveWindow(false);
+    const [currencyMenuOpen,setCurrencyMenuOpen]=useExclusiveWindow(false);
     const [priceAxisWidth,setPriceAxisWidth]=useState(24);
     const [compactMobileAxes,setCompactMobileAxes]=useState(()=>window.matchMedia('(max-width:767px), (hover:none) and (pointer:coarse)').matches);
     const [mobileAxisTicks,setMobileAxisTicks]=useState<Array<{y:number;value:number;label:string}>>([]);
