@@ -20,11 +20,15 @@ export default function WebBuildBanner(){
         if(!disposed && typeof data.sha==='string' &&
           /^[a-f0-9]{40}$/.test(data.sha) && data.sha!==currentBuild)
           setReady(data.sha);
+        else if(!disposed&&data.sha===currentBuild)setReady(null);
       }catch{/* Network errors leave the current workspace untouched. */}
     };
     void check();
-    const timer=window.setInterval(()=>{void check();},300000);
-    return ()=>{disposed=true;window.clearInterval(timer);};
+    const refresh=()=>{if(document.visibilityState==='visible')void check();};
+    const timer=window.setInterval(refresh,15000);
+    window.addEventListener('focus',refresh);
+    document.addEventListener('visibilitychange',refresh);
+    return ()=>{disposed=true;window.clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
   },[]);
   if(!ready||ready===dismissed)return null;
   const reload=()=>{
