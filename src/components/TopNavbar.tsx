@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import {useExclusiveWindow} from '../services/exclusiveWindow';
 import { Asset, ChartType, Timeframe, IndicatorSettings, DrawingToolType } from '../types';
 import {
   Search,
@@ -137,9 +138,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
   isLayoutManagerOpen,
   setIsLayoutManagerOpen,
 }) => {
-  const [isChartTypeOpen, setIsChartTypeOpen] = useState(false);
-  const [isMobileChartStyleOpen,setIsMobileChartStyleOpen]=useState(false);
-  const [isMobileLayoutOpen,setIsMobileLayoutOpen]=useState(false);
+  const [isChartTypeOpen, setIsChartTypeOpen] = useExclusiveWindow(false);
+  const [isMobileChartStyleOpen,setIsMobileChartStyleOpen]=useExclusiveWindow(false);
+  const [isMobileLayoutOpen,setIsMobileLayoutOpen]=useExclusiveWindow(false);
   const mobileLayoutRef=useRef<HTMLDivElement>(null);
   const mobileChartStyleRef=useRef<HTMLDivElement>(null);
   const desktopChartStyleRef=useRef<HTMLDivElement>(null);
@@ -704,7 +705,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = React.memo(({
         <button
           className="p-1 text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#1e222d] rounded transition"
           title="Select Chart Layout Grid"
-          onClick={() => { setIsLayoutDropdownOpen(true); setIsLayoutManagerOpen(false); }}
+          onClick={() => { setIsLayoutDropdownOpen(v=>!v); setIsLayoutManagerOpen(false); }}
         >
           <LayoutGrid className="w-3 h-3" />
         </button>
