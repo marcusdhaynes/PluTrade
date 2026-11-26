@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {editChartExit,type ChartExitEdit} from './services/chartExitEditing';
 import {useExclusiveWindow} from './services/exclusiveWindow';
 import {
   Asset,
@@ -1701,9 +1702,19 @@ export default function App() {
       setPaperError('');
     }catch(e){setPaperError(e instanceof Error?e.message:'Invalid take-profit levels');}
   };
+  const handleChartExitEdit=(id:string,edit:ChartExitEdit):string|null=>{
+    if(paperTradingBlocked)return 'Paper trading is locked or read-only.';
+    try{
+      editChartExit(paperPortfolio,id,edit);
+      setPaperPortfolio(previous=>{
+        try{return editChartExit(previous,id,edit);}catch{return previous;}
+      });
+      setPaperError('');
+      return null;
+    }catch(e){const message=e instanceof Error?e.message:'Unable to edit chart exit';setPaperError(message);return message;}
+  };
   const handleChartEditPositionStop=(id:string,kind:'sl'|'tp')=>{
-    if(typeof window!=='undefined'&&window.matchMedia('(max-width: 767px)').matches)
-      setMobileExitRequest(prev=>({id,kind,seq:(prev?.seq||0)+1}));
+    if(activePosition?.id===id)setMobileExitRequest(prev=>({id,kind,seq:(prev?.seq||0)+1}));
     else requestBottomPanel('positions');
   };
   const handleCancelPendingOrder=(id:string)=>{setPaperPortfolio(p=>cancelPaperOrder(p,id));setPaperError('');};
@@ -2040,6 +2051,7 @@ export default function App() {
             openPositions={paperPositions}
             onClosePosition={handleClosePosition}
             onEditPositionStop={handleChartEditPositionStop}
+            onChartExitEdit={handleChartExitEdit}
             allAssets={assets}
             windowStates={windowStates}
             onUpdateWindowStates={handleUpdateWindowStates}
