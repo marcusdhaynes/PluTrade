@@ -2,6 +2,8 @@ import type {PaperPortfolio} from './paperTrading';
 import {enableTrailingPaperStop,disableTrailingPaperStop} from './paperTrading';
 import {attachDynamicTrailing,disableDynamicTrailing,DEFAULT_DYNAMIC_TRAIL} from './dynamicTrailing';
 
+export type ChartEntryTrail={mode:'off'}|{mode:'trailing';percent:number}|{mode:'intelligent'};
+export type ChartEntryDrafts=Partial<Record<'sl'|'tp',{mode:import('./paperOrders').PaperExitMode;value:string}>>;
 export type ChartExitEdit =
   | {action:'place';kind:'sl'|'tp';price:number;levelId?:string}
   | {action:'remove';kind:'sl'|'tp';levelId?:string}

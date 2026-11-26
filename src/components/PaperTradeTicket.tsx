@@ -7,6 +7,7 @@ import {accountLeverage,isFreshPaperQuote,paperCommission} from '../services/pap
 import type {PaperOrderKind,PaperOrderRequest,PaperOrderSide,PaperTimeInForce,PaperExitMode} from '../services/paperOrders';
 import {estimatePaperQty,paperRiskSizedQty,exitPriceFromValue,exitValueFromPrice,withOrderReservations} from '../services/paperOrders';
 
+import type {ChartEntryTrail} from '../services/chartExitEditing';
 interface Props{
   open:boolean;onClose:()=>void;asset:Asset;portfolio:PaperPortfolio;
   onSubmit:(order:PaperOrderRequest)=>string|null;
@@ -14,6 +15,7 @@ interface Props{
   error:string;onOpenAccount:()=>void;
   quickSize?:{mode:'equity'|'cash';value:number};
   preparedExits?:Partial<Record<'sl'|'tp',{mode:PaperExitMode;value:string}>>;
+  preparedTrail?:ChartEntryTrail;
   quickFocus?:'sl'|'tp';quickOpenSequence?:number;
   onSaveSetup?:()=>void; onSetupCleared?:()=>void; resetSetupSequence?:number; setupScope?:string;
 }
@@ -64,7 +66,7 @@ function ExitField({kind,entry,qty,balance,side,tick,enabled,setEnabled,mode,set
     {enabled&&<div className="text-right text-[10px] text-[#8b96ac]">Target: {target&&target>0?pct(target):'Invalid target'} · {pct(money)} at risk/reward</div>}
   </div>;
 }
-export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onSubmit,bids,asks,error,onOpenAccount,quickSize,preparedExits,quickFocus,quickOpenSequence,onSaveSetup,onSetupCleared,resetSetupSequence,setupScope})=>{
+export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onSubmit,bids,asks,error,onOpenAccount,quickSize,preparedExits,preparedTrail,quickFocus,quickOpenSequence,onSaveSetup,onSetupCleared,resetSetupSequence,setupScope})=>{
   const [side,setSide]=useState<PaperOrderSide>('Long');
   const [kind,setKind]=useState<PaperOrderKind>('market');
   const [sizeMode,setSizeMode]=useState<'equity'|'cash'|'balance'|'units'|'notional'|'riskMoney'|'riskBalance'>('balance');
@@ -97,7 +99,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   const venue=asset.source||asset.exchange;
   const savedSetup=useRef<null|(()=>void)>(null);
   const savedQuick=useRef('');
-  const quickKey=JSON.stringify([quickSize,preparedExits]);
+  const quickKey=JSON.stringify([quickSize,preparedExits,preparedTrail]);
   useEffect(()=>{savedSetup.current=null;onSetupCleared?.();},[setupScope,asset.symbol,venue]);
   useEffect(()=>{if(savedSetup.current&&savedQuick.current!==quickKey){savedSetup.current=null;onSetupCleared?.();}},[quickKey]);
   useEffect(()=>{if(resetSetupSequence===undefined)return;savedSetup.current=null;setKind('market');setSide('Long');setPriceInput('');setLimitPriceInput('');setTpEnabled(false);setSlEnabled(false);setTrailingEnabled(false);setDynamicEnabled(false);setExtraTps([]);setReviewOpen(false);setSizeInput(String(quickSize?.value??99));setSizeMode(quickSize?.mode||'equity');setTif('Week');setPriceMode('price');setErrorLocal('');},[resetSetupSequence]);
@@ -105,7 +107,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
   // Mobile shortcuts prefill an equity-based size and reveal all SL/TP modes.
   // A shortcut only opens the reviewed order form; it never submits an order.
   useEffect(()=>{
-    if(!open||quickOpenSequence===undefined)return;
+    if(!open)return;
     if(savedSetup.current&&savedQuick.current===quickKey){savedSetup.current();setDom(false);setReviewOpen(false);return;}
     if(savedSetup.current){savedSetup.current=null;onSetupCleared?.();}
     setSizeMode(quickSize?.mode||'equity');
@@ -122,10 +124,14 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
       setTpMode(preparedExits.tp.mode);
       setTpValue(preparedExits.tp.value);
     }else setTpEnabled(quickFocus==='tp');
-    setExitsOpen(!!preparedExits?.sl||!!preparedExits?.tp||!!quickFocus);
+    setTrailingEnabled(preparedTrail?.mode==='trailing');
+    if(preparedTrail?.mode==='trailing')setTrailingPercent(String(preparedTrail.percent));
+    setDynamicEnabled(preparedTrail?.mode==='intelligent');
+    if(preparedTrail?.mode==='intelligent')setDynamicSettings({...DEFAULT_DYNAMIC_TRAIL,intrabar:true});
+    setExitsOpen(!!preparedExits?.sl||!!preparedExits?.tp||!!quickFocus||!!(preparedTrail&&preparedTrail.mode!=='off'));
     setDom(false);
     setReviewOpen(false);
-  },[quickOpenSequence]);
+  },[open,quickOpenSequence,quickKey]);
   useEffect(()=>{
     try {localStorage.setItem('plutrade_paper_one_click_v1',String(oneClick));}
     catch { /* browser storage can be disabled */ }

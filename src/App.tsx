@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import {editChartExit,type ChartExitEdit} from './services/chartExitEditing';
+import {editChartExit,type ChartExitEdit,type ChartEntryTrail} from './services/chartExitEditing';
 import {useExclusiveWindow} from './services/exclusiveWindow';
 import {
   Asset,
@@ -185,7 +185,7 @@ export default function App() {
     const saved = localStorage.getItem('tv_chart_type');
     const allowed:ChartType[]=['candlestick','bar','hollow','heikin-ashi','line',
       'area','baseline','column','step-line','high-low'];
-    return allowed.includes(saved as ChartType) ? saved as ChartType : 'candlestick';
+    return allowed.includes(saved as ChartType) ? saved as ChartType : 'line';
   });
 
   // State: Chart Data & Candles
@@ -935,13 +935,14 @@ export default function App() {
   const [mobileEntryExits,setMobileEntryExits]=useState<
     Partial<Record<'sl'|'tp',{mode:PaperExitMode;value:string}>>
   >({});
+  const [chartEntryTrail,setChartEntryTrail]=useState<ChartEntryTrail>({mode:'off'});
   const [mobileQuickTicket,setMobileQuickTicket]=useState<{focus?:'sl'|'tp';seq:number}|null>(null);
   const [mobileExitRequest,setMobileExitRequest]=useState<{id:string;kind:'sl'|'tp';seq:number}|null>(null);
   useEffect(()=>{
     try{localStorage.setItem('plutrade_mobile_quick_size_v2',JSON.stringify(mobileQuickSize));}catch{}
   },[mobileQuickSize]);
   // Never carry entry-exit drafts across markets or paper accounts.
-  useEffect(()=>setMobileEntryExits({}),[
+  useEffect(()=>{setMobileEntryExits({});setChartEntryTrail({mode:'off'});},[
     activeAsset.symbol,activeAsset.exchange,activeAsset.source,activeAsset.marketType,
     paperAccounts.activeId,
   ]);
@@ -1702,6 +1703,20 @@ export default function App() {
       setPaperError('');
     }catch(e){setPaperError(e instanceof Error?e.message:'Invalid take-profit levels');}
   };
+  const handleChartDraftEdit=(edit:ChartExitEdit):string|null=>{
+    if(edit.action==='place'){
+      if(!Number.isFinite(edit.price)||edit.price<=0)return 'Enter a positive price.';
+      setMobileEntryExits(prev=>({...prev,[edit.kind]:{mode:'price',value:String(edit.price)}}));
+    }else if(edit.action==='remove'){
+      setMobileEntryExits(prev=>{const next={...prev};delete next[edit.kind];return next;});
+      if(edit.kind==='sl')setChartEntryTrail({mode:'off'});
+    }else if(edit.action==='trailing'){
+      const percent=edit.percent??0.5;
+      if(edit.enabled&&(!Number.isFinite(percent)||percent<=0||percent>=100))return 'Trailing percent must be between 0 and 100.';
+      setChartEntryTrail(edit.enabled?{mode:'trailing',percent}:{mode:'off'});
+    }else setChartEntryTrail(edit.enabled?{mode:'intelligent'}:{mode:'off'});
+    return null;
+  };
   const handleChartExitEdit=(id:string,edit:ChartExitEdit):string|null=>{
     if(paperTradingBlocked)return 'Paper trading is locked or read-only.';
     try{
@@ -1937,7 +1952,7 @@ export default function App() {
         onToggleFullscreen={handleToggleFullscreen}
         onSelectQuickTool={(tool) => setActiveTool(tool)}
         activeTool={activeTool}
-        onToggleTradingPanel={() => setIsTradeTicketOpen(prev=>!prev)}
+        onToggleTradingPanel={()=>openMobileEntry()}
         onTogglePaperWorkspace={()=>setIsBottomTradingOpen(v=>!v)}
         onOpenSavedCharts={()=>setIsSavedChartsOpen(v=>!v)}
         onOpenReplay={()=>{if(isBottomTradingOpen&&activeDockTab==='replay')setIsBottomTradingOpen(false);else requestBottomPanel('replay');}}
@@ -2052,6 +2067,9 @@ export default function App() {
             onClosePosition={handleClosePosition}
             onEditPositionStop={handleChartEditPositionStop}
             onChartExitEdit={handleChartExitEdit}
+            chartDraftExits={mobileEntryExits} chartDraftTrail={chartEntryTrail}
+            chartDraftScope={paperAccounts.activeId+':'+marketIdentity(activeAsset)}
+            onChartDraftEdit={handleChartDraftEdit} onChartDraftAdvanced={openMobileEntry}
             allAssets={assets}
             windowStates={windowStates}
             onUpdateWindowStates={handleUpdateWindowStates}
@@ -2152,7 +2170,7 @@ export default function App() {
           asset={activeAsset} portfolio={paperPortfolio} bids={orderBook.bids} asks={orderBook.asks}
           onSubmit={handleSubmitTicketOrder} error={paperError}
           quickSize={mobileQuickSize}
-          preparedExits={mobileEntryExits}
+          preparedExits={mobileEntryExits} preparedTrail={chartEntryTrail}
           quickFocus={mobileQuickTicket?.focus} quickOpenSequence={mobileQuickTicket?.seq}
           onOpenAccount={()=>setTradeTicketAccountSettings(true)}
           onSaveSetup={()=>setMobileOrderSetupSaved(true)} onSetupCleared={()=>setMobileOrderSetupSaved(false)}

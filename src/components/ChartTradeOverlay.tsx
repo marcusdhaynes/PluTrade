@@ -1,13 +1,14 @@
 import React,{useEffect,useRef,useState} from 'react';
 import type {PaperPosition} from '../types';
 import type {ChartExitLevel} from '../services/chartPositionLevels';
-import type {ChartExitEdit} from '../services/chartExitEditing';
+import type {ChartExitEdit,ChartEntryTrail,ChartEntryDrafts} from '../services/chartExitEditing';
 import {useExclusiveWindow} from '../services/exclusiveWindow';
 
 type Kind='sl'|'tp';
 type Handle={kind:Kind;levelId?:string};
 type Props={
-  position:PaperPosition;positionY:number|null;levels:Array<ChartExitLevel&{y:number}>;
+  position?:PaperPosition|null;positionY:number|null;levels:Array<ChartExitLevel&{y:number}>;
+  draftExits?:ChartEntryDrafts;draftTrail?:ChartEntryTrail;draftScope?:string;onDraftEdit?:(edit:ChartExitEdit)=>string|null;onDraftAdvanced?:(kind:Kind)=>void;
   height:number;axisWidth:number;digits:number;currency:string;
   coordinateToPrice:(y:number)=>number|null;
   onEdit?:(id:string,edit:ChartExitEdit)=>string|null;
@@ -16,7 +17,7 @@ type Props={
 type Menu=Handle&{x:number;y:number};
 type Drag=Handle&{pointer:number;startX:number;startY:number;y:number;moved:boolean};
 const tint=(kind:Kind)=>kind==='sl'?'#f05e74':'#00dca0';
-export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,digits,currency,coordinateToPrice,onEdit,onAdvanced,onClose}:Props){
+export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,digits,currency,coordinateToPrice,onEdit,onAdvanced,onClose,draftExits,draftTrail,draftScope,onDraftEdit,onDraftAdvanced}:Props){
   const root=useRef<HTMLDivElement>(null);
   const dragRef=useRef<Drag|null>(null);
   const hold=useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -29,7 +30,7 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
   const [notice,setNotice]=useState('');
   const clearHold=()=>{if(hold.current!==null){clearTimeout(hold.current);hold.current=null;}};
   useEffect(()=>()=>clearHold(),[]);
-  useEffect(()=>{setMenu(null);setPreview(null);dragRef.current=null;clearHold();},[position.id]);
+  useEffect(()=>{setMenu(null);setPreview(null);dragRef.current=null;clearHold();},[position?.id,draftScope]);
   useEffect(()=>{if(!notice)return;const id=setTimeout(()=>setNotice(''),4500);return()=>clearTimeout(id);},[notice]);
   useEffect(()=>{
     if(!menu)return;
@@ -39,15 +40,17 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
     return()=>{window.removeEventListener('keydown',escape);window.removeEventListener('pointerdown',outside,true);};
   },[menu,setMenu]);
   const clampY=(y:number)=>Math.max(10,Math.min(Math.max(10,height-34),y));
-  const origin=positionY===null?null:clampY(positionY);
+  const origin=clampY(positionY??height*.52);
+  const trailing=position?position.trailingPercent:draftTrail?.mode==='trailing'?draftTrail.percent:undefined;
+  const intelligent=position?!!position.dynamicTrailing?.intrabar:draftTrail?.mode==='intelligent';
   const selected=(h:Handle)=>levels.find(l=>l.kind===h.kind&&(!h.levelId||l.id===h.levelId));
   const openMenu=(h:Handle,x:number,y:number)=>{
     const r=root.current?.getBoundingClientRect();if(!r)return;
-    setPrice(String(selected(h)?.price??''));setPercent(String(position.trailingPercent??0.5));setError('');
+    setPrice(String(selected(h)?.price??(draftExits?.[h.kind]?.mode==='price'?draftExits[h.kind]?.value:'')??''));setPercent(String(trailing??0.5));setError('');
     setMenu({...h,x:Math.max(2,Math.min(x-r.left,r.width-230)),y:Math.max(2,Math.min(y-r.top,r.height-215))});
   };
   const apply=(edit:ChartExitEdit,close=true)=>{
-    const result=onEdit?onEdit(position.id,edit):'Chart editing unavailable.';
+    const result=position?(onEdit?onEdit(position.id,edit):'Chart editing unavailable.'):(onDraftEdit?onDraftEdit(edit):'Select this chart to configure its order.');
     if(result){setError(result);setNotice(result);return false;}
     setError('');if(close)setMenu(null);return true;
   };
@@ -70,7 +73,7 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
       e.stopPropagation();clearHold();const d=dragRef.current;dragRef.current=null;setPreview(null);
       if(held.current){held.current=false;return;}
       if(!d||!d.moved){if(menu?.kind===h.kind&&menu.levelId===h.levelId)setMenu(null);else openMenu(h,e.clientX,e.clientY);return;}
-      if(origin!==null&&Math.abs(d.y-origin)<=10){if(selected(h))apply({action:'remove',kind:h.kind,levelId:h.levelId});return;}
+      if(origin!==null&&Math.abs(d.y-origin)<=10){if(selected(h)||draftExits?.[h.kind]||(h.kind==='sl'&&(trailing||intelligent)))apply({action:'remove',kind:h.kind,levelId:h.levelId});return;}
       const raw=coordinateToPrice(d.y);
       if(raw===null||!Number.isFinite(raw)){setNotice('No chart price at this location.');return;}
       const next=Number(raw.toFixed(Math.max(0,Math.min(10,digits))));
@@ -82,24 +85,24 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
   });
   const controls=(kind:Kind)=>{
     const matches=levels.filter(l=>l.kind===kind);
-    if(matches.length)return null;
-    const h:Handle={kind};
-    return <button type="button" data-chart-exit-handle={kind} data-attached={matches.length?'false':'true'}
+    const configured=matches.length>0||!!draftExits?.[kind]||(kind==='sl'&&!!(trailing||intelligent));
+    const h:Handle={kind,levelId:matches.length===1?matches[0].id:undefined};
+    return <button type="button" data-chart-exit-handle={kind} data-attached={matches.length?'false':'true'} data-configured={configured?'true':'false'}
       aria-label={kind==='sl'?'Edit or drag stop loss':'Edit or drag take profit'}
       title={matches.length?'Drag to adjust; drop on entry to remove; right-click to edit':'Drag to place; right-click to edit'}
-      {...handlers(h)} className="chart-exit-handle" style={{color:tint(kind),borderColor:tint(kind),borderStyle:matches.length?'solid':'dotted'}}>{kind.toUpperCase()}</button>;
+      {...handlers(h)} className="chart-exit-handle" style={{color:tint(kind),borderColor:tint(kind),borderStyle:configured?'solid':'dotted'}}>{kind.toUpperCase()}</button>;
   };
-  const pnlColor=position.unrealizedPnL>=0?'#00dca0':'#f05e74';
+  const pnlColor=(position?.unrealizedPnL??0)>=0?'#00dca0':'#f05e74';
   const right=Math.max(26,axisWidth)+4;
-  return <div ref={root} className="absolute inset-0 pointer-events-none z-30" data-chart-trade-overlay={position.id}>
+  return <div ref={root} className="absolute inset-0 pointer-events-none z-[65]" data-chart-trade-overlay={position?.id??'entry-draft'}>
     {origin!==null&&<>
-      {positionY!==null&&positionY>=0&&positionY<=height-24&&<div className="absolute left-0 border-b" style={{top:positionY,right,borderColor:'#00b889'}}/>}
+      {position&&positionY!==null&&positionY>=0&&positionY<=height-24&&<div className="absolute left-0 border-b" style={{top:positionY,right,borderColor:'#00b889'}}/>}
       <div className="chart-position-badge" style={{top:origin,right}}>
-        {controls('tp')}{controls('sl')}
+        {controls('sl')}{controls('tp')}
         <span className="chart-position-values" style={{borderColor:pnlColor,color:pnlColor}}>
-          <span>{position.qty.toLocaleString()}</span>
-          <span aria-label="Unrealized profit or loss">{position.unrealizedPnL>=0?'+':''}{position.unrealizedPnL.toFixed(2)} {currency}</span>
-          <button type="button" title="Close Position" onClick={e=>{e.stopPropagation();onClose?.(position.id);}}>×</button>
+          {position&&<span>{position.qty.toLocaleString()}</span>}
+          <span aria-label="Unrealized profit or loss">UP/L$ {position?(position.unrealizedPnL>=0?'+':'')+position.unrealizedPnL.toFixed(2):'0.00'}{currency!=='USD'?' '+currency:''}</span>
+          {position&&<button type="button" title="Close Position" onClick={e=>{e.stopPropagation();onClose?.(position.id);}}>×</button>}
         </span>
       </div>
     </>}
@@ -116,16 +119,17 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
     {preview&&<div className="absolute left-0 border-b border-dashed" style={{top:preview.y,right,borderColor:tint(preview.kind)}}><span className="absolute right-0 -translate-y-full text-[10px]" style={{color:tint(preview.kind)}}>{origin!==null&&Math.abs(preview.y-origin)<=10?'Remove':coordinateToPrice(preview.y)?.toFixed(digits)}</span></div>}
     {menu&&<div role="dialog" aria-label={menu.kind==='sl'?'Stop loss chart settings':'Take profit chart settings'} data-chart-exit-menu className="chart-exit-menu" style={{left:menu.x,top:menu.y}} onPointerDown={e=>e.stopPropagation()}>
       <div className="flex items-center justify-between"><strong>{menu.kind==='sl'?'Stop Loss':'Take Profit'}</strong><button type="button" onClick={()=>setMenu(null)} aria-label="Close exit settings">×</button></div>
+      {!position&&<small>Order setup · applies when the next order is submitted.</small>}
       <label>Exact Price <input aria-label="Exact exit price" type="number" min="0" step="any" value={price} onChange={e=>setPrice(e.target.value)}/></label>
       <button type="button" onClick={()=>apply({action:'place',kind:menu.kind,levelId:menu.levelId,price:Number(price)})}>Save Price</button>
       {menu.kind==='sl'&&<>
-        <label><input type="checkbox" checked={!!position.trailingPercent} onChange={e=>apply({action:'trailing',enabled:e.target.checked,percent:Number(percent)},false)}/> Trailing Stop</label>
+        <label><input type="checkbox" checked={!!trailing} onChange={e=>apply({action:'trailing',enabled:e.target.checked,percent:Number(percent)},false)}/> Trailing Stop</label>
         <label>Trail % <input aria-label="Trailing percent" type="number" min="0.01" max="99.99" step="0.01" value={percent} onChange={e=>setPercent(e.target.value)}/></label>
-        {position.trailingPercent!==undefined&&<button type="button" onClick={()=>apply({action:'trailing',enabled:true,percent:Number(percent)},false)}>Save Trailing %</button>}
-        <label><input type="checkbox" checked={!!position.dynamicTrailing?.intrabar} onChange={e=>apply({action:'intelligent',enabled:e.target.checked},false)}/> Intelligent Trailing</label>
-        {position.dynamicTrailing?.intrabar&&<small>Automatic ATR protection on verified ticks · never loosens the stop.</small>}
+        {trailing!==undefined&&<button type="button" onClick={()=>apply({action:'trailing',enabled:true,percent:Number(percent)},false)}>Save Trailing %</button>}
+        <label><input type="checkbox" checked={!!intelligent} onChange={e=>apply({action:'intelligent',enabled:e.target.checked},false)}/> Intelligent Trailing</label>
+        {intelligent&&<small>Automatic ATR protection on verified ticks · never loosens the stop.</small>}
       </>}
-      <div className="flex gap-1"><button type="button" onClick={()=>apply({action:'remove',kind:menu.kind,levelId:menu.levelId})}>Remove</button><button type="button" onClick={()=>{setMenu(null);onAdvanced?.(position.id,menu.kind);}}>Advanced</button></div>
+      <div className="flex gap-1"><button type="button" onClick={()=>apply({action:'remove',kind:menu.kind,levelId:menu.levelId})}>Remove</button><button type="button" onClick={()=>{setMenu(null);if(position)onAdvanced?.(position.id,menu.kind);else onDraftAdvanced?.(menu.kind);}}>Advanced</button></div>
       {error&&<small role="alert" className="text-[#ff9eac]">{error}</small>}
     </div>}
     {notice&&<div role="alert" className="absolute bottom-8 left-2 rounded bg-[#3b2028] p-2 text-[10px] text-[#ffbac4]">{notice}</div>}

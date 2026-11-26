@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback, useImperativeHandle, forwardRef } from 'react';
 import {attachCosmicLine} from '../services/cosmicLine';
 import {ChartTradeOverlay} from './ChartTradeOverlay';
-import type {ChartExitEdit} from '../services/chartExitEditing';
+import type {ChartExitEdit,ChartEntryTrail,ChartEntryDrafts} from '../services/chartExitEditing';
 import {useExclusiveWindow} from '../services/exclusiveWindow';
 import {
   createChart,
@@ -86,6 +86,8 @@ interface MainChartProps {
   onClosePosition?: (id: string) => void;
   onEditPositionStop?: (id:string,kind:'sl'|'tp')=>void;
   onChartExitEdit?: (id:string,edit:ChartExitEdit)=>string|null;
+  chartDraftExits?:ChartEntryDrafts;chartDraftTrail?:ChartEntryTrail;chartDraftScope?:string;
+  onChartDraftEdit?:(edit:ChartExitEdit)=>string|null;onChartDraftAdvanced?:(kind:'sl'|'tp')=>void;
   onOpenConditionalOrder?: (dep: DependencyContext) => void;
   chartHistoryState?:ChartLoadState;
   onRetryChartHistory?:()=>void;
@@ -170,7 +172,7 @@ export const MainChart = React.memo(
       openPosition,
       onClosePosition,
       onEditPositionStop,
-      onChartExitEdit,
+      onChartExitEdit,chartDraftExits,chartDraftTrail,chartDraftScope,onChartDraftEdit,onChartDraftAdvanced,
       onOpenConditionalOrder,
       chartHistoryState='empty',
       onRetryChartHistory,
@@ -1202,7 +1204,8 @@ export const MainChart = React.memo(
               setPositionY((prev) => (prev === null || Math.abs(prev - y) >= 1 ? Math.round(y) : prev));
             }else setPositionY(null);
           } else {
-            setPositionY(null);
+            const y=asset.price>0?mainSeriesRef.current.priceToCoordinate(asset.price):null;
+            setPositionY(y!==null&&Number.isFinite(y)?Math.round(y):null);
           }
           const exits=chartPositionExitLevels(openPosition).flatMap(level=>{
             const coordinate=mainSeriesRef.current?.priceToCoordinate(level.price);
@@ -1434,13 +1437,15 @@ export const MainChart = React.memo(
           </div>
         </section>}
 
-        {openPosition&&<ChartTradeOverlay
+        {<ChartTradeOverlay
           position={openPosition} positionY={positionY} levels={exitLinePositions}
           height={chartContainerRef.current?.clientHeight||240}
           axisWidth={compactMobileAxes?MOBILE_ORDER_RAIL_PX:priceAxisWidth}
           digits={asset.digits} currency={asset.currency}
           coordinateToPrice={y=>mainSeriesRef.current?.coordinateToPrice(y)??null}
-          onEdit={onChartExitEdit} onAdvanced={onEditPositionStop} onClose={onClosePosition}/>}
+          onEdit={onChartExitEdit} onAdvanced={onEditPositionStop} onClose={onClosePosition}
+          draftExits={chartDraftExits} draftTrail={chartDraftTrail} draftScope={chartDraftScope}
+          onDraftEdit={onChartDraftEdit} onDraftAdvanced={onChartDraftAdvanced}/>}
 
         {/* Current price tag lives entirely inside the plotting area, never on
             the fixed mobile price rail or the time axis. Its blue is identical

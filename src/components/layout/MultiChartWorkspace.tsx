@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import type {ChartExitEdit} from '../../services/chartExitEditing';
+import type {ChartExitEdit,ChartEntryTrail,ChartEntryDrafts} from '../../services/chartExitEditing';
 import {
   Asset,
   ChartType,
@@ -60,6 +60,8 @@ interface MultiChartWorkspaceProps {
   onClosePosition?: (id: string) => void;
   onEditPositionStop?: (id:string,kind:'sl'|'tp')=>void;
   onChartExitEdit?: (id:string,edit:ChartExitEdit)=>string|null;
+  chartDraftExits?:ChartEntryDrafts;chartDraftTrail?:ChartEntryTrail;chartDraftScope?:string;
+  onChartDraftEdit?:(edit:ChartExitEdit)=>string|null;onChartDraftAdvanced?:(kind:'sl'|'tp')=>void;
   allAssets: Asset[];
   windowStates: ChartWindowState[];
   onUpdateWindowStates: (states: ChartWindowState[]) => void;
@@ -205,7 +207,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
       openPositions,
       onClosePosition,
       onEditPositionStop,
-      onChartExitEdit,
+      onChartExitEdit,chartDraftExits,chartDraftTrail,chartDraftScope,onChartDraftEdit,onChartDraftAdvanced,
       allAssets,
       windowStates,
       onUpdateWindowStates,
@@ -747,6 +749,11 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
               onClosePosition={onClosePosition}
               onEditPositionStop={onEditPositionStop}
               onChartExitEdit={onChartExitEdit}
+              chartDraftExits={marketIdentity(winAsset)===marketIdentity(activeAsset)?chartDraftExits:undefined}
+              chartDraftTrail={marketIdentity(winAsset)===marketIdentity(activeAsset)?chartDraftTrail:undefined}
+              chartDraftScope={chartDraftScope+':'+marketIdentity(winAsset)}
+              onChartDraftEdit={marketIdentity(winAsset)===marketIdentity(activeAsset)?onChartDraftEdit:undefined}
+              onChartDraftAdvanced={marketIdentity(winAsset)===marketIdentity(activeAsset)?onChartDraftAdvanced:undefined}
               onOpenConditionalOrder={onOpenConditionalOrder}
             />
           </div>

@@ -96,6 +96,7 @@ export function attachDynamicTrailing(
   if(!input.positions.some(p=>p.id===id))throw new Error('Position not available for dynamic trailing.');
   return {...input,positions:input.positions.map(p=>p.id!==id?p:{
     ...p,trailingPercent:undefined,trailingAnchor:undefined,
+    sl:settings.intrabar?(p.side==='Long'?Math.max(p.sl??0,p.currentPrice*.99):Math.min(p.sl??Infinity,p.currentPrice*1.01)):p.sl,
     dynamicTrailing:{...settings,lastBarTime:undefined,atr:undefined},
   })};
 }

@@ -1272,3 +1272,9 @@ html,body,#root {
 .chart-exit-menu button{border:1px solid #53627a;border-radius:3px;padding:2px 5px;background:#243147;cursor:pointer}
 .chart-exit-menu button:hover{background:#2962ff}
 @media(max-width:420px){.chart-position-badge{gap:2px;font-size:9px}.chart-position-values>span,.chart-position-values>button,.chart-exit-handle{padding-inline:3px}}
+
+/* Trade controls remain readable before entry, and above the drawing canvas. */
+.chart-position-badge{z-index:2;max-width:calc(100% - 40px)}
+.chart-exit-handle[data-configured="true"]{background:#203541}
+.chart-exit-level{z-index:1}
+.chart-exit-menu{z-index:4}
