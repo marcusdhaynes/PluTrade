@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import type {ChartExitEdit} from '../../services/chartExitEditing';
 import {
   Asset,
   ChartType,
@@ -58,6 +59,7 @@ interface MultiChartWorkspaceProps {
   openPositions?: PaperPosition[];
   onClosePosition?: (id: string) => void;
   onEditPositionStop?: (id:string,kind:'sl'|'tp')=>void;
+  onChartExitEdit?: (id:string,edit:ChartExitEdit)=>string|null;
   allAssets: Asset[];
   windowStates: ChartWindowState[];
   onUpdateWindowStates: (states: ChartWindowState[]) => void;
@@ -203,6 +205,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
       openPositions,
       onClosePosition,
       onEditPositionStop,
+      onChartExitEdit,
       allAssets,
       windowStates,
       onUpdateWindowStates,
@@ -743,6 +746,7 @@ export const MultiChartWorkspace = forwardRef<MainChartRef, MultiChartWorkspaceP
               openPosition={openPositions?.find(pos=>matchesExactMarket(pos,winAsset)) || null}
               onClosePosition={onClosePosition}
               onEditPositionStop={onEditPositionStop}
+              onChartExitEdit={onChartExitEdit}
               onOpenConditionalOrder={onOpenConditionalOrder}
             />
           </div>
