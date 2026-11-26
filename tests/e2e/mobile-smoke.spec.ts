@@ -1275,3 +1275,41 @@ test('desktop uses the same nine-control bottom trading bar and saved order sizi
     await expect(page.getByRole('dialog',{name:'Stop loss options'})).toBeVisible();
   }finally{await context.close();}
 });
+
+
+test('desktop shares mobile left and right rails and viewport drawer geometry',async ({browser},testInfo)=>{
+  const context=await browser.newContext({baseURL:testInfo.project.use.baseURL,viewport:{width:1440,height:900},isMobile:false,hasTouch:false});
+  try{
+    const page=await context.newPage();
+    await isolateExternalFeeds(page);
+    await page.goto('./');
+    const left=page.locator('#tradingview-left-toolbar');
+    const right=page.locator('#tradingview-right-icon-bar');
+    await expect(left).toBeVisible();
+    await expect(right).toBeVisible();
+    expect(Math.abs((await left.boundingBox())!.width-27)).toBeLessThan(1);
+    expect(Math.abs((await right.boundingBox())!.width-28)).toBeLessThan(1);
+    const sizes=await right.locator('[data-right-rail-button]').evaluateAll(nodes=>nodes.map(node=>{
+      const r=node.getBoundingClientRect();return {width:r.width,height:r.height};
+    }));
+    expect(sizes.every(r=>Math.abs(r.width-22)<1&&Math.abs(r.height-22)<1)).toBe(true);
+    const crosshair=await page.locator('#left-tool-crosshair').boundingBox();
+    expect(Math.abs(crosshair!.width-22)).toBeLessThan(1);
+    expect(Math.abs(crosshair!.height-22)).toBeLessThan(1);
+    const workspace=page.locator('#chart-workspace-viewport');
+    const original=await workspace.boundingBox();
+    for(const [id,title] of [['right-tab-watchlist','Watchlist & Details'],['right-tab-indicators','Indicators'],['right-tab-metrics','Metrics'],['right-tab-strategies','Strategies'],['right-tab-help','Keyboard Shortcuts & Help'],['right-tab-trade-journal','Trading Journal']]){
+      await page.locator('#'+id).click();
+      const drawer=page.locator('#right-sidebar-content-pane[data-viewport-drawer="true"]');
+      await expect(drawer).toBeVisible();
+      await expect(drawer.locator('[data-right-drawer-header]')).toContainText(title);
+      const rect=(await drawer.boundingBox())!;
+      const rail=(await right.boundingBox())!;
+      expect(Math.abs(rect.x+rect.width-rail.x)).toBeLessThan(2);
+      expect(rect.width).toBeLessThanOrEqual(321);
+      expect(Math.abs((await workspace.boundingBox())!.width-original!.width)).toBeLessThan(1);
+      await drawer.getByRole('button',{name:'Close '+title,exact:true}).click();
+      await expect(drawer).toHaveCount(0);
+    }
+  }finally{await context.close();}
+});
