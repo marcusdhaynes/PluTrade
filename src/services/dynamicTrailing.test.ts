@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {editChartExit} from './chartExitEditing';
+import {makeQuickOrder,quickExitQuantity,closeWithProtection} from './quickExecution';
 import type {Asset,OHLCV} from '../types';
 import {emptyPaperPortfolio,placePaperPosition,markPaperPositions} from './paperTrading';
 import {submitPaperOrder,evaluatePaperOrders} from './paperOrders';
@@ -152,3 +153,32 @@ for(const side of ['Long','Short'] as const){
   assert.deepEqual(oneRemoved.positions[0].tpLevels?.map(t=>t.id),['b']);
 }
 console.log('Chart exit editing and intelligent tick trailing: long and short scenario checks passed.');
+
+
+// Quick entry and full ticket share the actual simulated order engine.
+for(const side of ['Long','Short'] as const){
+  const account=emptyPaperPortfolio();
+  const request=makeQuickOrder(account,market,side,{mode:'equity',value:50},{
+    sl:{mode:'percent',value:'2'},tp:{mode:'percent',value:'4'},
+  },{mode:'intelligent'},now);
+  assert.ok(request.qty>0);
+  assert.equal(request.dynamicTrailing?.intrabar,true);
+  const filled=submitPaperOrder(account,market,request,now);
+  const pos=filled.positions[0];
+  assert.equal(pos.side,side);
+  assert.equal(pos.tp,request.tp);
+  assert.equal(pos.dynamicTrailing?.intrabar,true);
+  const qty=quickExitQuantity(pos,{mode:'equity',value:25},filled,market);
+  assert.equal(qty,pos.qty*.25);
+  const protectedPosition={...filled,positions:[{...pos,tp:undefined,tpLevels:[{id:'a',price:request.tp!,quantity:pos.qty/2},{id:'b',price:side==='Long'?110:90,quantity:pos.qty/2}]}]};
+  const reduced=closeWithProtection(protectedPosition,pos.id,market.price,qty,now+1000);
+  assert.ok(Math.abs(reduced.positions[0].qty-pos.qty*.75)<1e-8);
+  assert.ok(Math.abs(reduced.positions[0].tpLevels!.reduce((sum,t)=>sum+t.quantity,0)-reduced.positions[0].qty)<1e-8);
+  assert.equal(reduced.positions[0].sl,pos.sl);
+  assert.equal(reduced.positions[0].dynamicTrailing?.intrabar,true);
+  assert.throws(()=>makeQuickOrder(account,market,side,{mode:'equity',value:0},{},{mode:'off'},now));
+  assert.throws(()=>makeQuickOrder(account,market,side,{mode:'equity',value:50},{sl:{mode:'price',value:side==='Long'?'120':'80'}},{mode:'off'},now));
+  assert.throws(()=>makeQuickOrder(account,{...market,quoteUpdatedAt:now-60000},side,{mode:'equity',value:50},{},{mode:'off'},now));
+  assert.throws(()=>quickExitQuantity(pos,{mode:'equity',value:101},filled,market));
+}
+console.log('Quick entry/exit: long/short validation, sizing and retained protection passed.');
