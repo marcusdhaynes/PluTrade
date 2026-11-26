@@ -220,6 +220,14 @@ export function markPaperPositions(input:PaperPortfolio,asset:Asset,at=Date.now(
   if(!input.positions.some(p=>matchesExactMarket(p,asset)))return input;
   let next:PaperPortfolio={...input,positions:input.positions.map(p=>{
     if(!matchesExactMarket(p,asset))return p;
+    if(p.dynamicTrailing?.intrabar){
+      const atr=p.dynamicTrailing.atr;
+      const distance=atr&&Number.isFinite(atr)&&atr>0?atr*p.dynamicTrailing.multiplier:asset.price*0.01;
+      const proposed=p.side==='Long'?asset.price-distance:asset.price+distance;
+      const sl=Number.isFinite(proposed)&&proposed>0?(p.sl===undefined?proposed:
+        p.side==='Long'?Math.max(p.sl,proposed):Math.min(p.sl,proposed)):p.sl;
+      return {...p,currentPrice:asset.price,lastMarkedAt:at,sl};
+    }
     if(!p.trailingPercent)return {...p,currentPrice:asset.price,lastMarkedAt:at};
     const anchor=p.side==='Long'?
       Math.max(p.trailingAnchor||p.currentPrice,asset.price):
