@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import {useExclusiveWindow} from '../services/exclusiveWindow';
 import {createPortal} from 'react-dom';
 import type { IChartApi } from 'lightweight-charts';
 import { Calendar, RotateCcw, Settings } from 'lucide-react';
@@ -33,10 +34,10 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
 }) => {
   const [chartCornerHost,setChartCornerHost]=useState<HTMLElement|null>(null);
   useEffect(()=>{setChartCornerHost(document.getElementById('chart-workspace-viewport'));},[]);
-  const [datePanelOpen,setDatePanelOpen]=useState(false);
+  const [datePanelOpen,setDatePanelOpen]=useExclusiveWindow(false);
   const [dateValue,setDateValue]=useState('');
   const [dateError,setDateError]=useState('');
-  const [scalePanelOpen,setScalePanelOpen]=useState(false);
+  const [scalePanelOpen,setScalePanelOpen]=useExclusiveWindow(false);
   const [barSpacing,setBarSpacing]=useState(6);
   const [rightOffset,setRightOffset]=useState(4);
   const [scaleError,setScaleError]=useState('');
