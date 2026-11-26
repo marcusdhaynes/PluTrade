@@ -1237,3 +1237,41 @@ test('compact order save highlights without execution and hold clears setup',asy
   await order.dispatchEvent('pointerdown',{button:0,pointerType:'touch'});await page.waitForTimeout(600);await order.dispatchEvent('pointerup',{pointerType:'touch'});await expect(order).toHaveAttribute('aria-pressed','false');
   const sl=page.locator('#mobile-stop-setup-btn');await sl.click();await page.getByRole('dialog',{name:'Stop loss options'}).getByRole('button',{name:'Save',exact:true}).click();await expect(sl).toHaveAttribute('aria-pressed','true');await sl.dispatchEvent('pointerdown',{button:0,pointerType:'touch'});await page.waitForTimeout(500);await sl.dispatchEvent('pointerup',{pointerType:'touch'});await expect(sl).toHaveAttribute('aria-pressed','false');
 });
+
+
+test('desktop uses the same nine-control bottom trading bar and saved order sizing',async ({browser},testInfo)=>{
+  const context=await browser.newContext({baseURL:testInfo.project.use.baseURL,viewport:{width:1440,height:900},isMobile:false,hasTouch:false});
+  try{
+    const page=await context.newPage();
+    await isolateExternalFeeds(page);
+    await page.goto('./');
+    expect(await page.evaluate(()=>matchMedia('(min-width:768px) and (pointer:fine)').matches)).toBe(true);
+    const bar=page.locator('#plutrade-mobile-trade-controls');
+    await expect(bar).toBeVisible();
+    await expect(page.locator('#paper-trading-collapsed-strip')).toBeHidden();
+    const buttons=bar.locator('div[aria-label="Mobile trading controls"] > button');
+    await expect(buttons).toHaveCount(9);
+    const rects=await buttons.evaluateAll(nodes=>nodes.map(node=>{
+      const r=node.getBoundingClientRect();return {top:r.top,width:r.width,height:r.height};
+    }));
+    expect(new Set(rects.map(r=>r.top)).size).toBe(1);
+    expect(rects.every(r=>Math.abs(r.height-21)<1)).toBe(true);
+    expect(Math.abs(rects[6].width-2*rects[1].width)).toBeLessThan(2);
+    expect(Math.abs(rects[7].width-.5*rects[1].width)).toBeLessThan(2);
+    expect(Math.abs(rects[8].width-.5*rects[1].width)).toBeLessThan(2);
+    await buttons.nth(6).click();
+    const equity=page.getByRole('dialog',{name:'Equity allocation'});
+    await expect(equity).toBeVisible();
+    await equity.getByRole('spinbutton',{name:'Percent of equity'}).fill('50');
+    await equity.getByRole('button',{name:'Save',exact:true}).click();
+    await expect(buttons.nth(6)).toContainText('50%');
+    await buttons.nth(1).click();
+    const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
+    await expect(ticket).toBeVisible();
+    await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('50');
+    await expect(ticket.locator('#compact-order-actions').getByRole('button',{name:'Save',exact:true})).toBeVisible();
+    await ticket.getByTitle('Close order panel').click();
+    await buttons.nth(7).click();
+    await expect(page.getByRole('dialog',{name:'Stop loss options'})).toBeVisible();
+  }finally{await context.close();}
+});
