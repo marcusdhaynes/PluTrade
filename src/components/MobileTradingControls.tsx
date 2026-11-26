@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {useExclusiveWindow} from '../services/exclusiveWindow';
 import type {Asset,PaperPosition} from '../types';
 import type {PaperExitMode} from '../services/paperOrders';
 import {exitPriceFromValue,exitValueFromPrice} from '../services/paperOrders';
@@ -50,7 +51,7 @@ export const MobileTradingControls:React.FC<Props>=({
   accountUnrealizedPnl=0,quickSize,onQuickSize,preparedExits,onPrepareExit,onClearPreparedExit,
   onEnter,onOpenOrder,orderSetupSaved=false,orderWindowOpen=false,onResetOrderSetup,onResetPositionExit,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
 })=>{
-  const [panel,setPanel]=useState<'equity'|ExitKind|null>(null);
+  const [panel,setPanel]=useExclusiveWindow<'equity'|ExitKind|null>(null);
   const [advanced,setAdvanced]=useState(false);
   const [mode,setMode]=useState<PaperExitMode>('percent');
   const [value,setValue]=useState('1');
@@ -63,13 +64,13 @@ export const MobileTradingControls:React.FC<Props>=({
   const [sizeModeDraft,setSizeModeDraft]=useState<'equity'|'cash'>(quickSize.mode);
   const [sizeDraft,setSizeDraft]=useState(String(quickSize.value));
   const [error,setError]=useState('');
-  const [accountMenuOpen,setAccountMenuOpen]=useState(false);
+  const [accountMenuOpen,setAccountMenuOpen]=useExclusiveWindow(false);
   const accountHoldTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const accountHeld=useRef(false);
   const accountHoldPoint=useRef({x:0,y:0});
   const cancelAccountHold=()=>{if(accountHoldTimer.current!==null){clearTimeout(accountHoldTimer.current);accountHoldTimer.current=null;}};
   useEffect(()=>()=>{if(accountHoldTimer.current!==null)clearTimeout(accountHoldTimer.current);},[]);
-  const [pnlMenu,setPnlMenu]=useState<'cash'|'percent'|null>(null);
+  const [pnlMenu,setPnlMenu]=useExclusiveWindow<'cash'|'percent'|null>(null);
   const [pnlScope,setPnlScope]=useState<'account'|'position'>(()=>{
     try{return localStorage.getItem('plutrade_mobile_unrealized_scope_v1')==='position'?'position':'account';}
     catch{return 'account';}
@@ -152,6 +153,7 @@ export const MobileTradingControls:React.FC<Props>=({
   const clickExit=(kind:ExitKind)=>{
     clearHold();
     if(held.current){held.current=false;return;}
+    if(panel===kind){setPanel(null);setError('');return;}
     openExit(kind);
   };
   const tick=10**(-Math.min(Math.max(asset.digits||2,0),10));
@@ -535,7 +537,7 @@ export const MobileTradingControls:React.FC<Props>=({
         onPointerDown={()=>{clearSizeHold();sizeHeld.current=false;sizeHoldTimer.current=setTimeout(()=>{sizeHeld.current=true;onQuickSize({...quickSize,value:0});setPanel(null);},450);}}
         onPointerUp={clearSizeHold} onPointerCancel={clearSizeHold} onPointerLeave={clearSizeHold}
         onContextMenu={e=>{e.preventDefault();clearSizeHold();sizeHeld.current=true;onQuickSize({...quickSize,value:0});setPanel(null);}}
-        onClick={()=>{if(sizeHeld.current){sizeHeld.current=false;return;}setSizeModeDraft(quickSize.mode);setSizeDraft(quickSize.value===0?'':String(quickSize.value));setError('');setPanel('equity');}}>
+        onClick={()=>{if(sizeHeld.current){sizeHeld.current=false;return;}if(panel==='equity'){setPanel(null);setError('');return;}setSizeModeDraft(quickSize.mode);setSizeDraft(quickSize.value===0?'':String(quickSize.value));setError('');setPanel('equity');}}>
         {quickSize.value===0?'Amount':quickSize.mode==='equity'?`${Math.round(quickSize.value)}% Equity`:moneyLabel(quickSize.value)}
       </button>
       {(['sl','tp'] as const).map(kind=><button key={kind} type="button"
