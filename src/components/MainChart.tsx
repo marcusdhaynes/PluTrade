@@ -1,4 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback, useImperativeHandle, forwardRef } from 'react';
+import {attachCosmicLine} from '../services/cosmicLine';
+import {ChartTradeOverlay} from './ChartTradeOverlay';
+import type {ChartExitEdit} from '../services/chartExitEditing';
 import {useExclusiveWindow} from '../services/exclusiveWindow';
 import {
   createChart,
@@ -82,6 +85,7 @@ interface MainChartProps {
   openPosition?: PaperPosition | null;
   onClosePosition?: (id: string) => void;
   onEditPositionStop?: (id:string,kind:'sl'|'tp')=>void;
+  onChartExitEdit?: (id:string,edit:ChartExitEdit)=>string|null;
   onOpenConditionalOrder?: (dep: DependencyContext) => void;
   chartHistoryState?:ChartLoadState;
   onRetryChartHistory?:()=>void;
@@ -166,6 +170,7 @@ export const MainChart = React.memo(
       openPosition,
       onClosePosition,
       onEditPositionStop,
+      onChartExitEdit,
       onOpenConditionalOrder,
       chartHistoryState='empty',
       onRetryChartHistory,
@@ -746,11 +751,12 @@ export const MainChart = React.memo(
           chart.addSeries(
             LineSeries,
             {
-              color: '#2962ff',
-              lineWidth: 2,
+              color: 'transparent',
+              crosshairMarkerBackgroundColor:'#8260ff',
+              lineWidth: 1,
               lineType: LineType.Simple,
               priceLineVisible: true,
-              priceLineColor: '#2962ff',
+              priceLineColor: '#00b9e9',
               priceLineStyle: LineStyle.Dashed,
             },
             0
@@ -762,6 +768,7 @@ export const MainChart = React.memo(
             value: c.close,
           }))
         );
+        attachCosmicLine(chart,mainSeries);
       } else if (chartType === 'step-line') {
         mainSeries = trackSeries(
           chart.addSeries(
@@ -1193,7 +1200,7 @@ export const MainChart = React.memo(
             const y = mainSeriesRef.current.priceToCoordinate(openPosition.entryPrice);
             if (y !== null) {
               setPositionY((prev) => (prev === null || Math.abs(prev - y) >= 1 ? Math.round(y) : prev));
-            }
+            }else setPositionY(null);
           } else {
             setPositionY(null);
           }
@@ -1218,6 +1225,7 @@ export const MainChart = React.memo(
         rafId = requestAnimationFrame(() => {
           rafId = null;
           updateLinePositions();
+          if(openPosition)scheduledUpdate();
         });
       };
 
@@ -1230,7 +1238,7 @@ export const MainChart = React.memo(
         if (rafId !== null) cancelAnimationFrame(rafId);
         chart.timeScale().unsubscribeVisibleLogicalRangeChange(scheduledUpdate);
       };
-    }, [openPosition?.entryPrice,exitSignature,asset.price,asset.symbol,chartType,showCurrentPriceLabel]);
+    }, [openPosition?.id,openPosition?.entryPrice,exitSignature,asset.price,asset.symbol,chartType,showCurrentPriceLabel]);
 
     return (
       <div ref={chartGestureRef} data-testid="chart-pinch-surface" className="relative flex-1 w-full h-full min-h-0 overflow-hidden bg-[#131722] select-none" style={{touchAction:'none'}}>
@@ -1426,76 +1434,13 @@ export const MainChart = React.memo(
           </div>
         </section>}
 
-        {/* Interactive Open Position Line & Badge (Matching Screenshot!) */}
-        {openPosition && positionY !== null && positionY > 30 && (
-          <>
-            {/* Horizontal Blue Dashed Execution Line */}
-            <div
-              className="absolute left-0 right-14 border-b border-[#2962ff] border-dashed pointer-events-none z-20"
-              style={{ top: `${positionY}px` }}
-            />
-
-            {/* Position Controls Marker Pill */}
-            <div
-              onClick={e=>e.stopPropagation()}
-              className="absolute right-12 md:right-16 -translate-y-1/2 z-30 flex items-center max-w-[calc(100%-4rem)] bg-[#131722] border border-[#2962ff] rounded-md text-[10px] md:text-[11px] font-mono shadow-xl overflow-hidden"
-              style={{ top: `${positionY}px` }}
-            >
-              <div className="px-1.5 py-0.5 bg-[#2962ff] text-white font-bold text-[10px]">
-                {openPosition.side==='Long'?'L':'S'}
-              </div>
-              <button type="button" onClick={()=>onEditPositionStop?.(openPosition.id,'tp')}
-                className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#66d9b5] hover:bg-[#274438]"
-                title="Edit take-profit levels">TP</button>
-              <button type="button" onClick={()=>onEditPositionStop?.(openPosition.id,'sl')}
-                className="px-1.5 py-0.5 border-r border-[#2962ff]/40 text-[#ff9ca7] hover:bg-[#4a2633]"
-                title="Edit stop-loss levels">SL</button>
-              <div className="hidden min-[360px]:block px-1 md:px-2 py-0.5 border-r border-[#2962ff]/40 text-[#2962ff] font-semibold truncate">
-                {openPosition.qty.toLocaleString()}
-              </div>
-              <div className="hidden sm:block px-1 md:px-2 py-0.5 border-r border-[#2962ff]/40 text-[#089981] font-semibold">
-                {openPosition.unrealizedPnL >= 0 ? '+' : ''}{openPosition.unrealizedPnL.toFixed(2)} {asset.currency}
-              </div>
-              <button
-                onClick={() => onClosePosition?.(openPosition.id)}
-                className="px-1.5 py-0.5 text-[#787b86] hover:text-[#f23645] transition cursor-pointer"
-                title="Close Position"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Blue Price Scale Badge on Right */}
-            <div
-              className="absolute right-0 -translate-y-1/2 bg-[#2962ff] text-white font-mono text-[10px] font-bold px-1 py-0.5 rounded-l shadow-md z-30 pointer-events-none"
-              style={{ top: `${positionY}px` }}
-            >
-              {openPosition.entryPrice.toFixed(asset.digits)}
-            </div>
-          </>
-        )}
-
-        {/* Effective stops and every partial/full target use actual paper-ledger levels.
-            They are only visible on the exact market for the displayed position. */}
-        {openPosition&&exitLinePositions.map(level=>{
-          const isStop=level.kind==='sl';
-          const tint=isStop?'#f06b7e':'#31c79a';
-          if(level.y<12||level.y>Math.max(0,chartContainerRef.current?.clientHeight||0)-12)return null;
-          return <React.Fragment key={level.id}>
-            <div aria-hidden="true" className="absolute left-0 right-14 border-b border-dashed pointer-events-none z-20"
-              style={{top:level.y,borderColor:tint}}/>
-            <button type="button" title={'Edit '+level.label} aria-label={'Edit '+level.label+' at '+level.price}
-              onClick={e=>{e.stopPropagation();onEditPositionStop?.(openPosition.id,level.kind);}}
-              className="absolute right-12 md:right-16 -translate-y-1/2 z-30 max-w-[calc(100%-4rem)] truncate rounded border px-1.5 py-0.5 text-[9px] font-semibold font-mono shadow-lg bg-[#131722] hover:bg-[#273142]"
-              style={{top:level.y,color:tint,borderColor:tint}}>
-              {level.label}{level.quantity!==undefined?' · '+level.quantity.toLocaleString():''}
-            </button>
-            <div aria-hidden="true" className="absolute right-0 -translate-y-1/2 z-30 rounded-l px-1 py-0.5 text-[9px] font-mono font-bold text-[#121820] pointer-events-none"
-              style={{top:level.y,backgroundColor:tint}}>
-              {level.price.toFixed(asset.digits)}
-            </div>
-          </React.Fragment>;
-        })}
+        {openPosition&&<ChartTradeOverlay key={openPosition.id}
+          position={openPosition} positionY={positionY} levels={exitLinePositions}
+          height={chartContainerRef.current?.clientHeight||240}
+          axisWidth={compactMobileAxes?MOBILE_ORDER_RAIL_PX:priceAxisWidth}
+          digits={asset.digits} currency={asset.currency}
+          coordinateToPrice={y=>mainSeriesRef.current?.coordinateToPrice(y)??null}
+          onEdit={onChartExitEdit} onAdvanced={onEditPositionStop} onClose={onClosePosition}/>}
 
         {/* Current price tag lives entirely inside the plotting area, never on
             the fixed mobile price rail or the time axis. Its blue is identical
