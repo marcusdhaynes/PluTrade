@@ -36,6 +36,25 @@ jobs:
 
       - name: Build production bundle
         run: pnpm run build
+        env:
+          VITE_BUILD_SHA: ${{ github.sha }}
+
+      - name: Stamp production revision and validate requested features
+        run: |
+          printf '{"sha":"%s"}\n' "$GITHUB_SHA" > dist/version.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const html=fs.readFileSync('dist/index.html','utf8');
+          fs.writeFileSync('dist/index.html',html.replace('</head>', '<meta name="plutrade-build" content="'+process.env.GITHUB_SHA+'" /></head>'));
+          const js=fs.readdirSync('dist/assets').filter(x=>x.endsWith('.js')).map(x=>fs.readFileSync('dist/assets/'+x,'utf8')).join('\n');
+          const css=fs.readdirSync('dist/assets').filter(x=>x.endsWith('.css')).map(x=>fs.readFileSync('dist/assets/'+x,'utf8')).join('\n');
+          for(const token of ['Intelligent Trailing','data-chart-trade-overlay','data-chart-exit-handle','data-viewport-drawer']) {
+            if(!js.includes(token)) throw Error('Missing built feature: '+token);
+          }
+          for(const token of ['.chart-position-badge','#plutrade-mobile-trade-controls','#tradingview-left-toolbar']) {
+            if(!css.includes(token)) throw Error('Missing built styling: '+token);
+          }
+          NODE
 
       - name: Validate build output
         run: |
@@ -46,6 +65,13 @@ jobs:
       - name: Add SPA fallback .htaccess
         run: |
           cat > dist/.htaccess <<'EOF'
+          <IfModule mod_headers.c>
+            <FilesMatch "^(index\.html|version\.json|sw\.js|manifest\.webmanifest)$">
+              Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+              Header always set Pragma "no-cache"
+              Header always set Expires "0"
+            </FilesMatch>
+          </IfModule>
           RewriteEngine On
           RewriteCond %{REQUEST_FILENAME} -f [OR]
           RewriteCond %{REQUEST_FILENAME} -d
@@ -64,6 +90,51 @@ jobs:
             -e "ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             dist/ \
             "${{ secrets.DREAMHOST_SFTP_USER }}@${{ secrets.DREAMHOST_SFTP_HOST }}:/home/marcusdhaynes/plutrade.com/"
+
+      - name: Verify public production HTML, revision and exact bundle bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {setTimeout as delay} from 'node:timers/promises';
+          const origin='https://plutrade.com/';
+          const expected=process.env.GITHUB_SHA;
+          const localHtml=fs.readFileSync('dist/index.html','utf8');
+          const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+          const paths=[...localHtml.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)]
+            .map(m=>m[1]).filter(p=>!p.startsWith('http')&&p.includes('assets/'));
+          if(!paths.length)throw Error('No production assets found');
+          async function get(path){
+            const url=new URL(path,origin);
+            url.searchParams.set('verify',expected+'-'+Date.now());
+            const response=await fetch(url,{cache:'no-store',headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(25000)});
+            if(!response.ok)throw Error(path+' HTTP '+response.status);
+            if(new URL(response.url).origin!==new URL(origin).origin)throw Error('Unexpected redirect: '+response.url);
+            return Buffer.from(await response.arrayBuffer());
+          }
+          async function verify(){
+            const revision=JSON.parse((await get('version.json')).toString());
+            if(revision.sha!==expected)throw Error('Public manifest is '+revision.sha+', expected '+expected);
+            const html=(await get('')).toString();
+            if(!html.includes('name="plutrade-build" content="'+expected+'"'))throw Error('Public index HTML serves a different revision');
+            for(const p of paths){
+              if(!html.includes(p))throw Error('Public HTML references stale asset: '+p);
+              const local=fs.readFileSync('dist/'+p.replace(/^\.\//,'').replace(/^\//,''));
+              const remote=await get(p);
+              if(digest(local)!==digest(remote))throw Error('Public asset differs: '+p);
+            }
+            console.log('Verified public production revision '+expected+' and '+paths.length+' exact asset hashes.');
+          }
+          for(let attempt=1;attempt<=5;attempt++){
+            try{await verify();break;}catch(e){
+              console.error('Production verification attempt '+attempt+': '+e.message);
+              if(attempt===5)throw e;
+              await delay(5000);
+            }
+          }
+          NODE
 
       - name: Probe deployed same-origin Kraken history (report only)
         shell: bash
