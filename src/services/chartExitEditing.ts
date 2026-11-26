@@ -17,7 +17,14 @@ export function editChartExit(input:PaperPortfolio,id:string,edit:ChartExitEdit)
     return edit.enabled?enableTrailingPaperStop(input,id,edit.percent??0.5):disableTrailingPaperStop(input,id);
   }
   if(edit.action==='intelligent'){
-    return edit.enabled?attachDynamicTrailing(input,id,DEFAULT_DYNAMIC_TRAIL):disableDynamicTrailing(input,id);
+    if(!edit.enabled)return disableDynamicTrailing(input,id);
+    // Provisional one-percent protection until verified ATR history arrives.
+    const base=Number.isFinite(p.currentPrice)&&p.currentPrice>0?p.currentPrice:p.entryPrice;
+    const provisional=p.side==='Long'?base*0.99:base*1.01;
+    const seeded={...input,positions:input.positions.map(x=>x.id!==id?x:{
+      ...x,sl:x.sl===undefined?provisional:x.side==='Long'?Math.max(x.sl,provisional):Math.min(x.sl,provisional)
+    })};
+    return attachDynamicTrailing(seeded,id,{...DEFAULT_DYNAMIC_TRAIL,intrabar:true});
   }
   if(edit.action==='remove'){
     return {...input,positions:input.positions.map(x=>{
