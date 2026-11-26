@@ -1434,7 +1434,7 @@ export const MainChart = React.memo(
           </div>
         </section>}
 
-        {openPosition&&<ChartTradeOverlay key={openPosition.id}
+        {openPosition&&<ChartTradeOverlay
           position={openPosition} positionY={positionY} levels={exitLinePositions}
           height={chartContainerRef.current?.clientHeight||240}
           axisWidth={compactMobileAxes?MOBILE_ORDER_RAIL_PX:priceAxisWidth}
