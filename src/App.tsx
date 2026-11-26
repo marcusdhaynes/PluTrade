@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {useExclusiveWindow} from './services/exclusiveWindow';
 import {
   Asset,
   ChartType,
@@ -552,7 +553,7 @@ export default function App() {
       setPaperError('Fresh paper account created. Original unreadable ledger remains in the recovery backup.');
     }catch(e){setPaperError('Storage unavailable; recovery cannot be completed.');}
   };
-  const [closeReviewId,setCloseReviewId]=useState<string|null>(null);
+  const [closeReviewId,setCloseReviewId]=useExclusiveWindow<string|null>(null);
   const [closeReviewQty,setCloseReviewQty]=useState('');
   const previousRulePrices=useRef<Record<string,number>>({});
   const previousRuleTimes=useRef<Record<string,number>>({});
@@ -915,8 +916,8 @@ export default function App() {
       if(paperWriteTimerRef.current!==null)window.clearTimeout(paperWriteTimerRef.current);
     };
   },[persistPaperNow]);
-  const [isBottomTradingOpen, setIsBottomTradingOpen] = useState(false);
-  const [isTradeTicketOpen,setIsTradeTicketOpen]=useState(false);
+  const [isBottomTradingOpen, setIsBottomTradingOpen] = useExclusiveWindow(false);
+  const [isTradeTicketOpen,setIsTradeTicketOpen]=useExclusiveWindow(false);
   const [mobileOrderSetupSaved,setMobileOrderSetupSaved]=useState(false);
   const [mobileOrderResetSeq,setMobileOrderResetSeq]=useState(0);
   // Mobile quick-entry sizing is explicit: % of currently AVAILABLE funds or
@@ -944,10 +945,11 @@ export default function App() {
     paperAccounts.activeId,
   ]);
   const openMobileEntry=(focus?:'sl'|'tp')=>{
+    if(isTradeTicketOpen&&!focus){setIsTradeTicketOpen(false);return;}
     setMobileQuickTicket(prev=>({focus,seq:(prev?.seq||0)+1}));
     setIsTradeTicketOpen(true);
   };
-  const [tradeTicketAccountSettings,setTradeTicketAccountSettings]=useState<boolean|string>(false);
+  const [tradeTicketAccountSettings,setTradeTicketAccountSettings]=useExclusiveWindow<boolean|string>(false);
   const [isBottomTradingExpanded, setIsBottomTradingExpanded] = useState(false);
 
   // State: Order Book & Trades
@@ -958,16 +960,16 @@ export default function App() {
   const [recentTrades, setRecentTrades] = useState<TradeItem[]>([]);
 
   // State: Modals & Panels (Right sidebar active tab defaults to 'alerts' as in screenshot!)
-  const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useState(false);
+  const [isSymbolSearchOpen, setIsSymbolSearchOpen] = useExclusiveWindow(false);
   const [addingWatchlistSymbol,setAddingWatchlistSymbol]=useState(false);
-  const [isIndicatorsOpen, setIsIndicatorsOpen] = useState(false);
-  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
-  const [isTradeJournalOpen, setIsTradeJournalOpen] = useState(false);
-  const [isSavedChartsOpen,setIsSavedChartsOpen]=useState(false);
+  const [isIndicatorsOpen, setIsIndicatorsOpen] = useExclusiveWindow(false);
+  const [isAlertsOpen, setIsAlertsOpen] = useExclusiveWindow(false);
+  const [isTradeJournalOpen, setIsTradeJournalOpen] = useExclusiveWindow(false);
+  const [isSavedChartsOpen,setIsSavedChartsOpen]=useExclusiveWindow(false);
   const [isPipActive, setIsPipActive] = useState(false);
   const pipRef = useRef<ChartPictureInPictureRef>(null);
 
-  const [shortcutHelpOpen,setShortcutHelpOpen]=useState(false);
+  const [shortcutHelpOpen,setShortcutHelpOpen]=useExclusiveWindow(false);
   const [requestedDockTab,setRequestedDockTab]=useState<{tab:string;seq:number}|undefined>();
   const [activeDockTab,setActiveDockTab]=useState('positions');
   const [networkOffline,setNetworkOffline]=useState(()=>typeof navigator!=='undefined'&&!navigator.onLine);
@@ -980,11 +982,11 @@ export default function App() {
     setIsBottomTradingOpen(true);
     setRequestedDockTab(prev=>({tab,seq:(prev?.seq||0)+1}));
   };
-  const [isConditionalOrderModalOpen, setIsConditionalOrderModalOpen] = useState(false);
+  const [isConditionalOrderModalOpen, setIsConditionalOrderModalOpen] = useExclusiveWindow(false);
   const [selectedDependencyForOrder, setSelectedDependencyForOrder] = useState<DependencyContext | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<ConditionalOrder | null>(null);
 
-   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+   const [isRightSidebarOpen, setIsRightSidebarOpen] = useExclusiveWindow(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<RightSidebarTab>(() => {
     const saved = localStorage.getItem('tv_right_sidebar_tab');
     return saved&&['alerts','watchlist','orderbook','technicals','news','calendar','notifications'].includes(saved) ? (saved as RightSidebarTab) : 'alerts';
@@ -1000,6 +1002,7 @@ export default function App() {
         setShortcutHelpOpen(false);
         setIsSymbolSearchOpen(false);setIsIndicatorsOpen(false);setIsAlertsOpen(false);
         setIsSavedChartsOpen(false);setIsConditionalOrderModalOpen(false);
+        setIsTradeTicketOpen(false);setTradeTicketAccountSettings(false);setIsBottomTradingOpen(false);setIsRightSidebarOpen(false);setCloseReviewId(null);setIsLayoutDropdownOpen(false);setIsLayoutManagerOpen(false);
         return;
       }
       if(editable||event.altKey)return;
@@ -1133,8 +1136,8 @@ export default function App() {
     return [50, 50];
   });
 
-  const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
-  const [isLayoutManagerOpen, setIsLayoutManagerOpen] = useState(false);
+  const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useExclusiveWindow(false);
+  const [isLayoutManagerOpen, setIsLayoutManagerOpen] = useExclusiveWindow(false);
 
   // Active Layout and Template Helpers
   const currentLayout =
@@ -1908,9 +1911,9 @@ export default function App() {
         activeTimeframe={activeTimeframe}
         chartType={chartType}
         setChartType={handleSetChartType}
-        onOpenSymbolSearch={() => {setAddingWatchlistSymbol(false);setIsSymbolSearchOpen(true);}}
-        onOpenIndicators={() => setIsIndicatorsOpen(true)}
-        onOpenAlerts={() => setIsAlertsOpen(true)}
+        onOpenSymbolSearch={() => {setAddingWatchlistSymbol(false);setIsSymbolSearchOpen(v=>!v);}}
+        onOpenIndicators={() => setIsIndicatorsOpen(v=>!v)}
+        onOpenAlerts={() => setIsAlertsOpen(v=>!v)}
         indicators={indicators}
         onTakeSnapshot={() => chartRef.current?.takeSnapshot()}
         onTogglePip={() => pipRef.current?.togglePip()}
@@ -1925,9 +1928,9 @@ export default function App() {
         activeTool={activeTool}
         onToggleTradingPanel={() => setIsTradeTicketOpen(prev=>!prev)}
         onTogglePaperWorkspace={()=>setIsBottomTradingOpen(v=>!v)}
-        onOpenSavedCharts={()=>setIsSavedChartsOpen(true)}
-        onOpenReplay={()=>requestBottomPanel('replay')}
-        onOpenStrategyLab={()=>requestBottomPanel('strategyLab')}
+        onOpenSavedCharts={()=>setIsSavedChartsOpen(v=>!v)}
+        onOpenReplay={()=>{if(isBottomTradingOpen&&activeDockTab==='replay')setIsBottomTradingOpen(false);else requestBottomPanel('replay');}}
+        onOpenStrategyLab={()=>{if(isBottomTradingOpen&&activeDockTab==='strategyLab')setIsBottomTradingOpen(false);else requestBottomPanel('strategyLab');}}
         sessionVwapEnabled={sessionVwapEnabled}
         onToggleSessionVwap={()=>setSessionVwapEnabled(v=>!v)}
         marketStatus={marketStatus}
@@ -2019,8 +2022,8 @@ export default function App() {
             showCurrentPriceLabel={showCurrentPriceLabel}
             areDrawingsLocked={areDrawingsLocked}
             stayInDrawingMode={stayInDrawingMode}
-            onOpenSymbolSearch={()=>{setAddingWatchlistSymbol(false);setIsSymbolSearchOpen(true);}}
-            onOpenIndicators={()=>setIsIndicatorsOpen(true)}
+            onOpenSymbolSearch={()=>{setAddingWatchlistSymbol(false);setIsSymbolSearchOpen(v=>!v);}}
+            onOpenIndicators={()=>setIsIndicatorsOpen(v=>!v)}
             indicators={indicators}
             activeTool={activeTool}
             setActiveTool={setActiveTool}
