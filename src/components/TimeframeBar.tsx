@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {useExclusiveWindow} from '../services/exclusiveWindow';
 import {ChevronDown,Star} from 'lucide-react';
 import {FloatingPortal} from './FloatingPortal';
 import type {Asset,Timeframe} from '../types';
@@ -59,8 +60,8 @@ export const TimeframeBar:React.FC<Props>=({
   const [draftCustom,setDraftCustom]=useState<CustomInterval[]>([]);
   const [customDigits,setCustomDigits]=useState('2');
   const [customUnit,setCustomUnit]=useState<CustomIntervalUnit>('hours');
-  const [intervalOpen,setIntervalOpen]=useState(false);
-  const [favoritesOpen,setFavoritesOpen]=useState(false);
+  const [intervalOpen,setIntervalOpen]=useExclusiveWindow(false);
+  const [favoritesOpen,setFavoritesOpen]=useExclusiveWindow(false);
   const [customError,setCustomError]=useState('');
   const chooserRef=useRef<HTMLDivElement>(null);
   const favoritesRef=useRef<HTMLDivElement>(null);
