@@ -38,7 +38,7 @@ test('mobile keeps one account/UPL/order/execution row and preloads equity sizin
   await equity.getByRole('button',{name:'Save'}).click();
   await expect(actions.nth(6)).toContainText('50%');
   await expect(actions.nth(1)).toContainText('Order');
-  await actions.nth(4).click();
+  await actions.nth(1).click();
   const ticket=page.getByRole('dialog',{name:'Paper Trading order entry'});
   await expect(ticket).toBeVisible();
   await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('50');
@@ -47,7 +47,7 @@ test('mobile keeps one account/UPL/order/execution row and preloads equity sizin
   await actions.nth(7).click();
   await expect(page.getByRole('dialog',{name:'Stop loss options'})).toBeVisible();
   await page.getByRole('dialog',{name:/Stop loss options|Take profit options/}).getByRole('button',{name:'Save',exact:true}).click();
-  await page.getByRole('button',{name:'Enter',exact:true}).click();
+  await page.getByRole('button',{name:'Order',exact:true}).click();
   await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','true');
   expect(errors).toEqual([]);
 });
@@ -865,7 +865,7 @@ test('quick cash sizing, precise available-equity percent and independent SL TP 
   await quick.getByRole('spinbutton',{name:'Percent of equity'}).fill('12.345678');
   await quick.getByRole('button',{name:'Save'}).click();
   await expect(amount).toContainText('12% Equity');
-  await page.getByRole('button',{name:'Enter',exact:true}).click();
+  await page.getByRole('button',{name:'Order',exact:true}).click();
   await expect(ticket.getByRole('spinbutton',{name:'Order size'})).toHaveValue('12.345678');
   await expect(ticket.getByRole('button',{name:'% Available Equity'})).toBeVisible();
   await ticket.getByTitle('Close order panel').click();
@@ -880,7 +880,7 @@ test('quick cash sizing, precise available-equity percent and independent SL TP 
   await tp.getByRole('spinbutton',{name:'Exit level value'}).fill('2.5');
   await tp.getByRole('button',{name:'Save'}).click();
   await expect(ticket).toHaveCount(0);
-  await page.getByRole('button',{name:'Enter',exact:true}).click();
+  await page.getByRole('button',{name:'Order',exact:true}).click();
   await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','true');
   await expect(ticket.getByRole('switch',{name:'Enable take profit'})).toHaveAttribute('aria-checked','true');
   await expect(ticket.getByRole('spinbutton',{name:'Stop-loss value'})).toHaveValue('1.25');
@@ -888,7 +888,7 @@ test('quick cash sizing, precise available-equity percent and independent SL TP 
   await ticket.getByTitle('Close order panel').click();
   await page.locator('#mobile-stop-setup-btn').click();
   await sl.getByRole('button',{name:'Clear SL Setup'}).click();
-  await page.getByRole('button',{name:'Enter',exact:true}).click();
+  await page.getByRole('button',{name:'Order',exact:true}).click();
   await expect(ticket.getByRole('switch',{name:'Enable stop loss'})).toHaveAttribute('aria-checked','false');
   await expect(ticket.getByRole('switch',{name:'Enable take profit'})).toHaveAttribute('aria-checked','true');
 });
@@ -1381,4 +1381,18 @@ test('chart exit menus expose intelligent trailing before entry and zero PNL is 
   await menu.getByRole('button',{name:'Close exit settings'}).click();
   await badge.getByRole('button',{name:'Edit or drag take profit'}).click();
   await expect(page.getByRole('dialog',{name:'Take profit chart settings'})).toBeVisible();
+});
+
+test('quick entry uses saved settings without opening the full order ticket',async ({page})=>{
+ await page.goto('./');
+ await page.getByRole('button',{name:'Enter',exact:true}).click();
+ const quick=page.getByRole('dialog',{name:'Quick entry'});
+ await expect(quick).toBeVisible();
+ await expect(quick).toContainText('Available Equity');
+ await expect(page.getByRole('dialog',{name:'Paper Trading order entry'})).toHaveCount(0);
+ await quick.getByRole('button',{name:'Sell / Short'}).click();
+ await expect(quick.getByRole('button',{name:'Sell / Short'})).toHaveAttribute('aria-pressed','true');
+ await quick.getByRole('button',{name:'Close quick entry'}).click();
+ await page.getByRole('button',{name:'Order',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Paper Trading order entry'})).toBeVisible();
 });

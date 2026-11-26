@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {QuickEntry} from './components/QuickEntry';
+import {quickExitQuantity,closeWithProtection} from './services/quickExecution';
 import {editChartExit,type ChartExitEdit,type ChartEntryTrail} from './services/chartExitEditing';
 import {useExclusiveWindow} from './services/exclusiveWindow';
 import {
@@ -936,6 +938,7 @@ export default function App() {
     Partial<Record<'sl'|'tp',{mode:PaperExitMode;value:string}>>
   >({});
   const [chartEntryTrail,setChartEntryTrail]=useState<ChartEntryTrail>({mode:'off'});
+  const [quickEntryOpen,setQuickEntryOpen]=useExclusiveWindow(false);
   const [mobileQuickTicket,setMobileQuickTicket]=useState<{focus?:'sl'|'tp';seq:number}|null>(null);
   const [mobileExitRequest,setMobileExitRequest]=useState<{id:string;kind:'sl'|'tp';seq:number}|null>(null);
   useEffect(()=>{
@@ -1631,6 +1634,7 @@ export default function App() {
 
   // All new paper trades must pass through the validated right-side order ticket.
   const handleSubmitTicketOrder = (request:PaperOrderRequest):string|null => {
+    if(paperTradingBlocked)return 'This paper account is locked or read-only.';
     try {
       const verdict=evaluateRiskPolicy(paperPortfolio,activeAsset,request,riskPolicy);
       if(!verdict.allowed)throw new Error(verdict.reason||'Risk policy rejected this paper entry.');
@@ -1653,30 +1657,33 @@ export default function App() {
   const executeClosePosition = (id:string,quantity?:number) => {
     const p=paperPositions.find(x=>x.id===id);
     if(!p)return;
+    if(paperTradingBlocked){setPaperError('This paper account is locked or read-only.');return;}
     if(!matchesExactMarket(p,activeAsset)||!isFreshPaperQuote(activeAsset)||
       !p.lastMarkedAt||Date.now()<p.lastMarkedAt||Date.now()-p.lastMarkedAt>15000){
       setPaperError('Select the exact position market and establish a currently connected verified trade stream to close.');
       return;
     }
     try {
-      setPaperPortfolio(closePaperPosition(paperPortfolio,id,p.currentPrice,quantity));
+      setPaperPortfolio(previous=>closeWithProtection(previous,id,p.currentPrice,quantity));
       setCloseReviewId(null);
       setPaperError('');
       setActiveNotification({id:String(Date.now()),message:`Simulated close: ${quantity??p.qty} ${p.symbol} at ${p.currentPrice}`,type:'info'});
     } catch(e){setPaperError(e instanceof Error?e.message:'Close rejected');}
   };
-  const handleClosePosition = (id:string) => {
+  const handleClosePosition = (id:string,quantity?:number) => {
     const p=paperPositions.find(x=>x.id===id);
     if(!p)return;
     // TradingView's default is review-before-close. One-click is user opt-in.
     let oneClick=false;
     try {oneClick=localStorage.getItem('plutrade_paper_one_click_v1')==='true';}catch{}
-    if(oneClick){executeClosePosition(id);return;}
-    setCloseReviewQty(String(p.qty));
+    if(oneClick){executeClosePosition(id,quantity);return;}
+    setPaperError('');
+    setCloseReviewQty(String(quantity??p.qty));
     setCloseReviewId(id);
   };
   const handleEditPaperStops = (id:string,tp?:number,sl?:number,trailing?:number|null,
-    dynamic?:DynamicTrailingSettings|null) => {
+    dynamic?:DynamicTrailingSettings|null):string|null => {
+    if(paperTradingBlocked)return 'This paper account is locked or read-only.';
     try {
       const position=paperPositions.find(item=>item.id===id);
       if(!position)throw new Error('Position unavailable.');
@@ -1687,21 +1694,25 @@ export default function App() {
       if(sl!==undefined&&(!Number.isFinite(sl)||sl<=0||
         (sl!==position.sl&&(position.side==='Long'?sl>=position.currentPrice:sl<=position.currentPrice))))
         throw new Error('Stop-loss target must be beyond the currently observed price.');
-      let next=updatePaperStops(paperPortfolio,id,tp,sl);
+      let next=paperPortfolio;
+      if(trailing===null)next=disableTrailingPaperStop(next,id);
+      if(dynamic===null)next=disableDynamicTrailing(next,id);
+      next=updatePaperStops(next,id,tp,sl);
       if(trailing===null)next=disableTrailingPaperStop(next,id);
       else if(trailing!==undefined)next=enableTrailingPaperStop(next,id,trailing);
       if(dynamic===null)next=disableDynamicTrailing(next,id);
       else if(dynamic!==undefined)next=attachDynamicTrailing(next,id,dynamic);
       setPaperPortfolio(next);
-      setPaperError('');
-    }catch(e){setPaperError(e instanceof Error?e.message:'Invalid stops');}
+      setPaperError('');return null;
+    }catch(e){const message=e instanceof Error?e.message:'Invalid stops';setPaperError(message);return message;}
   };
-  const handleEditPaperTargets=(id:string,targets:Array<{price:number;sharePercent:number}>)=>{
+  const handleEditPaperTargets=(id:string,targets:Array<{price:number;sharePercent:number}>):string|null=>{
+    if(paperTradingBlocked)return 'This paper account is locked or read-only.';
     try{
       const next=updatePaperTargetLevels(paperPortfolio,id,targets);
       setPaperPortfolio(next);
-      setPaperError('');
-    }catch(e){setPaperError(e instanceof Error?e.message:'Invalid take-profit levels');}
+      setPaperError('');return null;
+    }catch(e){const message=e instanceof Error?e.message:'Invalid take-profit levels';setPaperError(message);return message;}
   };
   const handleChartDraftEdit=(edit:ChartExitEdit):string|null=>{
     if(edit.action==='place'){
@@ -2149,13 +2160,13 @@ export default function App() {
             onClearPreparedExit={kind=>setMobileEntryExits(prev=>{
               const next={...prev};delete next[kind];return next;
             })}
-            onEnter={openMobileEntry}
+            onEnter={()=>{setPaperError('');setQuickEntryOpen(v=>!v);}}
             onOpenOrder={()=>openMobileEntry()}
             orderSetupSaved={mobileOrderSetupSaved} orderWindowOpen={isTradeTicketOpen}
             onResetOrderSetup={()=>{setMobileOrderSetupSaved(false);setMobileOrderResetSeq(n=>n+1);setIsTradeTicketOpen(false);}}
             onResetPositionExit={(id,kind)=>setPaperPortfolio(prev=>({...prev,positions:prev.positions.map(position=>position.id!==id?position:kind==='sl'?{...position,sl:undefined,trailingPercent:undefined,trailingAnchor:undefined,dynamicTrailing:undefined}:{...position,tp:undefined,tpLevels:undefined})}))}
             onOpenPaperWorkspace={()=>setIsBottomTradingOpen(open=>!open)}
-            onExit={()=>{if(activePosition)handleClosePosition(activePosition.id);}}
+            onExit={()=>{if(!activePosition)return;try{const qty=quickExitQuantity(activePosition,mobileQuickSize,paperPortfolio,activeAsset);handleClosePosition(activePosition.id,qty);}catch(e){setActiveNotification({id:String(Date.now()),type:'info',message:e instanceof Error?e.message:'Invalid exit amount'});}}}
             onEditStops={handleEditPaperStops}
             onEditTargets={handleEditPaperTargets}
             editRequest={mobileExitRequest}
@@ -2166,9 +2177,10 @@ export default function App() {
 
         {/* Tickets are viewport overlays, never descendants of clipped chart columns. */}
         <ViewportPortal>
+        {quickEntryOpen&&<QuickEntry asset={activeAsset} portfolio={paperPortfolio} size={mobileQuickSize} exits={mobileEntryExits} trail={chartEntryTrail} blocked={paperTradingBlocked} onClose={()=>setQuickEntryOpen(false)} onSubmit={handleSubmitTicketOrder} error={paperError}/>}
         <PaperTradeTicket open={isTradeTicketOpen} onClose={()=>setIsTradeTicketOpen(false)}
           asset={activeAsset} portfolio={paperPortfolio} bids={orderBook.bids} asks={orderBook.asks}
-          onSubmit={handleSubmitTicketOrder} error={paperError}
+          onSubmit={handleSubmitTicketOrder} error={paperError} blocked={paperTradingBlocked}
           quickSize={mobileQuickSize}
           preparedExits={mobileEntryExits} preparedTrail={chartEntryTrail}
           quickFocus={mobileQuickTicket?.focus} quickOpenSequence={mobileQuickTicket?.seq}

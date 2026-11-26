@@ -33,8 +33,8 @@ interface Props {
   onResetPositionExit?:(id:string,kind:ExitKind)=>void;
   onOpenPaperWorkspace?:()=>void;
   onExit:()=>void;
-  onEditStops:(id:string,tp?:number,sl?:number,trailing?:number|null,dynamic?:DynamicTrailingSettings|null)=>void;
-  onEditTargets:(id:string,levels:Array<{price:number;sharePercent:number}>)=>void;
+  onEditStops:(id:string,tp?:number,sl?:number,trailing?:number|null,dynamic?:DynamicTrailingSettings|null)=>string|null|void;
+  onEditTargets:(id:string,levels:Array<{price:number;sharePercent:number}>)=>string|null|void;
   onAdvancedConditional:()=>void;
   editRequest?:{id:string;kind:ExitKind;seq:number}|null;
 }
@@ -110,7 +110,7 @@ export const MobileTradingControls:React.FC<Props>=({
   const openExit=(kind:ExitKind,showAll=false)=>{
     setError('');
     setPanel(kind);
-    setAdvanced(showAll||(kind==='tp'&&!!position?.tpLevels?.length));
+    setAdvanced(showAll||kind==='tp');
     const prior=position?.tpLevels||[];
     setMultiTargets(kind==='tp'&&prior.length>0);
     setTargetDrafts(prior.map((level,i)=>({
@@ -171,6 +171,7 @@ export const MobileTradingControls:React.FC<Props>=({
   const validTrail=Number.isFinite(Number(trailPercent))&&Number(trailPercent)>0&&Number(trailPercent)<100;
   const saveExit=()=>{
     if(!position||!selectedKind)return;
+    let result:string|null|void;
     if(selectedKind==='tp'&&multiTargets){
       const targets=targetDrafts.map(level=>({price:Number(level.price),sharePercent:Number(level.share)}));
       const sum=targets.reduce((total,level)=>total+level.sharePercent,0);
@@ -182,25 +183,26 @@ export const MobileTradingControls:React.FC<Props>=({
         setError('Enter 1–6 profitable future-price targets with positive sizes totaling exactly 100% of remaining quantity.');
         return;
       }
-      onEditTargets(position.id,targets);
+      result=onEditTargets(position.id,targets);
     }else if(selectedKind==='sl'&&intelligent){
-      onEditStops(position.id,position.tp,position.sl,null,{...DEFAULT_DYNAMIC_TRAIL,intrabar:true});
+      result=onEditStops(position.id,position.tp,position.sl,null,{...DEFAULT_DYNAMIC_TRAIL,intrabar:true});
     }else if(selectedKind==='sl'&&dynamic){
       if(!validDynamicTrail(dynamicSettings)){setError('Dynamic ATR period/lookback must be 2–100 and the multiplier 0.25–10.');return;}
-      onEditStops(position.id,position.tp,position.sl,null,dynamicSettings);
+      result=onEditStops(position.id,position.tp,position.sl,null,dynamicSettings);
     }else if(selectedKind==='sl'&&trail){
       if(!validTrail){setError('Trail must be greater than 0% and less than 100%.');return;}
-      onEditStops(position.id,position.tp,position.sl,Number(trailPercent),null);
+      result=onEditStops(position.id,position.tp,position.sl,Number(trailPercent),null);
     }else{
       if(!validTarget){setError('Choose a positive price on the correct side of the entry.');return;}
       if(selectedKind==='tp'&&position.tpLevels?.length){
         // Explicitly converting a previous split to a single 100% target.
-        onEditTargets(position.id,[{price:target!,sharePercent:100}]);
+        result=onEditTargets(position.id,[{price:target!,sharePercent:100}]);
       }else{
-        onEditStops(position.id,selectedKind==='tp'?target:position.tp,
+        result=onEditStops(position.id,selectedKind==='tp'?target:position.tp,
           selectedKind==='sl'?target:position.sl,selectedKind==='sl'?null:undefined,selectedKind==='sl'?null:undefined);
       }
     }
+    if(result){setError(result);return;}
     setPanel(null);
   };
   const changeMethod=(next:PaperExitMode)=>{
@@ -293,8 +295,8 @@ export const MobileTradingControls:React.FC<Props>=({
           onClick={()=>{
             const n=Number(sizeDraft);
             if(!sizeDraft.trim()||!Number.isFinite(n)||n<=0||
-              (sizeModeDraft==='equity'&&n>100)||(sizeModeDraft==='cash'&&n>availableEquity)){
-              setError(sizeModeDraft==='equity'?'Use a percentage above zero, up to 100%.':'Enter a positive cash amount no larger than available equity.');
+              (sizeModeDraft==='equity'&&n>100)||(sizeModeDraft==='cash'&&n>Math.max(availableEquity,position?position.qty*position.entryPrice/(position.leverage||1):0))){
+              setError(sizeModeDraft==='equity'?'Use a percentage above zero, up to 100%.':'Enter a positive cash amount within available equity or open position margin.');
               return;
             }
             onQuickSize({mode:sizeModeDraft,value:n});close();
@@ -544,9 +546,9 @@ export const MobileTradingControls:React.FC<Props>=({
         </span>
       </button>
       <button type="button" className={baseButton+' border-[#255da9] bg-[#1c426f] text-white'}
-        onClick={()=>onEnter()}>Enter</button>
+        title="Quick market entry using saved Amount, SL and TP" onClick={()=>onEnter()}>Enter</button>
       <button type="button" className={baseButton+' '+(position?'border-[#ad4851] bg-[#49272f] text-white':'opacity-40')}
-        disabled={!position} aria-label="Exit paper position" onClick={onExit}>Exit</button>
+        disabled={!position} title="Close saved percentage of position or equivalent cash margin" aria-label="Exit paper position" onClick={onExit}>Exit</button>
       <button id="mobile-order-amount-btn" type="button"
         style={{flex:'2 1 0%'}}
         className={baseButton+' truncate '+(panel==='equity'?'bg-[#2962ff] border-[#709fff]':'')}
@@ -564,8 +566,8 @@ export const MobileTradingControls:React.FC<Props>=({
         className={baseButton+' relative '+((panel===kind||(position?(kind==='sl'?!!(position.sl||position.trailingPercent||position.dynamicTrailing):!!(position.tp||position.tpLevels?.length)):!!preparedExits[kind]))?'!bg-[#2962ff] !border-[#709fff] text-white':'')}
         aria-pressed={position?(kind==='sl'?!!(position.sl||position.trailingPercent||position.dynamicTrailing):!!(position.tp||position.tpLevels?.length)):!!preparedExits[kind]}
         aria-label={kind==='sl'?'Stop loss; hold to reset':'Take profit; hold to reset'}
-        title="Hold to Reset"
-        onContextMenu={e=>{e.preventDefault();clearHold();held.current=true;resetExit(kind);}}
+        title="Click to edit · hold to reset"
+        onContextMenu={e=>{e.preventDefault();clearHold();held.current=false;openExit(kind,true);}}
         onPointerDown={()=>startHold(kind)} onPointerUp={clearHold} onPointerCancel={clearHold} onPointerLeave={clearHold}
         onClick={()=>clickExit(kind)}>
         {kind.toUpperCase()}{(position?(

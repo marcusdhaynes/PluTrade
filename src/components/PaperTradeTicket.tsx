@@ -9,6 +9,7 @@ import {estimatePaperQty,paperRiskSizedQty,exitPriceFromValue,exitValueFromPrice
 
 import type {ChartEntryTrail} from '../services/chartExitEditing';
 interface Props{
+  blocked?:boolean;
   open:boolean;onClose:()=>void;asset:Asset;portfolio:PaperPortfolio;
   onSubmit:(order:PaperOrderRequest)=>string|null;
   bids:OrderBookItem[];asks:OrderBookItem[];
@@ -66,7 +67,7 @@ function ExitField({kind,entry,qty,balance,side,tick,enabled,setEnabled,mode,set
     {enabled&&<div className="text-right text-[10px] text-[#8b96ac]">Target: {target&&target>0?pct(target):'Invalid target'} · {pct(money)} at risk/reward</div>}
   </div>;
 }
-export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onSubmit,bids,asks,error,onOpenAccount,quickSize,preparedExits,preparedTrail,quickFocus,quickOpenSequence,onSaveSetup,onSetupCleared,resetSetupSequence,setupScope})=>{
+export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onSubmit,bids,asks,error,blocked=false,onOpenAccount,quickSize,preparedExits,preparedTrail,quickFocus,quickOpenSequence,onSaveSetup,onSetupCleared,resetSetupSequence,setupScope})=>{
   const [side,setSide]=useState<PaperOrderSide>('Long');
   const [kind,setKind]=useState<PaperOrderKind>('market');
   const [sizeMode,setSizeMode]=useState<'equity'|'cash'|'balance'|'units'|'notional'|'riskMoney'|'riskBalance'>('balance');
@@ -227,7 +228,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
     (side==='Long'?triggerPrice>mark:triggerPrice<mark);
   const validQuickSizing=(sizeMode!=='equity'||fraction<=100)&&
     (sizeMode!=='cash'||fraction<=base.account.availableFunds)&&fraction>0;
-  const canSubmit=live&&validQuickSizing&&qty>0&&Number.isFinite(qty)&&entry>0&&validStopTrigger&&
+  const canSubmit=!blocked&&live&&validQuickSizing&&qty>0&&Number.isFinite(qty)&&entry>0&&validStopTrigger&&
     (kind==='market'||(priceInput.trim()!==''&&Number.isFinite(triggerPrice)&&triggerPrice>0))&&
     (kind!=='stop-limit'||(Number(limitPriceInput)>0&&Number.isFinite(Number(limitPriceInput))))&&
     margin+fee<=base.account.availableFunds+1e-7&&
@@ -392,21 +393,22 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
             <div className="space-y-2 border-t border-[#33363a] pt-3">
               <div className="flex items-center justify-between">
                 <label htmlFor="paper-dynamic-trail-toggle" className="text-[11px] text-[#ffd096]">
-                  Dynamic Trailing Stop · ATR Chandelier
+                  Intelligent Trailing / Advanced ATR
                 </label>
                 <button type="button" id="paper-dynamic-trail-toggle" role="switch"
                   aria-label="Enable dynamic ATR trailing stop" aria-checked={dynamicEnabled}
                   className={`relative w-9 h-5 rounded-full ${dynamicEnabled?'bg-[#efce89]':'bg-[#44464b]'}`}
                   onClick={()=>{
                     setDynamicEnabled(value=>{
-                      if(!value)setTrailingEnabled(false);
+                      if(!value){setTrailingEnabled(false);setDynamicSettings({...DEFAULT_DYNAMIC_TRAIL,intrabar:true});}
                       return !value;
                     });
                   }}>
                   <span className={`absolute top-0.5 w-4 h-4 rounded-full shadow ${dynamicEnabled?'right-0.5 bg-[#332617]':'left-0.5 bg-[#81848b]'}`}/>
                 </button>
               </div>
-              {dynamicEnabled&&<div className="grid grid-cols-2 gap-2">
+              {dynamicEnabled&&<label className="flex items-center justify-between text-[11px]">Intelligent Trailing <input type="checkbox" aria-label="Intelligent Trailing" checked={!!dynamicSettings.intrabar} onChange={e=>setDynamicSettings({...DEFAULT_DYNAMIC_TRAIL,intrabar:e.target.checked})}/></label>}
+              {dynamicEnabled&&!dynamicSettings.intrabar&&<div className="grid grid-cols-2 gap-2">
                 <label className="text-[10px] text-[#abb6c8]">ATR Period
                   <input aria-label="Ticket dynamic ATR period" type="number" min="2" max="100" step="1"
                     value={dynamicSettings.period}
@@ -488,6 +490,7 @@ export const PaperTradeTicket:React.FC<Props>=({open,onClose,asset,portfolio,onS
         {(errorLocal||error)&&<p role="alert" className="mt-2 p-2 bg-[#431e29] rounded text-[11px] text-[#ffbbc5]">{errorLocal||error}</p>}
         {asset.currency!==cash&&<p className="text-[11px] text-[#efb578] mt-2">
           This market is quoted in {asset.currency}; account uses {cash}. Switch to a matching paper account.</p>}
+        {blocked&&<p role="alert" className="text-[11px] text-[#ffbbc5]">This paper account is locked or read-only. Check account recovery or another open tab.</p>}
         {!live&&<p className="text-[11px] text-[#e1b06f] mt-2">A verified recent exchange trade is required before submitting this order. Ticker and snapshot prices are display-only.</p>}
         <label className="mt-3 flex items-center justify-between text-[11px] text-[#b9bec8] cursor-pointer">
           <span>One-Click Paper Execution</span>
