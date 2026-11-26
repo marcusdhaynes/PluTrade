@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import {useExclusiveWindow} from '../services/exclusiveWindow';
 import {FloatingPortal} from './FloatingPortal';
 import { DrawingToolType } from '../types';
 import {
@@ -311,8 +312,8 @@ export const LeftDrawingToolbar: React.FC<LeftDrawingToolbarProps> = React.memo(
   setStayInDrawingMode,
   onZoomIn,
 }) => {
-  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
-  const [isLineMenuOpen, setIsLineMenuOpen] = useState(false);
+  const [isColorPickerOpen, setIsColorPickerOpen] = useExclusiveWindow(false);
+  const [isLineMenuOpen, setIsLineMenuOpen] = useExclusiveWindow(false);
   const allToolbarKeys=['crosshair','line-group','fibonacci','rectangle','text','measure',
     'zoom','magnet','stay','lock','hide','clear','color'];
   const [visibleTools,setVisibleTools]=useState<Record<string,boolean>>(()=>{
