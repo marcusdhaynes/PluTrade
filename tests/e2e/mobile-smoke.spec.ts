@@ -1313,3 +1313,49 @@ test('desktop shares mobile left and right rails and viewport drawer geometry',a
     }
   }finally{await context.close();}
 });
+
+
+test('workspace windows are mutually exclusive and their launch buttons toggle closed',async ({page,browser},testInfo)=>{
+  const desktop=await browser.newContext({baseURL:testInfo.project.use.baseURL,viewport:{width:1440,height:900},isMobile:false,hasTouch:false});
+  try{
+    const desktopPage=await desktop.newPage();
+    await isolateExternalFeeds(desktopPage);
+    for(const p of [page,desktopPage]){
+      await p.goto('./');
+      const pairs=[
+        ['#mobile-active-account-btn','#mobile-account-picker'],
+        ['#mobile-upl-cash','#mobile-unrealized-options'],
+        ['#mobile-upl-percent','#mobile-unrealized-options'],
+        ['#mobile-order-amount-btn','#compact-quick-window'],
+        ['#mobile-stop-setup-btn','#compact-quick-window'],
+        ['#mobile-target-setup-btn','#compact-quick-window'],
+        ['#mobile-order-ticket-btn','#paper-order-window'],
+        ['#right-tab-indicators','#right-sidebar-content-pane'],
+        ['#right-tab-metrics','#right-sidebar-content-pane'],
+        ['#go-to-chart-date-btn','#chart-date-popup'],
+        ['#left-tool-line-group','#tradingview-lines-flyout-menu'],
+      ];
+      const windows=[...new Set(pairs.map(pair=>pair[1]))];
+      for(const [button,window] of pairs){
+        await p.locator(button).click();
+        await expect(p.locator(window)).toBeVisible();
+        for(const other of windows.filter(id=>id!==window))await expect(p.locator(other)).toHaveCount(0);
+        await p.locator(button).click();
+        await expect(p.locator(window)).toHaveCount(0);
+      }
+      await p.locator('#mobile-order-ticket-btn').click();
+      await expect(p.locator('#paper-order-window')).toBeVisible();
+      await p.locator('#right-tab-watchlist').click();
+      await expect(p.locator('#paper-order-window')).toHaveCount(0);
+      await expect(p.locator('#right-sidebar-content-pane')).toBeVisible();
+      await p.locator('#mobile-target-setup-btn').click();
+      await expect(p.locator('#right-sidebar-content-pane')).toHaveCount(0);
+      await expect(p.getByRole('dialog',{name:'Take profit options'})).toBeVisible();
+      await p.locator('#mobile-stop-setup-btn').click();
+      await expect(p.getByRole('dialog',{name:'Take profit options'})).toHaveCount(0);
+      await expect(p.getByRole('dialog',{name:'Stop loss options'})).toBeVisible();
+      await p.keyboard.press('Escape');
+      await expect(p.locator('#compact-quick-window')).toHaveCount(0);
+    }
+  }finally{await desktop.close();}
+});
