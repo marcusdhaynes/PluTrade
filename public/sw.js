@@ -1,6 +1,6 @@
 /* Only immutable app-shell assets; never store or synthesize market quotes,
  * broker sessions, user records, trading events, API responses or credentials. */
-const CACHE='plutrade-app-shell-v2';
+const CACHE='plutrade-app-shell-v3';
 const PREFIX='plutrade-app-shell-';
 const scope=self.registration.scope;
 self.addEventListener('install',event=>{
@@ -35,7 +35,8 @@ self.addEventListener('fetch',event=>{
  if(url.origin!==here.origin||!url.pathname.startsWith(here.pathname))return;
  if(/(?:^|\/)api\//i.test(url.pathname)||/auth|token|callback/i.test(url.pathname))return;
  if(req.mode==='navigate'){
-  event.respondWith(fetch(req).then(response=>{
+  // Never accept a stale HTTP-cache document while online. Offline fallback remains available.
+  event.respondWith(fetch(req,{cache:'no-store'}).then(response=>{
     if(response.ok){
       const copy=response.clone();
       void caches.open(CACHE).then(cache=>cache.put(req,copy)).catch(()=>{});
