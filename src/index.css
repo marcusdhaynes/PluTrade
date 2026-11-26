@@ -1255,3 +1255,20 @@ html,body,#root {
   #right-sidebar-content-pane #journal-account-import-strip {padding-right:3px;}
   #right-sidebar-content-pane [data-journal-calendar-square] :is(span,div) {font-size:7px;}
 }
+
+/* Compact reference-style trade markers: no enclosing bulky position card. */
+.chart-position-badge{position:absolute;display:flex;align-items:center;gap:3px;transform:translateY(-50%);font:600 10px/13px ui-monospace,monospace;white-space:nowrap;max-width:calc(100% - 32px);pointer-events:auto}
+.chart-position-values{display:inline-flex;align-items:center;border:1px solid;border-radius:3px;background:#101012;overflow:hidden;min-width:0}
+.chart-position-values>span,.chart-position-values>button{padding:0 5px;white-space:nowrap}
+.chart-position-values>span+span,.chart-position-values>button{border-left:1px solid currentColor}
+.chart-position-values>button{cursor:pointer;color:inherit;background:transparent}
+.chart-exit-handle,.chart-exit-level{pointer-events:auto;touch-action:none;cursor:ns-resize;background:#101012;border:1px solid;border-radius:3px;font:600 10px/13px ui-monospace,monospace;padding:0 5px;white-space:nowrap}
+.chart-exit-level{position:absolute;transform:translateY(-50%);max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
+.chart-exit-handle:hover,.chart-exit-level:hover{background:#243044}
+.chart-exit-menu{position:absolute;width:230px;max-width:calc(100% - 4px);max-height:calc(100% - 4px);overflow:auto;pointer-events:auto;touch-action:pan-y;display:flex;flex-direction:column;gap:5px;padding:7px;border:1px solid #48556a;border-radius:5px;background:#182233;color:#dce7f7;font-size:11px;box-shadow:0 8px 28px #000a}
+.chart-exit-menu label{display:flex;gap:5px;align-items:center;justify-content:space-between;min-width:0}
+.chart-exit-menu input[type=number]{width:105px;min-width:0;border:1px solid #53627a;border-radius:3px;background:#101a29;padding:3px;color:#e0ebfa}
+.chart-exit-menu input[type=checkbox]{accent-color:#2962ff}
+.chart-exit-menu button{border:1px solid #53627a;border-radius:3px;padding:2px 5px;background:#243147;cursor:pointer}
+.chart-exit-menu button:hover{background:#2962ff}
+@media(max-width:420px){.chart-position-badge{gap:2px;font-size:9px}.chart-position-values>span,.chart-position-values>button,.chart-exit-handle{padding-inline:3px}}
