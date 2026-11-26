@@ -82,7 +82,8 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
   });
   const controls=(kind:Kind)=>{
     const matches=levels.filter(l=>l.kind===kind);
-    const h:Handle={kind,levelId:matches.length===1?matches[0].id:undefined};
+    if(matches.length)return null;
+    const h:Handle={kind};
     return <button type="button" data-chart-exit-handle={kind} data-attached={matches.length?'false':'true'}
       aria-label={kind==='sl'?'Edit or drag stop loss':'Edit or drag take profit'}
       title={matches.length?'Drag to adjust; drop on entry to remove; right-click to edit':'Drag to place; right-click to edit'}
@@ -121,8 +122,8 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
         <label><input type="checkbox" checked={!!position.trailingPercent} onChange={e=>apply({action:'trailing',enabled:e.target.checked,percent:Number(percent)},false)}/> Trailing Stop</label>
         <label>Trail % <input aria-label="Trailing percent" type="number" min="0.01" max="99.99" step="0.01" value={percent} onChange={e=>setPercent(e.target.value)}/></label>
         {position.trailingPercent!==undefined&&<button type="button" onClick={()=>apply({action:'trailing',enabled:true,percent:Number(percent)},false)}>Save Trailing %</button>}
-        <label><input type="checkbox" checked={!!position.dynamicTrailing} onChange={e=>apply({action:'intelligent',enabled:e.target.checked},false)}/> Intelligent Trailing</label>
-        {position.dynamicTrailing&&<small>Automatic ATR protection · never loosens the stop.</small>}
+        <label><input type="checkbox" checked={!!position.dynamicTrailing?.intrabar} onChange={e=>apply({action:'intelligent',enabled:e.target.checked},false)}/> Intelligent Trailing</label>
+        {position.dynamicTrailing?.intrabar&&<small>Automatic ATR protection on verified ticks · never loosens the stop.</small>}
       </>}
       <div className="flex gap-1"><button type="button" onClick={()=>apply({action:'remove',kind:menu.kind,levelId:menu.levelId})}>Remove</button><button type="button" onClick={()=>{setMenu(null);onAdvanced?.(position.id,menu.kind);}}>Advanced</button></div>
       {error&&<small role="alert" className="text-[#ff9eac]">{error}</small>}
