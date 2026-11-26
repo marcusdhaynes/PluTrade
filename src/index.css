@@ -1278,3 +1278,11 @@ html,body,#root {
 .chart-exit-handle[data-configured="true"]{background:#203541}
 .chart-exit-level{z-index:1}
 .chart-exit-menu{z-index:4}
+
+/* Portal prevents the chart and its drawing layer from clipping exit editors. */
+.chart-exit-menu{position:fixed;z-index:2100;width:248px;max-width:calc(100vw - 8px);max-height:calc(100dvh - 8px);background:#182233;box-sizing:border-box}
+.chart-exit-menu .chart-exit-toggle{min-height:24px;border-top:1px solid #39495f;padding-top:4px;cursor:pointer}
+.chart-exit-menu input[type=checkbox]{appearance:auto;width:15px;height:15px;flex:0 0 15px;cursor:pointer;accent-color:#2962ff}
+.chart-position-quantity,.chart-position-close{background:#101012;border:1px solid #697583;color:#aab6c4;border-radius:3px;padding:0 4px;line-height:13px}
+.chart-position-close{cursor:pointer;pointer-events:auto}
+.chart-position-values{min-width:0;font-variant-numeric:tabular-nums}

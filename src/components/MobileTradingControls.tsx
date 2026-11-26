@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import type {ChartEntryTrail} from '../services/chartExitEditing';
 import {useExclusiveWindow} from '../services/exclusiveWindow';
 import type {Asset,PaperPosition} from '../types';
 import type {PaperExitMode} from '../services/paperOrders';
@@ -24,6 +25,7 @@ interface Props {
   onQuickSize:(size:{mode:'equity'|'cash';value:number})=>void;
   preparedExits:Partial<Record<ExitKind,{mode:PaperExitMode;value:string}>>;
   onPrepareExit:(kind:ExitKind,draft:{mode:PaperExitMode;value:string})=>void;
+  preparedTrail?:ChartEntryTrail;onPrepareTrail?:(trail:ChartEntryTrail)=>void;
   onClearPreparedExit:(kind:ExitKind)=>void;
   onEnter:(focus?:ExitKind)=>void;
   onOpenOrder:()=>void;
@@ -48,7 +50,7 @@ const numeric=(n:number,digits=6)=>Number.isFinite(n)?n.toLocaleString(undefined
 export const MobileTradingControls:React.FC<Props>=({
   asset,position,accountEquity,availableEquity,accountBalance,activeAccountName,activeAccountId,
   availableAccounts=[],onSelectAccount,onManageAccounts,onEditAccount,accountCurrency='USD',
-  accountUnrealizedPnl=0,quickSize,onQuickSize,preparedExits,onPrepareExit,onClearPreparedExit,
+  accountUnrealizedPnl=0,quickSize,onQuickSize,preparedExits,onPrepareExit,onClearPreparedExit,preparedTrail,onPrepareTrail,
   onEnter,onOpenOrder,orderSetupSaved=false,orderWindowOpen=false,onResetOrderSetup,onResetPositionExit,onOpenPaperWorkspace,onExit,onEditStops,onEditTargets,onAdvancedConditional,editRequest,
 })=>{
   const [panel,setPanel]=useExclusiveWindow<'equity'|ExitKind|null>(null);
@@ -59,6 +61,7 @@ export const MobileTradingControls:React.FC<Props>=({
   const [targetDrafts,setTargetDrafts]=useState<Array<{id:number;price:string;share:string}>>([]);
   const [trail,setTrail]=useState(false);
   const [dynamic,setDynamic]=useState(false);
+  const [intelligent,setIntelligent]=useState(false);
   const [dynamicSettings,setDynamicSettings]=useState<DynamicTrailingSettings>({...DEFAULT_DYNAMIC_TRAIL});
   const [trailPercent,setTrailPercent]=useState('0.50');
   const [sizeModeDraft,setSizeModeDraft]=useState<'equity'|'cash'>(quickSize.mode);
@@ -113,10 +116,11 @@ export const MobileTradingControls:React.FC<Props>=({
     setTargetDrafts(prior.map((level,i)=>({
       id:i+1,price:String(level.price),share:String(Number((level.quantity/(position?.qty||1)*100).toPrecision(7))),
     })));
-    setTrail(kind==='sl'&&!!position?.trailingPercent);
-    setDynamic(kind==='sl'&&!!position?.dynamicTrailing);
+    setTrail(kind==='sl'&&(position?!!position.trailingPercent:preparedTrail?.mode==='trailing'));
+    setDynamic(kind==='sl'&&!!position?.dynamicTrailing&&!position.dynamicTrailing.intrabar);
+    setIntelligent(kind==='sl'&&(position?!!position.dynamicTrailing?.intrabar:preparedTrail?.mode==='intelligent'));
     setDynamicSettings(position?.dynamicTrailing||{...DEFAULT_DYNAMIC_TRAIL});
-    setTrailPercent(String(position?.trailingPercent||0.5));
+    setTrailPercent(String(position?.trailingPercent||(preparedTrail?.mode==='trailing'?preparedTrail.percent:0.5)));
     const priorDraft=!position?preparedExits[kind]:undefined;
     const existing=kind==='sl'?position?.sl:position?.tp;
     if(priorDraft){setMode(priorDraft.mode);setValue(priorDraft.value);}
@@ -143,7 +147,7 @@ export const MobileTradingControls:React.FC<Props>=({
     if(position){
       const has=kind==='sl'?(position.sl!==undefined||!!position.trailingPercent||!!position.dynamicTrailing):(position.tp!==undefined||!!position.tpLevels?.length);
       if(has&&window.confirm('Remove the '+(kind==='sl'?'Stop Loss':'Take Profit')+' from this open paper position?'))onResetPositionExit?.(position.id,kind);
-    }else onClearPreparedExit(kind);
+    }else {onClearPreparedExit(kind);if(kind==='sl')onPrepareTrail?.({mode:'off'});}
     setPanel(null);setError('');
   };
   const startHold=(kind:ExitKind)=>{
@@ -179,6 +183,8 @@ export const MobileTradingControls:React.FC<Props>=({
         return;
       }
       onEditTargets(position.id,targets);
+    }else if(selectedKind==='sl'&&intelligent){
+      onEditStops(position.id,position.tp,position.sl,null,{...DEFAULT_DYNAMIC_TRAIL,intrabar:true});
     }else if(selectedKind==='sl'&&dynamic){
       if(!validDynamicTrail(dynamicSettings)){setError('Dynamic ATR period/lookback must be 2–100 and the multiplier 0.25–10.');return;}
       onEditStops(position.id,position.tp,position.sl,null,dynamicSettings);
@@ -192,7 +198,7 @@ export const MobileTradingControls:React.FC<Props>=({
         onEditTargets(position.id,[{price:target!,sharePercent:100}]);
       }else{
         onEditStops(position.id,selectedKind==='tp'?target:position.tp,
-          selectedKind==='sl'?target:position.sl);
+          selectedKind==='sl'?target:position.sl,selectedKind==='sl'?null:undefined,selectedKind==='sl'?null:undefined);
       }
     }
     setPanel(null);
@@ -315,9 +321,10 @@ export const MobileTradingControls:React.FC<Props>=({
           </label>
           <p className="text-[#93a8c4] mt-1">Price Level: {validTarget?numeric(target!,asset.digits):'Invalid'} {asset.currency}</p>
         </>}
-        {selectedKind==='sl'&&advanced&&<div className="mt-3 border-t border-[#39495f] pt-3">
+        {selectedKind==='sl'&&<div className="mt-3 border-t border-[#39495f] pt-3">
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Intelligent Trailing" checked={intelligent} onChange={e=>{setIntelligent(e.target.checked);if(e.target.checked){setTrail(false);setDynamic(false);}}}/> Intelligent Trailing</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={trail}
-            onChange={e=>{setTrail(e.target.checked);if(e.target.checked)setDynamic(false);}}/>
+            onChange={e=>{setTrail(e.target.checked);if(e.target.checked){setDynamic(false);setIntelligent(false);}}}/>
             Percent trailing stop (follows favorable price only)
           </label>
           {trail&&<label className="block mt-2">Trailing distance %
@@ -326,7 +333,7 @@ export const MobileTradingControls:React.FC<Props>=({
               value={trailPercent} onChange={e=>setTrailPercent(e.target.value)}/>
           </label>}
           <label className="flex items-center gap-2 mt-3"><input type="checkbox" checked={dynamic}
-            onChange={e=>{setDynamic(e.target.checked);if(e.target.checked)setTrail(false);}}/>
+            onChange={e=>{setDynamic(e.target.checked);if(e.target.checked){setTrail(false);setIntelligent(false);}}}/>
             Dynamic ATR Chandelier trailing stop
           </label>
           {dynamic&&<div className="grid grid-cols-2 gap-2 mt-2">
@@ -416,13 +423,24 @@ export const MobileTradingControls:React.FC<Props>=({
             onChange={e=>{setValue(e.target.value);setError('');}}
             className="block w-full h-10 mt-1 rounded border border-[#53627a] bg-[#111b2a] px-2 text-white"/>
         </label>
+        {selectedKind==='sl'&&<div className="mt-2 border-t border-[#39495f] pt-2 flex flex-col gap-2">
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Intelligent Trailing" checked={intelligent} onChange={e=>{setIntelligent(e.target.checked);if(e.target.checked)setTrail(false);}}/> Intelligent Trailing</label>
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Trailing Stop" checked={trail} onChange={e=>{setTrail(e.target.checked);if(e.target.checked)setIntelligent(false);}}/> Trailing Stop</label>
+          {trail&&<label>Trailing % <input type="number" min="0.01" max="99.99" step="0.01" value={trailPercent} onChange={e=>setTrailPercent(e.target.value)} aria-label="Trailing stop percent" className="w-20 rounded border border-[#53627a] bg-[#111b2a] px-1"/></label>}
+        </div>}
         <button type="button" className="mt-3 w-full rounded bg-[#2962ff] text-white p-2.5 font-semibold"
           onClick={()=>{
+            if(selectedKind==='sl'&&(intelligent||trail)){
+              if(trail&&!validTrail){setError('Trail must be greater than 0% and less than 100%.');return;}
+              onPrepareTrail?.(intelligent?{mode:'intelligent'}:{mode:'trailing',percent:Number(trailPercent)});
+              close();return;
+            }
             const number=Number(value);
             if(!value.trim()||!Number.isFinite(number)||number<=0||
               (mode==='percent'&&number>=100&&panel==='sl')){
               setError('Enter a positive, valid distance or price.');return;
             }
+            if(selectedKind==='sl')onPrepareTrail?.({mode:'off'});
             onPrepareExit(panel as ExitKind,{mode,value});close();
           }}>Save</button>
         {selectedKind&&preparedExits[selectedKind]&&

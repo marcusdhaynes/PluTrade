@@ -2144,7 +2144,7 @@ export default function App() {
             onManageAccounts={()=>requestBottomPanel('positions')}
             onEditAccount={id=>{setTradeTicketAccountSettings(id);}}
             quickSize={mobileQuickSize} onQuickSize={setMobileQuickSize}
-            preparedExits={mobileEntryExits}
+            preparedExits={mobileEntryExits} preparedTrail={chartEntryTrail} onPrepareTrail={setChartEntryTrail}
             onPrepareExit={(kind,draft)=>setMobileEntryExits(prev=>({...prev,[kind]:draft}))}
             onClearPreparedExit={kind=>setMobileEntryExits(prev=>{
               const next={...prev};delete next[kind];return next;

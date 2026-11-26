@@ -1359,3 +1359,26 @@ test('workspace windows are mutually exclusive and their launch buttons toggle c
     }
   }finally{await desktop.close();}
 });
+
+
+test('chart exit menus expose intelligent trailing before entry and zero PNL is numeric only',async ({page})=>{
+  await page.goto('./');
+  const badge=page.locator('.chart-position-badge').first();
+  await expect(badge).toBeVisible();
+  const pnl=badge.locator('.chart-position-values');
+  await expect(pnl).toHaveText('0.00');
+  await expect(pnl).toHaveAttribute('data-pnl-sign','zero');
+  const sl=badge.getByRole('button',{name:'Edit or drag stop loss'});
+  await sl.click();
+  const menu=page.getByRole('dialog',{name:'Stop loss chart settings'});
+  await expect(menu).toBeVisible();
+  const intelligent=menu.getByRole('checkbox',{name:'Intelligent Trailing'});
+  await intelligent.check();
+  await expect(intelligent).toBeChecked();
+  await menu.getByRole('button',{name:'Close exit settings'}).click();
+  await sl.click({button:'right'});
+  await expect(intelligent).toBeChecked();
+  await menu.getByRole('button',{name:'Close exit settings'}).click();
+  await badge.getByRole('button',{name:'Edit or drag take profit'}).click();
+  await expect(page.getByRole('dialog',{name:'Take profit chart settings'})).toBeVisible();
+});

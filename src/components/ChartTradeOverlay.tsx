@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import type {PaperPosition} from '../types';
 import type {ChartExitLevel} from '../services/chartPositionLevels';
 import type {ChartExitEdit,ChartEntryTrail,ChartEntryDrafts} from '../services/chartExitEditing';
@@ -22,6 +23,7 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
   const dragRef=useRef<Drag|null>(null);
   const hold=useRef<ReturnType<typeof setTimeout>|null>(null);
   const held=useRef(false);
+  const ignoreClick=useRef(false);
   const [preview,setPreview]=useState<Drag|null>(null);
   const [menu,setMenu]=useExclusiveWindow<Menu|null>(null);
   const [price,setPrice]=useState('');
@@ -47,7 +49,7 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
   const openMenu=(h:Handle,x:number,y:number)=>{
     const r=root.current?.getBoundingClientRect();if(!r)return;
     setPrice(String(selected(h)?.price??(draftExits?.[h.kind]?.mode==='price'?draftExits[h.kind]?.value:'')??''));setPercent(String(trailing??0.5));setError('');
-    setMenu({...h,x:Math.max(2,Math.min(x-r.left,r.width-230)),y:Math.max(2,Math.min(y-r.top,r.height-215))});
+    setMenu({...h,x:Math.max(4,Math.min(x,window.innerWidth-252)),y:Math.max(4,Math.min(y-6,window.innerHeight-270))});
   };
   const apply=(edit:ChartExitEdit,close=true)=>{
     const result=position?(onEdit?onEdit(position.id,edit):'Chart editing unavailable.'):(onDraftEdit?onDraftEdit(edit):'Select this chart to configure its order.');
@@ -56,11 +58,12 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
   };
   const handlers=(h:Handle)=>({
     onPointerDown:(e:React.PointerEvent<HTMLButtonElement>)=>{
-      if(e.button!==0)return;e.stopPropagation();e.preventDefault();clearHold();held.current=false;
+      if(e.button!==0)return;e.stopPropagation();clearHold();held.current=false;ignoreClick.current=false;
       e.currentTarget.setPointerCapture(e.pointerId);
       const r=root.current?.getBoundingClientRect();if(!r)return;
       dragRef.current={...h,pointer:e.pointerId,startX:e.clientX,startY:e.clientY,y:clampY(e.clientY-r.top),moved:false};
-      hold.current=setTimeout(()=>{held.current=true;dragRef.current=null;openMenu(h,e.clientX,e.clientY);},480);
+      const x=e.clientX,y=e.clientY;
+      hold.current=setTimeout(()=>{held.current=true;ignoreClick.current=true;dragRef.current=null;openMenu(h,x,y);},480);
     },
     onPointerMove:(e:React.PointerEvent<HTMLButtonElement>)=>{
       const d=dragRef.current;if(!d||d.pointer!==e.pointerId)return;
@@ -71,8 +74,9 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
     },
     onPointerUp:(e:React.PointerEvent<HTMLButtonElement>)=>{
       e.stopPropagation();clearHold();const d=dragRef.current;dragRef.current=null;setPreview(null);
-      if(held.current){held.current=false;return;}
-      if(!d||!d.moved){if(menu?.kind===h.kind&&menu.levelId===h.levelId)setMenu(null);else openMenu(h,e.clientX,e.clientY);return;}
+      if(held.current){held.current=false;ignoreClick.current=true;return;}
+      if(!d||!d.moved)return;
+      ignoreClick.current=true;
       if(origin!==null&&Math.abs(d.y-origin)<=10){if(selected(h)||draftExits?.[h.kind]||(h.kind==='sl'&&(trailing||intelligent)))apply({action:'remove',kind:h.kind,levelId:h.levelId});return;}
       const raw=coordinateToPrice(d.y);
       if(raw===null||!Number.isFinite(raw)){setNotice('No chart price at this location.');return;}
@@ -80,7 +84,8 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
       apply({action:'place',kind:h.kind,levelId:h.levelId,price:next});
     },
     onPointerCancel:()=>{clearHold();dragRef.current=null;setPreview(null);},
-    onContextMenu:(e:React.MouseEvent<HTMLButtonElement>)=>{e.preventDefault();e.stopPropagation();clearHold();dragRef.current=null;setPreview(null);openMenu(h,e.clientX,e.clientY);},
+    onClick:(e:React.MouseEvent<HTMLButtonElement>)=>{e.stopPropagation();if(ignoreClick.current){ignoreClick.current=false;return;}if(menu?.kind===h.kind&&menu.levelId===h.levelId)setMenu(null);else{const r=e.currentTarget.getBoundingClientRect();openMenu(h,r.left,r.bottom);}},
+    onContextMenu:(e:React.MouseEvent<HTMLButtonElement>)=>{e.preventDefault();e.stopPropagation();clearHold();dragRef.current=null;setPreview(null);ignoreClick.current=true;openMenu(h,e.clientX,e.clientY);},
     onKeyDown:(e:React.KeyboardEvent<HTMLButtonElement>)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();openMenu(h,r.left,r.top);}},
   });
   const controls=(kind:Kind)=>{
@@ -92,18 +97,19 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
       title={matches.length?'Drag to adjust; drop on entry to remove; right-click to edit':'Drag to place; right-click to edit'}
       {...handlers(h)} className="chart-exit-handle" style={{color:tint(kind),borderColor:tint(kind),borderStyle:configured?'solid':'dotted'}}>{kind.toUpperCase()}</button>;
   };
-  const pnlColor=(position?.unrealizedPnL??0)>=0?'#00dca0':'#f05e74';
+  const pnl=Number((position?.unrealizedPnL??0).toFixed(2));
+  const pnlColor=pnl>0?'#00dca0':pnl<0?'#f05e74':'#8b909a';
   const right=Math.max(26,axisWidth)+4;
   return <div ref={root} className="absolute inset-0 pointer-events-none z-[65]" data-chart-trade-overlay={position?.id??'entry-draft'}>
     {origin!==null&&<>
       {position&&positionY!==null&&positionY>=0&&positionY<=height-24&&<div className="absolute left-0 border-b" style={{top:positionY,right,borderColor:'#00b889'}}/>}
       <div className="chart-position-badge" style={{top:origin,right}}>
         {controls('sl')}{controls('tp')}
-        <span className="chart-position-values" style={{borderColor:pnlColor,color:pnlColor}}>
-          {position&&<span>{position.qty.toLocaleString()}</span>}
-          <span aria-label="Unrealized profit or loss">UP/L$ {position?(position.unrealizedPnL>=0?'+':'')+position.unrealizedPnL.toFixed(2):'0.00'}{currency!=='USD'?' '+currency:''}</span>
-          {position&&<button type="button" title="Close Position" onClick={e=>{e.stopPropagation();onClose?.(position.id);}}>×</button>}
+        {position&&<span className="chart-position-quantity">{position.qty.toLocaleString()}</span>}
+        <span className="chart-position-values" data-pnl-sign={pnl>0?'positive':pnl<0?'negative':'zero'} style={{borderColor:pnlColor,color:pnlColor}}>
+          <span aria-label="Unrealized profit or loss" title={'Unrealized P/L ('+currency+')'}>{pnl>0?'+':''}{pnl===0?'0.00':pnl.toFixed(2)}</span>
         </span>
+        {position&&<button type="button" className="chart-position-close" title="Close Position" onClick={e=>{e.stopPropagation();onClose?.(position.id);}}>×</button>}
       </div>
     </>}
     {levels.map(level=>{
@@ -117,21 +123,21 @@ export function ChartTradeOverlay({position,positionY,levels,height,axisWidth,di
       </React.Fragment>;
     })}
     {preview&&<div className="absolute left-0 border-b border-dashed" style={{top:preview.y,right,borderColor:tint(preview.kind)}}><span className="absolute right-0 -translate-y-full text-[10px]" style={{color:tint(preview.kind)}}>{origin!==null&&Math.abs(preview.y-origin)<=10?'Remove':coordinateToPrice(preview.y)?.toFixed(digits)}</span></div>}
-    {menu&&<div role="dialog" aria-label={menu.kind==='sl'?'Stop loss chart settings':'Take profit chart settings'} data-chart-exit-menu className="chart-exit-menu" style={{left:menu.x,top:menu.y}} onPointerDown={e=>e.stopPropagation()}>
+    {menu&&createPortal(<div role="dialog" aria-label={menu.kind==='sl'?'Stop loss chart settings':'Take profit chart settings'} data-chart-exit-menu className="chart-exit-menu" style={{left:menu.x,top:menu.y}} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()} onContextMenu={e=>e.stopPropagation()}>
       <div className="flex items-center justify-between"><strong>{menu.kind==='sl'?'Stop Loss':'Take Profit'}</strong><button type="button" onClick={()=>setMenu(null)} aria-label="Close exit settings">×</button></div>
       {!position&&<small>Order setup · applies when the next order is submitted.</small>}
       <label>Exact Price <input aria-label="Exact exit price" type="number" min="0" step="any" value={price} onChange={e=>setPrice(e.target.value)}/></label>
       <button type="button" onClick={()=>apply({action:'place',kind:menu.kind,levelId:menu.levelId,price:Number(price)})}>Save Price</button>
       {menu.kind==='sl'&&<>
-        <label><input type="checkbox" checked={!!trailing} onChange={e=>apply({action:'trailing',enabled:e.target.checked,percent:Number(percent)},false)}/> Trailing Stop</label>
-        <label>Trail % <input aria-label="Trailing percent" type="number" min="0.01" max="99.99" step="0.01" value={percent} onChange={e=>setPercent(e.target.value)}/></label>
+        <label className="chart-exit-toggle"><span>Trailing Stop</span><input type="checkbox" aria-label="Trailing Stop" checked={!!trailing} onChange={e=>apply({action:'trailing',enabled:e.target.checked,percent:Number(percent)},false)}/></label>
+        {trailing!==undefined&&<label>Trail % <input aria-label="Trailing percent" type="number" min="0.01" max="99.99" step="0.01" value={percent} onChange={e=>setPercent(e.target.value)}/></label>}
         {trailing!==undefined&&<button type="button" onClick={()=>apply({action:'trailing',enabled:true,percent:Number(percent)},false)}>Save Trailing %</button>}
-        <label><input type="checkbox" checked={!!intelligent} onChange={e=>apply({action:'intelligent',enabled:e.target.checked},false)}/> Intelligent Trailing</label>
+        <label className="chart-exit-toggle"><span>Intelligent Trailing</span><input type="checkbox" aria-label="Intelligent Trailing" checked={!!intelligent} onChange={e=>apply({action:'intelligent',enabled:e.target.checked},false)}/></label>
         {intelligent&&<small>Automatic ATR protection on verified ticks · never loosens the stop.</small>}
       </>}
       <div className="flex gap-1"><button type="button" onClick={()=>apply({action:'remove',kind:menu.kind,levelId:menu.levelId})}>Remove</button><button type="button" onClick={()=>{setMenu(null);if(position)onAdvanced?.(position.id,menu.kind);else onDraftAdvanced?.(menu.kind);}}>Advanced</button></div>
       {error&&<small role="alert" className="text-[#ff9eac]">{error}</small>}
-    </div>}
+    </div>,document.body)}
     {notice&&<div role="alert" className="absolute bottom-8 left-2 rounded bg-[#3b2028] p-2 text-[10px] text-[#ffbac4]">{notice}</div>}
   </div>;
 }
