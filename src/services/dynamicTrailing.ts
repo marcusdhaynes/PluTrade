@@ -20,6 +20,8 @@ export interface DynamicTrailingSettings {
   /** Last committed exchange bar start in Unix seconds. */
   lastBarTime?:number;
   atr?:number;
+  /** Intelligent mode also ratchets on each verified quote using the last closed ATR. */
+  intrabar?:boolean;
 }
 export const DEFAULT_DYNAMIC_TRAIL:Omit<DynamicTrailingSettings,'lastBarTime'|'atr'>={
   mode:'chandelier',period:22,lookback:22,multiplier:3,timeframe:'1h'
@@ -31,6 +33,7 @@ export const validDynamicTrail=(value:unknown):value is DynamicTrailingSettings=
     Number.isInteger(v.lookback)&&v.lookback>=2&&v.lookback<=100&&
     Number.isFinite(v.multiplier)&&v.multiplier>=.25&&v.multiplier<=10&&
     (DYNAMIC_TRAIL_TIMEFRAMES as readonly string[]).includes(v.timeframe)&&
+    (v.intrabar===undefined||typeof v.intrabar==='boolean')&&
     (v.lastBarTime===undefined||(Number.isFinite(v.lastBarTime)&&v.lastBarTime>=0))&&
     (v.atr===undefined||(Number.isFinite(v.atr)&&v.atr>0));
 };
