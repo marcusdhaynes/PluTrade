@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {editChartExit} from './chartExitEditing';
 import type {Asset,OHLCV} from '../types';
 import {emptyPaperPortfolio,placePaperPosition,markPaperPositions} from './paperTrading';
 import {submitPaperOrder,evaluatePaperOrders} from './paperOrders';
@@ -105,3 +106,49 @@ for(let round=1;round<=10;round++)for(const [name,check] of checks){
   try{check();}catch(error){throw new Error('Dynamic ATR round '+round+': '+name,{cause:error});}
 }
 console.log('Dynamic Chandelier: 11 invariants × 10 rounds = 110 scenario runs passed.');
+
+
+// Chart-driven edits use the same ledger as the execution and fill engine.
+for(const side of ['Long','Short'] as const){
+  const opened=placePaperPosition(emptyPaperPortfolio(),market,side,1,1,undefined,undefined,now);
+  const id=opened.positions[0].id;
+  const protective=side==='Long'?95:105, target=side==='Long'?110:90;
+  const sl=editChartExit(opened,id,{action:'place',kind:'sl',price:protective});
+  const both=editChartExit(sl,id,{action:'place',kind:'tp',price:target});
+  assert.equal(both.positions[0].sl,protective);
+  assert.equal(both.positions[0].tp,target);
+  assert.throws(()=>editChartExit(both,id,{action:'place',kind:'sl',price:side==='Long'?105:95}));
+  assert.throws(()=>editChartExit(both,id,{action:'place',kind:'tp',price:side==='Long'?95:105}));
+  const removed=editChartExit(both,id,{action:'remove',kind:'sl'});
+  assert.equal(removed.positions[0].sl,undefined);
+  assert.equal(removed.positions[0].tp,target);
+  const normal=editChartExit(both,id,{action:'trailing',enabled:true,percent:2});
+  assert.equal(normal.positions[0].trailingPercent,2);
+  const intelligent=editChartExit(normal,id,{action:'intelligent',enabled:true});
+  assert.equal(intelligent.positions[0].dynamicTrailing?.intrabar,true);
+  assert.equal(intelligent.positions[0].trailingPercent,undefined);
+  assert.equal(intelligent.positions[0].sl,side==='Long'?99:101);
+  const favorable=side==='Long'?105:95;
+  const moved=markPaperPositions(intelligent,{...market,price:favorable,quoteUpdatedAt:now+1000},now+1000);
+  const newStop=moved.positions[0].sl!;
+  assert.ok(side==='Long'?newStop>99:newStop<101);
+  const adverse=side==='Long'?newStop+0.1:newStop-0.1;
+  const held=markPaperPositions(moved,{...market,price:adverse,quoteUpdatedAt:now+2000},now+2000);
+  assert.equal(held.positions[0].sl,newStop);
+  const fixed=editChartExit(held,id,{action:'intelligent',enabled:false});
+  assert.equal(fixed.positions[0].dynamicTrailing,undefined);
+  assert.equal(fixed.positions[0].sl,newStop);
+  const hit=side==='Long'?newStop-.1:newStop+.1;
+  const filled=markPaperPositions(fixed,{...market,price:hit,quoteUpdatedAt:now+3000},now+3000);
+  assert.equal(filled.positions.length,0);
+  assert.equal(filled.fills[0].price,hit);
+  const multiple={...opened,positions:opened.positions.map(p=>({...p,tpLevels:[
+    {id:'a',price:target,quantity:.4},{id:'b',price:side==='Long'?120:80,quantity:.6},
+  ]}))};
+  const revised=editChartExit(multiple,id,{action:'place',kind:'tp',levelId:'a',price:side==='Long'?115:85});
+  assert.equal(revised.positions[0].tpLevels?.[0].quantity,.4);
+  assert.equal(revised.positions[0].tpLevels?.[1].price,side==='Long'?120:80);
+  const oneRemoved=editChartExit(revised,id,{action:'remove',kind:'tp',levelId:'a'});
+  assert.deepEqual(oneRemoved.positions[0].tpLevels?.map(t=>t.id),['b']);
+}
+console.log('Chart exit editing and intelligent tick trailing: long and short scenario checks passed.');
