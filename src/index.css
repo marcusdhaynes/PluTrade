@@ -803,30 +803,6 @@ html,body,#root {
  * Border/padding no longer distort the Amount=2x and SL/TP=.5x ratios
  * relative to Order. The chart remains 100% viewport width. */
 @media (max-width:767px), (hover:none) and (pointer:coarse) {
-  #plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] {
-    display:grid !important;
-    grid-template-columns:
-      minmax(0,1.45fr)
-      minmax(0,1fr)
-      minmax(0,1.35fr)
-      minmax(0,1.3fr)
-      minmax(0,1fr)
-      minmax(0,1fr)
-      minmax(0,2fr)
-      minmax(0,.5fr)
-      minmax(0,.5fr);
-    gap:3px;
-    width:100%;
-    min-width:0;
-    align-items:center;
-  }
-  #plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] > button {
-    box-sizing:border-box;
-    width:100% !important;
-    max-width:100%;
-    min-width:0;
-    overflow:hidden;
-  }
   #mobile-top-chart-actions,
   #mobile-window-actions,
   #mobile-layout-anchor {
@@ -903,7 +879,8 @@ html,body,#root {
 
 /* Shared condensed mobile trading popup language: same dark navy, border,
    controls and selected blue as the SL/TP setup windows. */
-@media (max-width:767px), (hover:none) and (pointer:coarse) {
+/* Shared compact account and order editors for the universal bottom bar. */
+
   #paper-account-editor-backdrop {background:#0003;align-items:flex-end;justify-content:center;padding-bottom:26px;}
   #paper-account-editor,#paper-order-window {
     width:min(310px,calc(100vw - 58px));max-width:310px;max-height:min(67dvh,440px);
@@ -972,11 +949,61 @@ html,body,#root {
   #compact-quick-window button {padding:4px 5px;font-size:10px;}
   #compact-quick-window button[aria-pressed=true] {background:#2962ff;color:white;}
   #plutrade-mobile-trade-controls button[aria-pressed=true] {box-shadow:inset 0 0 0 1px #8ab4ff;}
-}
 
-@media (max-width:767px), (hover:none) and (pointer:coarse) {
+
   #plutrade-mobile-trade-controls button[aria-expanded=true] {box-shadow:inset 0 0 0 1px #8ab4ff;background-color:#2962ff !important;}
   #paper-order-body button[aria-pressed=true] {border-color:#709fff;}
   #paper-order-body button[aria-pressed=true][role=switch] {background:#2962ff;}
   #paper-order-body :is(button,select,input):focus-visible,#paper-account-editor :is(button,select,input):focus-visible {outline:1px solid #8ab4ff;outline-offset:1px;}
+
+
+
+/* The mobile execution strip is the single bottom trading bar on every
+   viewport. Its exact nine-column grid, actions and state are shared. */
+#plutrade-mobile-trade-controls {
+  display:block !important;
+  position:relative;
+  z-index:1500 !important;
+  box-sizing:border-box;
+  width:100%;max-width:100%;min-width:0;
+  height:24px !important;min-height:24px !important;max-height:24px !important;
+  flex:0 0 24px;
+  padding:1px 2px;
+}
+#paper-trading-collapsed-strip {display:none !important;}
+  #plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] {
+    display:grid !important;
+    grid-template-columns:
+      minmax(0,1.45fr)
+      minmax(0,1fr)
+      minmax(0,1.35fr)
+      minmax(0,1.3fr)
+      minmax(0,1fr)
+      minmax(0,1fr)
+      minmax(0,2fr)
+      minmax(0,.5fr)
+      minmax(0,.5fr);
+    gap:3px;
+    width:100%;
+    min-width:0;
+    align-items:center;
+  }
+  #plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] > button {
+    box-sizing:border-box;
+    width:100% !important;
+    max-width:100%;
+    min-width:0;
+    overflow:hidden;
+  }
+#plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] {height:21px;}
+#plutrade-mobile-trade-controls > div[aria-label="Mobile trading controls"] > button {
+  height:21px;min-height:21px;padding:0;font-size:10px;line-height:19px;
+  border-radius:4px;white-space:nowrap;
+}
+/* On a wide chart keep the mobile-sized option cards near the bar rather
+   than stretching short forms to the full desktop width. */
+@media (min-width:768px) and (hover:hover) and (pointer:fine) {
+  #compact-quick-window {left:auto;right:0;width:min(100%,440px);}
+  #mobile-account-picker {width:min(100%,310px);}
+  #mobile-unrealized-options {width:min(100%,310px);margin-inline:auto;}
 }
